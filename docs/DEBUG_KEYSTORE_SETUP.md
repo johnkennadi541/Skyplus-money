@@ -76,6 +76,27 @@ GitHub → **Settings → Environments → `debug-signing` → Add secret**:
 On a phone: open the `.pem` in a private editor, select all, copy, paste, then clear
 the clipboard and delete the file. Never send it through chat or email.
 
+## 3b. Getting the workflow onto `main` (needs approval)
+
+`workflow_dispatch` only works for a workflow file that exists on the default branch, so
+this workflow cannot run from `main` until it is there. Nothing has been merged.
+
+Two safe routes, both needing the founder's approval:
+
+- **Route A — minimal PR into `main`.** A new branch containing only
+  `.github/workflows/provision-debug-keystore.yml`, the two-job
+  `.github/workflows/android-ci.yml` and this document, opened directly against `main`.
+  It does not carry the UI redesign or any app code. Between the merge and the first
+  provisioning run, pushes to `main` will show a failing `debug-apk` job with the
+  message that the keystore is not provisioned yet — that is the designed fail-closed
+  behaviour, not a defect.
+- **Route B — merge PR #4 first.** Merge `fix/stable-google-signin-keystore` into
+  `feature/ui-redesign`, then `feature/ui-redesign` into `main`. Slower and it carries
+  the whole redesign, so Route A is recommended.
+
+Never commit directly to `main`, and never dispatch the workflow from a branch other
+than `main`.
+
 ## 4. Run the provisioning workflow once (manual)
 
 Actions → **Provision debug signing keystore** → **Run workflow** → branch **`main`**.
@@ -189,6 +210,25 @@ which Google Sign-In will fail, because its certificate is random.
 
 That gives review builds without weakening secret protection. It needs approval
 before implementation.
+
+## Post-provisioning verification checklist
+
+Run these in order after the provisioning workflow succeeds and before anyone tests
+Google Sign-In.
+
+1. **Fingerprints exist.** The provisioning run printed one `SHA1:` and one `SHA256:`
+   line. Record them; they are public.
+2. **APK signature verified by CI.** The `debug-apk` job compares the APK certificate
+   with the keystore certificate and fails if they differ. Do not distribute an APK
+   from a run where that step did not pass.
+3. **APK fingerprint matches the keystore.** Read `keystore SHA-1` and `APK SHA-1`
+   from the verify step log; they must be identical, and the same for SHA-256.
+4. **Firebase registration.** Add both fingerprints to the Android app
+   `com.skyplus.money` in project `skyplus-money`, then wait five to ten minutes.
+5. **Version code.** The first stable APK must carry `versionCode = 2` or higher —
+   it is 2 in this branch — because the installed debug build is version 1.
+6. **Install and test.** Install the verified APK, then try Google Sign-In. Sign-in
+   must not be tested on any APK whose certificate is not the registered one.
 
 ## Failure behaviour
 

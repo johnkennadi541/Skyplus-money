@@ -15,10 +15,14 @@ android {
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
+    // applicationId never changes. versionCode strictly increases for every distributed
+    // APK so an update installs over the previous build: 1 was the throw-away-keystore
+    // debug build already installed on the test phone, so the first stable-keystore APK
+    // is 2. Increment by one before each future distribution.
     applicationId = "com.skyplus.money"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
+    versionCode = 2
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
