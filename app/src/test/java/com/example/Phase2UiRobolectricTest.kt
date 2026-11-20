@@ -1,6 +1,8 @@
 package com.example
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -141,8 +143,18 @@ class Phase2UiRobolectricTest {
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
     composeTestRule.onNodeWithTag("auto_saved_notice_banner").assertIsDisplayed()
+    // The dashboard is a lazy list: scroll the list to each quick action before asserting.
+    composeTestRule
+      .onNodeWithTag("home_screen")
+      .performScrollToNode(hasTestTag("home_accounts_button"))
     composeTestRule.onNodeWithTag("home_accounts_button").assertIsDisplayed()
+    composeTestRule
+      .onNodeWithTag("home_screen")
+      .performScrollToNode(hasTestTag("home_smart_detection_button"))
     composeTestRule.onNodeWithTag("home_smart_detection_button").assertIsDisplayed()
+    composeTestRule
+      .onNodeWithTag("home_screen")
+      .performScrollToNode(hasTestTag("home_review_queue_button"))
     composeTestRule.onNodeWithTag("home_review_queue_button").performClick()
     assertTrue(reviewClicked)
   }

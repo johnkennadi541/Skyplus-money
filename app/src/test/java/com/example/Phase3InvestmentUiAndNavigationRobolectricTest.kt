@@ -59,7 +59,10 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
     composeTestRule.onNodeWithTag("nav_tab_shopping_list").assertIsDisplayed()
 
     // Open Investments from Home Quick Action
-    composeTestRule.onNodeWithTag("home_investments_button").performScrollTo().performClick()
+    composeTestRule
+      .onNodeWithTag("home_screen")
+      .performScrollToNode(hasTestTag("home_investments_button"))
+    composeTestRule.onNodeWithTag("home_investments_button").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("investments_screen").assertIsDisplayed()
     composeTestRule.onNodeWithTag("investments_back_button").performClick()

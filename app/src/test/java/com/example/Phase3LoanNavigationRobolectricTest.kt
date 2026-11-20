@@ -46,7 +46,10 @@ class Phase3LoanNavigationRobolectricTest {
     composeTestRule.onNodeWithTag("nav_tab_shopping_list").assertIsDisplayed()
 
     // Scroll to Quick Actions and open EMI Calculator directly
-    composeTestRule.onNodeWithTag("home_emi_calculator_button").performScrollTo().performClick()
+    composeTestRule
+      .onNodeWithTag("home_screen")
+      .performScrollToNode(hasTestTag("home_emi_calculator_button"))
+    composeTestRule.onNodeWithTag("home_emi_calculator_button").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("emi_calculator_screen").assertIsDisplayed()
     composeTestRule.onNodeWithTag("emi_calculator_list").performScrollToNode(hasTestTag("emi_results_card"))
