@@ -72,8 +72,12 @@ object SignInFailureClassifier {
       STATUS_SIGN_IN_IN_PROGRESS,
     )
 
-  /** The one verified Google Play services phrase that means an OAuth/signing rejection. */
-  private const val REAUTH_FAILED_SIGNAL = "reauth failed"
+  /**
+   * The one verified Google Play services phrase that means an OAuth/signing
+   * rejection: the complete "Account reauth failed" response. A bare "reauth failed"
+   * or any other wording must NOT raise a provider classification.
+   */
+  private const val REAUTH_FAILED_SIGNAL = "account reauth failed"
 
   fun classify(snapshot: SignInFailureSnapshot): SignInFailureKind {
     val statusCode = snapshot.statusCode
@@ -137,7 +141,11 @@ object SignInFailureClassifier {
     return match.groupValues.getOrNull(1)?.toIntOrNull()
   }
 
-  /** True only for the verified Google Play services "Account reauth failed" response. */
+  /**
+   * True only for the verified Google Play services "Account reauth failed" response.
+   * "Other reauth failed", a bare "reauth failed", "cancelled by user" and
+   * "The flow has been cancelled." all return false.
+   */
   fun hasReauthFailedSignal(message: String?): Boolean =
     message?.lowercase()?.contains(REAUTH_FAILED_SIGNAL) == true
 

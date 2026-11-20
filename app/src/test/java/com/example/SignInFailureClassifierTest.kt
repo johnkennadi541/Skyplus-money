@@ -93,11 +93,59 @@ class SignInFailureClassifierTest {
   }
 
   @Test
-  fun `only the exact reauth wording counts as the provider signal`() {
+  fun `only the exact account reauth failed phrase counts as the provider signal`() {
     assertTrue(SignInFailureClassifier.hasReauthFailedSignal("[16] Account reauth failed."))
-    assertFalse(SignInFailureClassifier.hasReauthFailedSignal("The flow has been cancelled."))
+    assertTrue(SignInFailureClassifier.hasReauthFailedSignal("Account reauth failed."))
+    assertTrue(SignInFailureClassifier.hasReauthFailedSignal("account reauth failed"))
+
+    // Look-alikes and ordinary cancellations must never match.
+    assertFalse(SignInFailureClassifier.hasReauthFailedSignal("Other reauth failed"))
+    assertFalse(SignInFailureClassifier.hasReauthFailedSignal("reauth failed"))
+    assertFalse(SignInFailureClassifier.hasReauthFailedSignal("reauth"))
     assertFalse(SignInFailureClassifier.hasReauthFailedSignal("cancelled by user"))
+    assertFalse(SignInFailureClassifier.hasReauthFailedSignal("The flow has been cancelled."))
     assertFalse(SignInFailureClassifier.hasReauthFailedSignal(null))
+  }
+
+  @Test
+  fun `other reauth failed wording is not a provider problem`() {
+    val error = RuntimeException("[16] Other reauth failed")
+    val snapshot = SignInFailureClassifier.snapshotFrom(error)
+
+    assertEquals(16, snapshot.statusCode)
+    assertFalse(snapshot.hasProviderReauthSignal)
+    assertEquals(SignInFailureKind.USER_CANCELLED, SignInFailureClassifier.classify(snapshot))
+  }
+
+  @Test
+  fun `cancelled by user wording is not a provider problem`() {
+    val error = RuntimeException("cancelled by user")
+    val snapshot = SignInFailureClassifier.snapshotFrom(error)
+
+    assertNull(snapshot.statusCode)
+    assertFalse(snapshot.hasProviderReauthSignal)
+    assertEquals(SignInFailureKind.UNKNOWN, SignInFailureClassifier.classify(snapshot))
+  }
+
+  @Test
+  fun `the flow has been cancelled is a user cancel, not a provider problem`() {
+    val error =
+      androidx.credentials.exceptions.GetCredentialCancellationException(
+        "The flow has been cancelled."
+      )
+    val snapshot = SignInFailureClassifier.snapshotFrom(error)
+
+    assertFalse(snapshot.hasProviderReauthSignal)
+    assertEquals(SignInFailureKind.USER_CANCELLED, SignInFailureClassifier.classify(snapshot))
+  }
+
+  @Test
+  fun `account reauth failed is a provider problem end to end`() {
+    val error = RuntimeException("[16] Account reauth failed.")
+    val snapshot = SignInFailureClassifier.snapshotFrom(error)
+
+    assertTrue(snapshot.hasProviderReauthSignal)
+    assertEquals(SignInFailureKind.PROVIDER_CONFIGURATION, SignInFailureClassifier.classify(snapshot))
   }
 
   // ---- status parsing ------------------------------------------------------
