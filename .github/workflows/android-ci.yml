@@ -51,6 +51,20 @@ jobs:
       - name: Run Unit & Robolectric Tests
         run: ./gradlew :app:testDebugUnitTest
 
+      # Always print an exact count of what the suite actually executed, so the
+      # result can be quoted without guessing.
+      - name: Summarise test results
+        if: always()
+        run: |
+          set -euo pipefail
+          DIR=app/build/test-results/testDebugUnitTest
+          if [ ! -d "$DIR" ]; then
+            echo "::error::No test results directory at $DIR"
+            exit 1
+          fi
+          echo "Test classes executed: $(find "$DIR" -name 'TEST-*.xml' | wc -l)"
+          awk -F'"' '/<testsuite /{for(i=1;i<=NF;i++){if($i ~ /tests=$/){t+=$(i+1)} if($i ~ /failures=$/){f+=$(i+1)} if($i ~ /errors=$/){e+=$(i+1)} if($i ~ /skipped=$/){s+=$(i+1)}}} END{printf "tests=%d failures=%d errors=%d skipped=%d\n", t, f, e, s}' "$DIR"/TEST-*.xml
+
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
