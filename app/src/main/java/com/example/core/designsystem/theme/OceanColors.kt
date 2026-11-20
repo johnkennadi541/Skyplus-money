@@ -168,7 +168,9 @@ val LightOceanExtendedColors =
   OceanExtendedColors(
     cardSubtle = SkyplusLightSurface,
     cardBorder = SkyplusLightBorder,
-    gold = SkyplusGoldDeep,
+    // Approved token: gold is #D6B45A in both modes. SkyplusGoldDeep stays
+    // available where a darker gold is needed for small text on white.
+    gold = SkyplusGold,
     onGold = Color.White,
     positive = Color(0xFF059669),
     positiveContainer = OceanPositiveContainerLight,
