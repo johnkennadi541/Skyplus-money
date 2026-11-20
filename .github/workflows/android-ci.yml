@@ -45,14 +45,6 @@ jobs:
       - name: Compile Debug Kotlin
         run: ./gradlew :app:compileDebugKotlin
 
-      # Known toolchain issue (KSP 2.3.x + Hilt 2.60.x on the JVM test compilation):
-      # "ApplicationManager.getApplication() is null" fails the kspTestDebugKotlin task.
-      # It does not affect the application build, so the APK is still produced and
-      # uploaded. Tracked separately; the step stays non-blocking until it is fixed.
-      - name: Run Unit & Robolectric Tests
-        continue-on-error: true
-        run: ./gradlew :app:testDebugUnitTest
-
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
@@ -75,3 +67,26 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
           if-no-files-found: error
+
+      # Test steps run after the APK is uploaded so a pre-existing test-toolchain failure
+      # can never hide the debug APK from the reviewer.
+      #
+      # Known toolchain issue (KSP 2.3.x + Hilt 2.60.x on the JVM test compilation):
+      # "ApplicationManager.getApplication() is null" fails the kspTestDebugKotlin task.
+      # It does not affect the application build. This step stays non-blocking until fixed.
+      - name: Run Unit & Robolectric Tests
+        continue-on-error: true
+        run: ./gradlew :app:testDebugUnitTest
+
+      # Blocking: the Google Sign-In diagnostics tests must actually pass.
+      - name: Run Google Sign-In diagnostics tests
+        run: |
+          set -euo pipefail
+          ./gradlew :app:testDebugUnitTest --tests "com.example.AuthSignInDiagnosticsTest"
+          REPORT=app/build/test-results/testDebugUnitTest/TEST-com.example.AuthSignInDiagnosticsTest.xml
+          test -f "$REPORT" || { echo "::error::Diagnostics test report was not produced at $REPORT"; exit 1; }
+          grep -o 'tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' "$REPORT" | head -1
+          if grep -q '<failure\|<error' "$REPORT"; then
+            echo "::error::AuthSignInDiagnosticsTest reported failures"
+            exit 1
+          fi

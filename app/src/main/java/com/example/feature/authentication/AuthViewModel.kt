@@ -4,7 +4,10 @@ import android.content.Context
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.BuildConfig
 import com.example.R
+import com.example.data.remote.AuthDiagnosticsRecorder
+import com.example.data.remote.AuthSignInDiagnostics
 import com.example.data.remote.GoogleCredentialClient
 import com.example.data.remote.GoogleCredentialResult
 import com.example.domain.model.AuthError
@@ -36,6 +39,8 @@ data class AuthUiState(
   val consentRecord: ConsentRecord? = null,
   @StringRes val consentErrorMessageRes: Int? = null,
   val isSavingConsent: Boolean = false,
+  /** DEBUG-only Google Sign-In diagnostics. Always null in release builds. */
+  val diagnostics: AuthSignInDiagnostics? = null,
 )
 
 @HiltViewModel
@@ -166,8 +171,17 @@ constructor(
   fun onContinueWithGoogle(activityContext: Context) {
     if (_uiState.value.isSigningIn) return
 
+    if (BuildConfig.DEBUG) {
+      AuthDiagnosticsRecorder.clear()
+    }
+
     _uiState.update {
-      it.copy(isSigningIn = true, feedbackMessageRes = null, isCancellationNotice = false)
+      it.copy(
+        isSigningIn = true,
+        feedbackMessageRes = null,
+        isCancellationNotice = false,
+        diagnostics = null,
+      )
     }
 
     viewModelScope.launch {
@@ -198,6 +212,7 @@ constructor(
                   isSigningIn = false,
                   feedbackMessageRes = mapAuthErrorToStringRes(authResult.error),
                   isCancellationNotice = false,
+                  diagnostics = debugDiagnostics(),
                 )
               }
             }
@@ -209,6 +224,7 @@ constructor(
               isSigningIn = false,
               feedbackMessageRes = R.string.auth_cancelled_message,
               isCancellationNotice = true,
+              diagnostics = debugDiagnostics(),
             )
           }
         }
@@ -218,6 +234,7 @@ constructor(
               isSigningIn = false,
               feedbackMessageRes = mapAuthErrorToStringRes(credentialResult.error),
               isCancellationNotice = false,
+              diagnostics = debugDiagnostics(),
             )
           }
         }
@@ -298,8 +315,14 @@ constructor(
   }
 
   fun onDismissFeedback() {
-    _uiState.update { it.copy(feedbackMessageRes = null, isCancellationNotice = false) }
+    _uiState.update {
+      it.copy(feedbackMessageRes = null, isCancellationNotice = false, diagnostics = null)
+    }
   }
+
+  /** DEBUG-only. Returns null in release builds so no diagnostic detail can leak. */
+  private fun debugDiagnostics(): AuthSignInDiagnostics? =
+    if (BuildConfig.DEBUG) AuthDiagnosticsRecorder.last.value else null
 
   @StringRes
   private fun mapAuthErrorToStringRes(error: AuthError): Int =
