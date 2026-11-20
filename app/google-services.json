@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "735404789471",
+    "project_id": "skyplus-money",
+    "storage_bucket": "skyplus-money.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:735404789471:android:36f2e2a640959f6f17e36a",
+        "android_client_info": {
+          "package_name": "com.skyplus.money"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "735404789471-boqqld7mhvamfrk47oetf31vg2pbi5e0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.skyplus.money",
+            "certificate_hash": "c10d778ec3c0fa2e4617d50234a1dc22cbb706c3"
+          }
+        },
+        {
+          "client_id": "735404789471-5c1ok63ng15plb3d2p87j4br3a1c7g16.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByAoFpTMYoOhoypSPXtofnyQwm6In93lo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "735404789471-5c1ok63ng15plb3d2p87j4br3a1c7g16.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

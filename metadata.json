@@ -1,0 +1,6 @@
+{
+  "name": "SKYPLUS MONEY",
+  "description": "Personal and family wealth management — Take Control. Build Wealth.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

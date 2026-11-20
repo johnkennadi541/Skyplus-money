@@ -1,0 +1,143 @@
+<resources>
+    <string name="app_name">SKYPLUS MONEY</string>
+    <string name="app_tagline">Take Control. Build Wealth.</string>
+    <string name="phase_zero_badge">Phase 0 • Foundation</string>
+    <string name="auth_pending_badge">Auth Gate: Phase 1 Pending</string>
+
+    <!-- Primary Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_transactions">Transactions</string>
+    <string name="nav_budgets">Budgets</string>
+    <string name="nav_budget">Budget</string>
+    <string name="nav_shopping_list">Shopping List</string>
+    <string name="nav_investments">Investments</string>
+    <string name="nav_reports">Reports</string>
+    <string name="nav_more">More</string>
+    <string name="profile_title">User Profile &amp; Governance</string>
+    <string name="profile_account_details">Account Details</string>
+    <string name="profile_settings">App Settings</string>
+    <string name="profile_theme_selection">Theme Selection</string>
+    <string name="profile_security_settings">Security Settings</string>
+    <string name="profile_notification_settings">Notification Detection Settings</string>
+    <string name="profile_cloud_sync">Cloud Sync Settings</string>
+    <string name="profile_backup">Google Drive Backup</string>
+    <string name="cd_profile_menu">Open user profile and governance menu</string>
+    <string name="shopping_title">Shopping Lists</string>
+
+    <!-- Accessibility & Actions -->
+    <string name="cd_brand_emblem">SKYPLUS MONEY emblem</string>
+    <string name="cd_toggle_theme">Switch between dark and light theme</string>
+    <string name="cd_navigate_back">Navigate back</string>
+    <string name="action_back">Back</string>
+    <string name="action_open_settings">App Settings</string>
+    <string name="action_open_auth_status">Authentication Readiness</string>
+    <string name="action_open_legal_preview">Terms &amp; Privacy Preview</string>
+
+    <!-- Home / Foundation Overview -->
+    <string name="home_hero_title">SKYPLUS MONEY</string>
+    <string name="home_hero_subtitle">Take Control. Build Wealth.</string>
+    <string name="home_foundation_notice_title">Foundation Ready — No Fake Data</string>
+    <string name="home_foundation_notice_body">Authentication is mandatory and will be activated in Phase 1 (Google Sign-In &amp; Facebook Login). No guest access or simulated balances are shown.</string>
+    <string name="home_section_architecture">Architecture &amp; Security Baseline</string>
+    <string name="home_section_roadmap">Delivery Roadmap</string>
+    <string name="home_precision_card_title">Precision Monetary Engine</string>
+    <string name="home_precision_card_body">Strict BigDecimal and integer minor-unit arithmetic with ISO 4217 currency scale. Floating-point Double calculations are disallowed.</string>
+
+    <!-- Placeholder Feature Screens (Phases 1-6) -->
+    <string name="transactions_title">Transactions Ledger</string>
+    <string name="transactions_empty_title">Encrypted Ledger Pending (Phase 2)</string>
+    <string name="transactions_empty_body">Multi-currency accounts, atomic transfers, duplicate prevention, and SQLCipher-encrypted Room storage will be delivered in Phase 2.</string>
+
+    <string name="budgets_title">Budgets &amp; Obligations</string>
+    <string name="budgets_empty_title">Budget Planner Pending (Phase 3)</string>
+    <string name="budgets_empty_body">Monthly budget envelopes, savings goals, loans, EMI schedules, and credit card tracking will be delivered in Phase 3.</string>
+
+    <string name="investments_title">Investments</string>
+    <string name="investments_subtitle">Portfolio valuation, manual &amp; opt-in EOD NAV tracking</string>
+    <string name="investments_empty_title">No Investments Tracked Yet</string>
+    <string name="investments_empty_body">Track stocks, mutual funds, ETFs, gold, fixed deposits, and custom holdings with offline-capable manual pricing.</string>
+
+    <string name="reports_title">Financial Reports</string>
+    <string name="reports_empty_title">Financial Analytics Ready</string>
+    <string name="reports_empty_body">Track net worth, cash flow, budgets, loans, investments, and shopping analytics with PDF, DOCX, and CSV exports.</string>
+
+    <!-- More & Sub-Screens -->
+    <string name="more_title">More &amp; Governance</string>
+    <string name="more_subtitle">Foundation controls, security status, and legal policy placeholders</string>
+    <string name="more_module_directory_title">Planned Domain Modules</string>
+
+    <string name="settings_title">App Settings</string>
+    <string name="settings_theme_section">Ocean Visual Theme</string>
+    <string name="settings_theme_system">Follow System</string>
+    <string name="settings_theme_dark">Deep Ocean Dark</string>
+    <string name="settings_theme_light">Ocean Mist Light</string>
+    <string name="settings_sync_section">Cloud &amp; Backup Controls (Phase 5)</string>
+    <string name="settings_sync_note">Firebase Cloud Sync and Google Drive Encrypted Backup will operate as independent opt-in controls in Phase 5.</string>
+
+    <string name="auth_status_title">Authentication Readiness</string>
+    <string name="auth_status_banner">Mandatory Authentication Architecture (Phase 1)</string>
+    <string name="auth_status_body">SKYPLUS MONEY enforces mandatory Firebase Authentication with zero Guest Mode. Separate Google Sign-In and Facebook Login providers with verified ownership before account linking will be integrated in Phase 1.</string>
+    <string name="auth_missing_config_title">External Configuration Required Before Phase 1</string>
+
+    <string name="legal_preview_title">Terms &amp; Privacy Preview</string>
+    <string name="legal_preview_disclaimer">LEGAL REVIEW REQUIRED: These policy placeholders are prepared for governance structure only and do not constitute legal compliance until approved by legal counsel.</string>
+
+    <!-- Phase 1B Google Authentication -->
+    <string name="auth_screen_badge">Mandatory Authentication • No Guest Mode</string>
+    <string name="auth_screen_title">Secure Wealth Access</string>
+    <string name="auth_screen_subtitle">Sign in to protect your personal and family financial records with verified Firebase identity.</string>
+    <string name="auth_continue_with_google">Continue with Google</string>
+    <string name="auth_signing_in">Signing in with Google…</string>
+    <string name="auth_loading_session">Verifying secure session…</string>
+    <string name="auth_facebook_upcoming">Facebook Login will be introduced in a later authorized phase.</string>
+    <string name="auth_consent_upcoming">Terms &amp; Conditions and Privacy Policy acceptance (Phase 1D) is required before full financial workspace access.</string>
+    <string name="auth_sign_out">Sign Out</string>
+    <string name="auth_signed_in_as">Signed in as %1$s</string>
+    <string name="auth_provider_google">Provider: Google (Firebase Auth)</string>
+    <string name="auth_dismiss_message">Dismiss</string>
+
+    <!-- Safe Authentication Error & Cancellation Messages -->
+    <string name="auth_cancelled_message">Google Sign-In was cancelled. Select Continue with Google to try again.</string>
+    <string name="auth_error_no_google_account">No Google account is available on this device. Add a Google account in device Settings and try again.</string>
+    <string name="auth_error_credential_retrieval">Unable to retrieve Google credentials right now. Ensure Google Play Services is available and try again.</string>
+    <string name="auth_error_missing_id_token">Google Sign-In did not return a valid ID token. Please try again.</string>
+    <string name="auth_error_network">Network connection unavailable. Check your internet connection and retry.</string>
+    <string name="auth_error_session_expired">Your session has expired or is no longer valid. Please sign in again.</string>
+    <string name="auth_error_missing_config">Google Sign-In client configuration is unavailable in this build.</string>
+    <string name="auth_error_firebase_failed">Authentication could not be completed. Please try again.</string>
+    <string name="auth_error_linking_verification">An account with this email already exists under another sign-in method. Verified ownership is required before linking accounts.</string>
+    <!-- Phase 1D Legal Consent Gate -->
+    <string name="legal_consent_badge">Phase 1D • Mandatory Consent</string>
+    <string name="legal_consent_title">Terms &amp; Privacy Consent</string>
+    <string name="legal_consent_subtitle">Please review and accept our Terms &amp; Conditions and Privacy Policy (v1.0.0) to enter your secure SKYPLUS MONEY workspace.</string>
+    <string name="legal_terms_title">Terms &amp; Conditions (v1.0.0)</string>
+    <string name="legal_terms_summary">By using SKYPLUS MONEY, you agree to secure account access, precision financial ledger rules, and local device encryption policies. Full draft terms are available below.</string>
+    <string name="legal_privacy_title">Privacy Policy (v1.0.0)</string>
+    <string name="legal_privacy_summary">We respect your financial privacy. Identity verification is processed securely via Firebase Auth; personal records remain private and unshared. Full draft policy is available below.</string>
+    <string name="legal_accept_terms_checkbox">I have read and agree to the Terms &amp; Conditions (v1.0.0)</string>
+    <string name="legal_accept_privacy_checkbox">I have read and agree to the Privacy Policy (v1.0.0)</string>
+    <string name="legal_accept_button">Accept &amp; Enter SKYPLUS MONEY</string>
+    <string name="legal_review_required_notice">DRAFT DOCUMENTATION: Formal legal counsel review is required prior to production deployment.</string>
+    <string name="legal_consent_load_error">Unable to verify your saved legal consent status. Please retry before accessing financial records.</string>
+    <string name="legal_consent_save_error">Unable to save your legal consent acceptance. Check device storage and try again.</string>
+    <string name="legal_consent_retry_button">Retry Verification</string>
+
+    <!-- Fail-Closed Encryption & Keystore Security Error -->
+    <string name="security_db_error_title">Encrypted Vault Unavailable</string>
+    <string name="security_db_error_recoverable">SKYPLUS MONEY could not unlock your encrypted financial database because Android Keystore or SQLCipher initialization failed. No unencrypted database fallback is permitted.</string>
+    <string name="security_db_error_corrupted">Your device encryption key or vault metadata does not match the existing encrypted database. SKYPLUS MONEY has blocked access to prevent data corruption or key overwrite.</string>
+    <string name="security_db_retry_button">Retry Secure Unlock</string>
+
+    <!-- Phase 3C Loan & EMI Management -->
+    <string name="loans_title">Loans &amp; EMIs</string>
+    <string name="loans_subtitle">Personal debt ledger, EMI tracking &amp; payment history</string>
+    <string name="emi_calculator_title">EMI Calculator</string>
+    <string name="emi_calculator_subtitle">Precision reducing-balance installment planner</string>
+    <string name="cd_emi_calculator">Open EMI Calculator</string>
+    <string name="cd_loans_tracker">Open Loans Tracker</string>
+
+    <!-- Phase 3E Smart Shopping List -->
+    <string name="shopping_subtitle">Multi-list budgeting, purchase tracking &amp; store price compare</string>
+    <string name="shopping_empty_title">No Shopping Lists Yet</string>
+    <string name="shopping_empty_body">Create dedicated shopping lists with optional budgets, track estimated vs actual spending, and manually compare store prices.</string>
+</resources>
