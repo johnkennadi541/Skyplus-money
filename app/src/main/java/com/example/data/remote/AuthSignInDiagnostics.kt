@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import androidx.annotation.VisibleForTesting
-import com.google.firebase.FirebaseException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -127,7 +126,7 @@ data class AuthFailureSnapshot(
         statusCode = statusCodeOf(throwable),
         message = AuthDiagnosticSanitizer.sanitize(throwable.message),
         causeChain = causes,
-        firebaseErrorCode = (throwable as? FirebaseException)?.errorCode,
+        firebaseErrorCode = readErrorCode(throwable),
       )
     }
 
@@ -146,6 +145,19 @@ data class AuthFailureSnapshot(
       }
       return null
     }
+
+    /**
+     * Reads `getErrorCode()` from any Firebase exception without a compile-time
+     * dependency on a specific Firebase exception type.
+     */
+    private fun readErrorCode(throwable: Throwable): String? =
+      try {
+        val getter =
+          throwable.javaClass.methods.firstOrNull { it.name == "getErrorCode" && it.parameterCount == 0 }
+        getter?.invoke(throwable) as? String
+      } catch (_: Throwable) {
+        null
+      }
 
     private fun readStatusCode(throwable: Throwable): Int? =
       try {
