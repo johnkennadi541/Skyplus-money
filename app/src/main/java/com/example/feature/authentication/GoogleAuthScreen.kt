@@ -53,12 +53,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.BuildConfig
 import com.example.R
 import com.example.core.designsystem.component.BadgeTone
 import com.example.core.designsystem.component.OceanCard
 import com.example.core.designsystem.component.OceanStatusBadge
 import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
+import com.example.data.remote.AuthSignInDiagnostics
 
 @Composable
 fun AuthLoadingScreen(modifier: Modifier = Modifier) {
@@ -248,6 +250,16 @@ fun GoogleAuthScreen(
           }
         }
 
+        if (BuildConfig.DEBUG) {
+          val diagnostics = uiState.diagnostics
+          if (diagnostics != null) {
+            AuthSignInDiagnosticsCard(
+              diagnostics = diagnostics,
+              modifier = Modifier.fillMaxWidth().testTag("auth_debug_diagnostics"),
+            )
+          }
+        }
+
         OceanCard {
           Button(
             onClick = { onContinueWithGoogle(context) },
@@ -313,6 +325,79 @@ fun GoogleAuthScreen(
           )
         }
       }
+    }
+  }
+}
+
+/**
+ * DEBUG-ONLY Google Sign-In diagnostics card.
+ * Rendered only when BuildConfig.DEBUG is true, so release builds never show it.
+ * It shows no tokens, no account identity and no personal data.
+ */
+@Composable
+private fun AuthSignInDiagnosticsCard(
+  diagnostics: AuthSignInDiagnostics,
+  modifier: Modifier = Modifier,
+) {
+  val extended = OceanTheme.colors
+
+  val rows =
+    buildList {
+      add("Stage" to diagnostics.stage.name)
+      add("Outcome" to diagnostics.outcome.name)
+      diagnostics.statusCode?.let { add("ApiException statusCode" to it.toString()) }
+      diagnostics.exceptionClassName?.let { add("Exception class" to it) }
+      diagnostics.credentialExceptionType?.let { add("GetCredentialException type" to it) }
+      diagnostics.message?.let { add("Message" to it) }
+      if (diagnostics.causeChain.isNotEmpty()) {
+        add("Cause chain" to diagnostics.causeChain.joinToString(" -> "))
+      }
+      diagnostics.firebaseErrorCode?.let { add("Firebase error code" to it) }
+      diagnostics.packageName?.let { add("Package" to it) }
+      add("default_web_client_id present" to diagnostics.webClientIdConfigured.toString())
+      diagnostics.signingSha1?.let { add("APK signing SHA-1" to it) }
+      diagnostics.signingSha256?.let { add("APK signing SHA-256" to it) }
+    }
+
+  Surface(
+    modifier = modifier,
+    shape = MaterialTheme.shapes.medium,
+    color = extended.warningContainer,
+    border = BorderStroke(1.dp, extended.warning.copy(alpha = 0.5f)),
+  ) {
+    Column(
+      modifier = Modifier.fillMaxWidth().padding(OceanSpacing.sm),
+      verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
+    ) {
+      Text(
+        text = "DEBUG ONLY - Google Sign-In diagnostics",
+        style = MaterialTheme.typography.labelLarge,
+        color = extended.warning,
+      )
+      Text(
+        text = diagnostics.hint,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurface,
+      )
+      rows.forEach { (label, value) ->
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+          Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = extended.warning,
+          )
+          Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+          )
+        }
+      }
+      Text(
+        text = "This panel exists only in debug builds and is never shown in release.",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
     }
   }
 }

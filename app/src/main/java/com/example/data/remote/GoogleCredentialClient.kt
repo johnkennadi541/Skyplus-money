@@ -13,6 +13,7 @@ import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.GetCredentialProviderConfigurationException
 import androidx.credentials.exceptions.GetCredentialUnsupportedException
 import androidx.credentials.exceptions.NoCredentialException
+import com.example.BuildConfig
 import com.example.R
 import com.example.domain.model.AuthError
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
@@ -59,6 +60,7 @@ constructor(private val credentialManager: CredentialManager) : GoogleCredential
     }
 
     val hostContext = context.findActivity() ?: context
+    val webClientIdConfigured = serverClientId.isNotEmpty()
     val googleSignInOption = GetSignInWithGoogleOption.Builder(serverClientId).build()
     val request = GetCredentialRequest.Builder().addCredentialOption(googleSignInOption).build()
 
@@ -79,21 +81,27 @@ constructor(private val credentialManager: CredentialManager) : GoogleCredential
     } catch (e: CancellationException) {
       throw e
     } catch (e: GetCredentialCancellationException) {
+      recordFailure(e, hostContext, webClientIdConfigured)
       Log.w(TAG, "Google Sign-In cancelled or dismissed: ${e.type}")
       GoogleCredentialResult.Cancelled
-    } catch (_: NoCredentialException) {
+    } catch (e: NoCredentialException) {
+      recordFailure(e, hostContext, webClientIdConfigured)
       Log.w(TAG, "No Google account credential available on device")
       GoogleCredentialResult.Failure(AuthError.NoGoogleAccount)
-    } catch (_: GetCredentialProviderConfigurationException) {
+    } catch (e: GetCredentialProviderConfigurationException) {
+      recordFailure(e, hostContext, webClientIdConfigured)
       Log.e(TAG, "Google credential provider configuration error")
       GoogleCredentialResult.Failure(AuthError.CredentialRetrievalFailed)
-    } catch (_: GetCredentialUnsupportedException) {
+    } catch (e: GetCredentialUnsupportedException) {
+      recordFailure(e, hostContext, webClientIdConfigured)
       Log.e(TAG, "Credential Manager unsupported on this device")
       GoogleCredentialResult.Failure(AuthError.CredentialRetrievalFailed)
-    } catch (_: GoogleIdTokenParsingException) {
+    } catch (e: GoogleIdTokenParsingException) {
+      recordFailure(e, hostContext, webClientIdConfigured)
       Log.e(TAG, "Failed to parse Google ID token payload")
       GoogleCredentialResult.Failure(AuthError.MissingIdToken)
     } catch (e: GetCredentialException) {
+      recordFailure(e, hostContext, webClientIdConfigured)
       val message = e.message.orEmpty().lowercase()
       if ("network" in message || "timeout" in message || "unable to resolve host" in message) {
         Log.w(TAG, "Credential retrieval failed due to network error")
@@ -102,7 +110,8 @@ constructor(private val credentialManager: CredentialManager) : GoogleCredential
         Log.e(TAG, "Credential retrieval failed: ${e.type}")
         GoogleCredentialResult.Failure(AuthError.CredentialRetrievalFailed)
       }
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+      recordFailure(e, hostContext, webClientIdConfigured)
       Log.e(TAG, "Unexpected credential retrieval failure")
       GoogleCredentialResult.Failure(AuthError.CredentialRetrievalFailed)
     }
@@ -116,6 +125,20 @@ constructor(private val credentialManager: CredentialManager) : GoogleCredential
         Log.w(TAG, "Unable to clear Credential Manager state: ${e::class.simpleName}")
       }
     }
+  }
+
+  /**
+   * DEBUG-only: captures the non-sensitive diagnostic detail of a failed attempt.
+   * Release builds never collect or display it.
+   */
+  private fun recordFailure(error: Throwable, context: Context, webClientIdConfigured: Boolean) {
+    if (!BuildConfig.DEBUG) return
+    AuthDiagnosticsRecorder.recordCredentialFailure(
+      stage = AuthDiagnosticStage.CREDENTIAL_REQUEST,
+      throwable = error,
+      context = context,
+      webClientIdConfigured = webClientIdConfigured,
+    )
   }
 
   private tailrec fun Context.findActivity(): Activity? =

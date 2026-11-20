@@ -1,6 +1,7 @@
 package com.example.data.remote
 
 import android.util.Log
+import com.example.BuildConfig
 import com.example.domain.model.AuthError
 import com.example.domain.model.AuthProviderType
 import com.example.domain.model.AuthResult
@@ -102,6 +103,10 @@ class FirebaseAuthDataSource @Inject constructor(private val firebaseAuth: Fireb
   }
 
   private fun mapFirebaseException(error: Exception): AuthError {
+    if (BuildConfig.DEBUG) {
+      // DEBUG-only: records the Firebase error code and a sanitised message for diagnosis.
+      AuthDiagnosticsRecorder.recordFirebaseFailure(error)
+    }
     return when (error) {
       is FirebaseNetworkException -> {
         Log.w(TAG, "Firebase auth network error")
