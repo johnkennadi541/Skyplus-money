@@ -101,7 +101,7 @@ class HomeViewModelTest {
       if (emitNothing) {
         return flow { /* never emits: the dashboard must stay in its loading state */ }
       }
-      return flowOf(snapshot ?: emptySnapshot())
+      return flowOf(requireNotNull(snapshot) { "snapshot or failure must be supplied" })
     }
   }
 
