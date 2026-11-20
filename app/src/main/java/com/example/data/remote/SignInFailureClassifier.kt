@@ -6,8 +6,8 @@ package com.example.data.remote
  * Kept separate from the UI so the decision is unit testable and so the app stops
  * reporting every `GetCredentialCancellationException` as a genuine user cancel:
  * Credential Manager also raises that exception when Google Play services rejects
- * the request (for example an unregistered signing certificate), with the real
- * status code only present inside the message, as in "[16] Account reauth failed.".
+ * the request, with the real status code only present inside the message, as in
+ * "[16] Account reauth failed.".
  */
 enum class SignInFailureKind {
   /** The person dismissed the account sheet, and nothing suggests a provider fault. */
@@ -29,12 +29,19 @@ enum class SignInFailureKind {
   UNKNOWN,
 }
 
-/** Non-sensitive view of a failure. No tokens, no account identity, no payload text. */
+/**
+ * Non-sensitive view of a failure.
+ *
+ * It deliberately has **no message field**. The raw exception message is read once,
+ * turned into the two booleans below, and then discarded, so it can never be
+ * retained, logged or copied anywhere — structurally, not by discipline.
+ */
 data class SignInFailureSnapshot(
   val exceptionClassName: String,
   val credentialType: String? = null,
   val statusCode: Int? = null,
-  val message: String? = null,
+  val hasProviderReauthSignal: Boolean = false,
+  val hasNetworkSignal: Boolean = false,
   val causeChain: List<String> = emptyList(),
 )
 
@@ -50,67 +57,66 @@ object SignInFailureClassifier {
   private const val STATUS_SIGN_IN_CANCELLED = 12501
   private const val STATUS_SIGN_IN_IN_PROGRESS = 12502
 
-  /** Status codes that mean the app's Google configuration is wrong, not the user. */
+  /**
+   * Status codes that always mean the app's Google configuration is wrong.
+   * Status 16 is intentionally absent: on its own it is CommonStatusCodes.CANCELED,
+   * which can be a real dismissal. It is only treated as a provider problem when the
+   * verified "Account reauth failed" wording accompanies it.
+   */
   private val providerStatusCodes =
     setOf(
       STATUS_DEVELOPER_ERROR,
       STATUS_INTERNAL_ERROR,
-      STATUS_CANCELED,
       STATUS_API_NOT_CONNECTED,
       STATUS_SIGN_IN_FAILED,
       STATUS_SIGN_IN_IN_PROGRESS,
     )
 
-  /** Message fragments Google Play services uses when the OAuth client rejects the app. */
-  private val providerMessageFragments =
-    listOf(
-      "reauth",
-      "apiexception",
-      "api exception",
-      "developer error",
-      "not registered",
-      "unknown calling package",
-      "10:",
-      "16:",
-    )
+  /** The one verified Google Play services phrase that means an OAuth/signing rejection. */
+  private const val REAUTH_FAILED_SIGNAL = "reauth failed"
 
   fun classify(snapshot: SignInFailureSnapshot): SignInFailureKind {
     val statusCode = snapshot.statusCode
     val type = snapshot.credentialType.orEmpty().lowercase()
     val className = snapshot.exceptionClassName.lowercase()
-    val message = snapshot.message.orEmpty().lowercase()
 
-    // 1. An explicit status code always wins over the exception type.
+    // 1. An explicit status code wins over the exception type.
     when (statusCode) {
       STATUS_NETWORK_ERROR -> return SignInFailureKind.NETWORK
       STATUS_SIGN_IN_CANCELLED -> return SignInFailureKind.USER_CANCELLED
+      STATUS_CANCELED ->
+        return if (snapshot.hasProviderReauthSignal) {
+          SignInFailureKind.PROVIDER_CONFIGURATION
+        } else {
+          SignInFailureKind.USER_CANCELLED
+        }
       in providerStatusCodes -> return SignInFailureKind.PROVIDER_CONFIGURATION
       else -> Unit
     }
 
-    // 2. A provider failure described in the message, without a parsed code.
-    if (providerMessageFragments.any { it in message }) {
+    // 2. The verified provider wording, even without a parsed code.
+    if (snapshot.hasProviderReauthSignal) {
       return SignInFailureKind.PROVIDER_CONFIGURATION
     }
 
-    // 3. No account on the device.
+    // 3. Network wording.
+    if (snapshot.hasNetworkSignal) {
+      return SignInFailureKind.NETWORK
+    }
+
+    // 4. No account on the device.
     if ("nocredential" in className || "no_credential" in type) {
       return SignInFailureKind.NO_ACCOUNT_AVAILABLE
     }
 
-    // 4. Credential Manager unsupported on this device.
+    // 5. Credential Manager unsupported on this device.
     if ("unsupported" in className || "unsupported" in type) {
       return SignInFailureKind.UNSUPPORTED
     }
 
-    // 5. Provider configuration exception.
+    // 6. Provider configuration exception.
     if ("providerconfiguration" in className || "provider_configuration" in type) {
       return SignInFailureKind.PROVIDER_CONFIGURATION
-    }
-
-    // 6. Network wording.
-    if ("network" in message || "timeout" in message || "unable to resolve" in message) {
-      return SignInFailureKind.NETWORK
     }
 
     // 7. A plain cancellation with nothing else attached is a real user cancel.
@@ -131,9 +137,21 @@ object SignInFailureClassifier {
     return match.groupValues.getOrNull(1)?.toIntOrNull()
   }
 
+  /** True only for the verified Google Play services "Account reauth failed" response. */
+  fun hasReauthFailedSignal(message: String?): Boolean =
+    message?.lowercase()?.contains(REAUTH_FAILED_SIGNAL) == true
+
+  /** True when the message describes a connectivity problem. */
+  fun hasNetworkSignal(message: String?): Boolean {
+    val lower = message?.lowercase() ?: return false
+    return "network" in lower || "timeout" in lower || "unable to resolve" in lower
+  }
+
   /**
-   * Builds a snapshot from a throwable. Only class names, the Credential Manager
-   * type, a parsed status code and a length-capped message are kept — never a token.
+   * Builds a snapshot from a throwable.
+   *
+   * The raw message is read here, reduced to a status code and two booleans, and
+   * never stored. No token, account identity or payload text can leave this method.
    */
   fun snapshotFrom(throwable: Throwable): SignInFailureSnapshot {
     val causes = mutableListOf<String>()
@@ -148,14 +166,14 @@ object SignInFailureClassifier {
     val credentialType =
       (throwable as? androidx.credentials.exceptions.GetCredentialException)?.type?.toString()
 
-    val message = throwable.message?.take(200)
+    val rawMessage = throwable.message
 
     return SignInFailureSnapshot(
       exceptionClassName = throwable.javaClass.name,
       credentialType = credentialType,
-      statusCode =
-        statusCodeFromMessage(message) ?: statusCodeFromCauseChain(throwable),
-      message = message,
+      statusCode = statusCodeFromMessage(rawMessage) ?: statusCodeFromCauseChain(throwable),
+      hasProviderReauthSignal = hasReauthFailedSignal(rawMessage),
+      hasNetworkSignal = hasNetworkSignal(rawMessage),
       causeChain = causes,
     )
   }

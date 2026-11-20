@@ -1,61 +1,118 @@
-# Stable Debug Keystore — one-time setup
+# Stable Debug Keystore — one-time setup (Android / Termux only)
 
 Google Sign-In checks the signing certificate of the installed APK. CI used to
 generate a brand-new debug keystore on every run, so every debug APK had a
 different SHA-1 and the fingerprint registered in Firebase could never match.
 
-This document describes the one-time procedure. It contains **no secrets**. The
-keystore, its passwords and its base64 form live only on the founder's machine and
-in GitHub Actions secrets.
+This is a one-time procedure and it needs **no computer** — everything runs on the
+Android phone in Termux. This document contains **no secrets**. The keystore, its
+passwords and its base64 form stay on the phone and in GitHub Actions secrets, and
+must never be pasted into a chat, a PR, a commit or a document.
 
 ---
 
-## 1. Create the keystore once, on your own machine
+## 1. Install the tools on the phone (Termux)
+
+Install **Termux from F-Droid**, not from the Play Store (that build is deprecated).
+Also install the **Termux:API** app from F-Droid if you want the clipboard step.
 
 ```bash
-keytool -genkeypair \
-  -v \
-  -keystore skyplus-debug.jks \
+pkg update && pkg upgrade -y
+pkg install openjdk-17 coreutils -y
+pkg install termux-api -y        # optional, only for the clipboard step
+```
+
+`keytool` comes with `openjdk-17`. Check it:
+
+```bash
+keytool -help | head -3
+```
+
+## 2. Create the keystore once
+
+Set the two passwords as environment variables so they never appear on a command
+line. Use at least 8 characters. Do not reuse any other password.
+
+```bash
+export SKYPLUS_STORE_PASS='<your store password>'
+export SKYPLUS_KEY_PASS='<your key password>'
+```
+
+```bash
+keytool -genkeypair -v \
+  -keystore ~/skyplus-debug.jks \
   -storetype JKS \
   -alias skyplusdebug \
   -keyalg RSA -keysize 2048 -validity 10000 \
-  -storepass "<STORE_PASSWORD>" \
-  -keypass "<KEY_PASSWORD>" \
+  -storepass:env SKYPLUS_STORE_PASS \
+  -keypass:env SKYPLUS_KEY_PASS \
   -dname "CN=SKYPLUS Debug,O=SKYPLUS,C=IN"
 ```
 
-Keep `skyplus-debug.jks` somewhere safe and backed up. If it is lost, the
-fingerprint changes and Firebase must be updated again.
-
-## 2. Read its public fingerprints
+Restrict the file and keep it private:
 
 ```bash
-keytool -list -v -keystore skyplus-debug.jks -alias skyplusdebug
+chmod 600 ~/skyplus-debug.jks
 ```
 
-Copy the `SHA1:` and `SHA256:` values. These are public and safe to share; the CI
-workflow prints them too.
+`~/skyplus-debug.jks` is inside Termux's private app storage, which other apps
+cannot read. Back it up somewhere safe — if it is lost, the fingerprint changes and
+Firebase must be updated again.
 
-## 3. Add four repository secrets
+## 3. Read the public fingerprints
 
-In GitHub: **Settings → Secrets and variables → Actions → New repository secret**
+```bash
+keytool -list -v \
+  -keystore ~/skyplus-debug.jks \
+  -alias skyplusdebug \
+  -storepass:env SKYPLUS_STORE_PASS
+```
+
+Copy the `SHA1:` and `SHA256:` values. These two are public and safe to share; the
+CI workflow prints the same values.
+
+## 4. Make the base64 form for the secret
+
+```bash
+base64 -w0 ~/skyplus-debug.jks > ~/skyplus-debug.jks.b64
+```
+
+To copy it to the phone clipboard (needs Termux:API):
+
+```bash
+termux-clipboard-set < ~/skyplus-debug.jks.b64
+```
+
+Now open the GitHub repository in the phone browser and paste it into the secret.
+Never paste it anywhere else.
+
+## 5. Add four repository secrets
+
+GitHub → **Settings → Secrets and variables → Actions → New repository secret**
 
 | Secret name | Value |
 |---|---|
-| `SKYPLUS_DEBUG_KEYSTORE_BASE64` | `base64 -w0 skyplus-debug.jks` output |
-| `SKYPLUS_DEBUG_STORE_PASSWORD` | the store password |
-| `SKYPLUS_DEBUG_KEY_PASSWORD` | the key password |
+| `SKYPLUS_DEBUG_KEYSTORE_BASE64` | contents of `~/skyplus-debug.jks.b64` |
+| `SKYPLUS_DEBUG_STORE_PASSWORD` | the store password from step 2 |
+| `SKYPLUS_DEBUG_KEY_PASSWORD` | the key password from step 2 |
 | `SKYPLUS_DEBUG_KEY_ALIAS` | `skyplusdebug` |
 
-Never paste these into a file, a commit, a PR description or a chat message.
+## 6. Clear the passwords from the shell
 
-## 4. Register the fingerprints in Firebase
+```bash
+unset SKYPLUS_STORE_PASS SKYPLUS_KEY_PASS
+rm -f ~/skyplus-debug.jks.b64
+```
+
+Keep `~/skyplus-debug.jks` — it is the only copy of the key.
+
+## 7. Register the fingerprints in Firebase
 
 Firebase Console → project `skyplus-money` → Project settings → Your apps →
 Android app `com.skyplus.money` → **Add fingerprint** → paste the SHA-1, then add
 the SHA-256 as well. Allow five to ten minutes for propagation.
 
-## 5. What CI does with the secrets
+## 8. What CI does with the secrets
 
 1. Fails immediately with a clear error if any of the four secrets is missing — it
    never generates a replacement keystore.
@@ -69,13 +126,13 @@ the SHA-256 as well. Allow five to ten minutes for propagation.
 7. Deletes the keystore in an `if: always()` step, including after a failure.
 8. Never uploads the keystore as an artifact.
 
-## 6. Local and AI Studio builds
+## 9. Local and AI Studio builds
 
 When `SKYPLUS_DEBUG_KEYSTORE_PATH` is not set, `app/build.gradle.kts` falls back to
 the git-ignored `./debug.keystore` with the usual `android` password, so local and
 AI Studio builds keep working exactly as before. Only CI uses the stable keystore.
 
-## 7. Release signing
+## 10. Release signing
 
 Untouched. The `release` signing config still reads `KEYSTORE_PATH`,
 `STORE_PASSWORD` and `KEY_PASSWORD`, and no release key was created or changed.
