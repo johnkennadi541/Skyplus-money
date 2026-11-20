@@ -29,8 +29,8 @@ exactly **`debug-signing`**.
 - **Deployment branches**: *Selected branches* → add exactly **`main`**. One branch
   only, no wildcard.
 
-The provisioning workflow verifies all of this at runtime and fails closed if any part
-is missing, so this step is not optional.
+The provisioning workflow verifies the reviewer and branch-policy configuration at
+runtime and fails closed if any part is missing, so this step is not optional.
 
 ## 2. Create the GitHub App (manual)
 
@@ -49,24 +49,17 @@ Nothing else. No contents, no actions, no administration, no workflows.
 
 Then **Install App** → **Only select repositories** → `Skyplus-money`.
 
-### About the Secrets permission — read this carefully
+### About the permission the workflow uses
 
-The workflow currently requests **only** `Environments: write`, as approved.
+The workflow requests **only** `Environments: write`, the least-privilege permission
+for creating and updating environment secrets. No other write permission is granted.
 
-GitHub's REST documentation for *Create or update an environment secret* states that
-a GitHub App must have the **`secrets`** repository permission to call that endpoint;
-`environments` alone does not write secret values. Because that conflicts with the
-approved permission set, the workflow does not guess: it performs an explicit
-**preflight** against the environment secret public-key endpoint before generating
-anything, and fails closed with a precise message if the token is not authorised.
-
-If the preflight fails, the fix is exactly two lines:
-
-1. App permissions: add **Secrets — Read and write**.
-2. In `.github/workflows/provision-debug-keystore.yml`, add
-   `permission-secrets: write` next to `permission-environments: write`.
-
-That change needs the founder's approval, because it widens the token.
+Before generating anything, the workflow performs a **preflight** that verifies the
+token can read the environment secret public key. That call proves public-key **read**
+access on the environment secrets endpoint; it does not assert anything about write
+permission. If it fails, the job stops with a message asking you to check that the App
+has `Environments: Read and write`, that the installation covers this repository, and
+that the token requests `permission-environments: write`.
 
 ## 3. Add the App credentials to the environment (manual)
 
@@ -93,11 +86,14 @@ What it does, in order:
 1. mints a one-hour GitHub App installation token, scoped to this repository with
    `environments: write` only, from an action pinned to a commit SHA;
 2. refuses to run outside `main`;
-3. verifies the environment **already exists**, has **required reviewers configured**,
-   and has a **custom deployment branch policy listing exactly `main`** — the number
-   of protection rules is not treated as proof;
-4. proves the token can reach the environment secret API, and fails closed with the
-   exact remedy if it cannot;
+3. verifies the **configuration** that must be in place: required reviewers actually
+   configured, and a **custom deployment branch policy listing exactly `main`** with no
+   wildcard and no second branch. The number of protection rules is not treated as
+   proof. Referencing an environment in a workflow can cause GitHub to create it, so
+   this check does not claim the environment existed beforehand — it fails closed when
+   the required configuration is absent;
+4. verifies the token can read the environment secret public key, and fails closed if
+   it cannot;
 5. generates the keystore with randomly generated passwords that nobody sees, under
    `$RUNNER_TEMP` with `0600` permissions;
 6. prints only the public SHA-1 and SHA-256;
