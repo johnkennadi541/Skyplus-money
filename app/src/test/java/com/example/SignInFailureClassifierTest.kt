@@ -93,18 +93,53 @@ class SignInFailureClassifierTest {
   }
 
   @Test
-  fun `only the exact account reauth failed phrase counts as the provider signal`() {
-    assertTrue(SignInFailureClassifier.hasReauthFailedSignal("[16] Account reauth failed."))
+  fun `only the complete account reauth failed phrase counts as the provider signal`() {
+    // Accepted forms: the phrase alone, with Google's status prefix, with the single
+    // trailing full stop, with surrounding whitespace, in any letter case.
+    assertTrue(SignInFailureClassifier.hasReauthFailedSignal("Account reauth failed"))
     assertTrue(SignInFailureClassifier.hasReauthFailedSignal("Account reauth failed."))
+    assertTrue(SignInFailureClassifier.hasReauthFailedSignal("[16] Account reauth failed."))
+    assertTrue(SignInFailureClassifier.hasReauthFailedSignal("  [16] Account reauth failed.  "))
+    assertTrue(SignInFailureClassifier.hasReauthFailedSignal("ACCOUNT REAUTH FAILED."))
     assertTrue(SignInFailureClassifier.hasReauthFailedSignal("account reauth failed"))
+  }
 
-    // Look-alikes and ordinary cancellations must never match.
+  @Test
+  fun `look-alike phrases and trailing text are rejected`() {
     assertFalse(SignInFailureClassifier.hasReauthFailedSignal("Other reauth failed"))
     assertFalse(SignInFailureClassifier.hasReauthFailedSignal("reauth failed"))
     assertFalse(SignInFailureClassifier.hasReauthFailedSignal("reauth"))
+    assertFalse(SignInFailureClassifier.hasReauthFailedSignal("Account reauth failed for user 42"))
+    assertFalse(
+      SignInFailureClassifier.hasReauthFailedSignal("[16] Account reauth failed for eyJhbGciOiJIUzI1NiJ9")
+    )
+    assertFalse(SignInFailureClassifier.hasReauthFailedSignal("Account reauth failed badly"))
     assertFalse(SignInFailureClassifier.hasReauthFailedSignal("cancelled by user"))
     assertFalse(SignInFailureClassifier.hasReauthFailedSignal("The flow has been cancelled."))
     assertFalse(SignInFailureClassifier.hasReauthFailedSignal(null))
+    assertFalse(SignInFailureClassifier.hasReauthFailedSignal(""))
+    assertFalse(SignInFailureClassifier.hasReauthFailedSignal("   "))
+  }
+
+  @Test
+  fun `status 16 with the complete phrase is a provider problem`() {
+    val snapshot = SignInFailureClassifier.snapshotFrom(RuntimeException("[16] Account reauth failed."))
+
+    assertEquals(16, snapshot.statusCode)
+    assertTrue(snapshot.hasProviderReauthSignal)
+    assertEquals(SignInFailureKind.PROVIDER_CONFIGURATION, SignInFailureClassifier.classify(snapshot))
+  }
+
+  @Test
+  fun `status 16 with trailing text is a user cancel`() {
+    val snapshot =
+      SignInFailureClassifier.snapshotFrom(
+        RuntimeException("[16] Account reauth failed for someone@example.com")
+      )
+
+    assertEquals(16, snapshot.statusCode)
+    assertFalse(snapshot.hasProviderReauthSignal)
+    assertEquals(SignInFailureKind.USER_CANCELLED, SignInFailureClassifier.classify(snapshot))
   }
 
   @Test
@@ -247,9 +282,10 @@ class SignInFailureClassifierTest {
 
     val snapshot = SignInFailureClassifier.snapshotFrom(error)
 
-    // The classification inputs survive...
+    // The status code survives, and the phrase is correctly rejected because it
+    // carries trailing text — the message is not the verified response.
     assertEquals(16, snapshot.statusCode)
-    assertTrue(snapshot.hasProviderReauthSignal)
+    assertFalse(snapshot.hasProviderReauthSignal)
 
     // ...but nothing of the raw text does. The snapshot has no message field at all,
     // so its full textual form must be free of every sensitive fragment.

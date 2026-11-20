@@ -73,11 +73,14 @@ object SignInFailureClassifier {
     )
 
   /**
-   * The one verified Google Play services phrase that means an OAuth/signing
-   * rejection: the complete "Account reauth failed" response. A bare "reauth failed"
-   * or any other wording must NOT raise a provider classification.
+   * The complete verified Google Play services response that means an OAuth/signing
+   * rejection. Nothing shorter and nothing longer counts: "reauth failed",
+   * "Other reauth failed" and "Account reauth failed for ..." must all be rejected.
    */
-  private const val REAUTH_FAILED_SIGNAL = "account reauth failed"
+  private const val REAUTH_FAILED_PHRASE = "account reauth failed"
+
+  /** Leading Google status-code group, as in "[16] ". */
+  private val LEADING_STATUS_GROUP = Regex("^\\[\\d{1,6}]\\s*")
 
   fun classify(snapshot: SignInFailureSnapshot): SignInFailureKind {
     val statusCode = snapshot.statusCode
@@ -142,12 +145,27 @@ object SignInFailureClassifier {
   }
 
   /**
-   * True only for the verified Google Play services "Account reauth failed" response.
-   * "Other reauth failed", a bare "reauth failed", "cancelled by user" and
-   * "The flow has been cancelled." all return false.
+   * True only when the message is the complete verified response phrase.
+   *
+   * Accepted: "Account reauth failed", "Account reauth failed." and the real
+   * "[16] Account reauth failed." the status prefix and the single trailing full
+   * stop are removed before comparing.
+   *
+   * Rejected: "Other reauth failed", "reauth failed", "Account reauth failed for …",
+   * "cancelled by user" and "The flow has been cancelled." — any extra word means the
+   * phrase is not the verified response, so it is not a provider signal.
    */
-  fun hasReauthFailedSignal(message: String?): Boolean =
-    message?.lowercase()?.contains(REAUTH_FAILED_SIGNAL) == true
+  fun hasReauthFailedSignal(message: String?): Boolean {
+    if (message.isNullOrBlank()) return false
+    val normalised =
+      message
+        .lowercase()
+        .trim()
+        .replace(LEADING_STATUS_GROUP, "")
+        .removeSuffix(".")
+        .trim()
+    return normalised == REAUTH_FAILED_PHRASE
+  }
 
   /** True when the message describes a connectivity problem. */
   fun hasNetworkSignal(message: String?): Boolean {
