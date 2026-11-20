@@ -1,0 +1,246 @@
+# Stable debug signing keystore — setup (GitHub App, Android-only)
+
+One stable debug keystore keeps the signing certificate identical on every build, so
+the SHA-1 and SHA-256 registered in Firebase stay valid and Google Sign-In works.
+
+Provisioning happens once, inside GitHub Actions, through a short-lived GitHub App
+token. No computer, no terminal, no online generator, no third party ever holds the
+key.
+
+**This document contains no secret values.**
+
+---
+
+## ⚠ Read this before generating any key
+
+**A newly generated keystore cannot update an APK that is already installed under a
+different signing certificate.** Android refuses such an install. See the section
+"APK update compatibility" below for the evidence and the only two possible outcomes.
+
+---
+
+## 1. Create the protected environment (manual, required first)
+
+GitHub → repository → **Settings → Environments → New environment** → name it
+exactly **`debug-signing`**.
+
+- **Required reviewers**: add yourself.
+- **Prevent self-review**: **OFF**, otherwise a solo founder can never approve.
+- **Deployment branches**: *Selected branches* → add exactly **`main`**. One branch
+  only, no wildcard.
+
+The provisioning workflow verifies the reviewer and branch-policy configuration at
+runtime and fails closed if any part is missing, so this step is not optional.
+
+## 2. Create the GitHub App (manual)
+
+GitHub → **Settings → Developer settings → GitHub Apps → New GitHub App**.
+
+- Name: for example `skyplus-debug-signing`. Homepage: the repository URL.
+- **Webhook: untick Active.** No webhook, no callback URL.
+- Repository permissions:
+
+| Permission | Level | Why this permission exists |
+|---|---|---|
+| **Environments** | Read and write | read the environment and its deployment branch policy, and reach the environment secret endpoints |
+| Metadata | Read | granted automatically to every App; cannot be removed |
+
+Nothing else. No contents, no actions, no administration, no workflows.
+
+Then **Install App** → **Only select repositories** → `Skyplus-money`.
+
+### About the permission the workflow uses
+
+The workflow requests **only** `Environments: write`, the least-privilege permission
+for creating and updating environment secrets. No other write permission is granted.
+
+Before generating anything, the workflow performs a **preflight** that verifies the
+token can read the environment secret public key. That call proves public-key **read**
+access on the environment secrets endpoint; it does not assert anything about write
+permission. If it fails, the job stops with a message asking you to check that the App
+has `Environments: Read and write`, that the installation covers this repository, and
+that the token requests `permission-environments: write`.
+
+## 3. Add the App credentials to the environment (manual)
+
+In the App page, note the **App ID**, then **Generate a private key** (one-time `.pem`
+download).
+
+GitHub → **Settings → Environments → `debug-signing` → Add secret**:
+
+| Secret name | Value |
+|---|---|
+| `SKYPLUS_APP_ID` | the App ID number |
+| `SKYPLUS_APP_PRIVATE_KEY` | the whole `.pem` file, including the BEGIN and END lines |
+
+On a phone: open the `.pem` in a private editor, select all, copy, paste, then clear
+the clipboard and delete the file. Never send it through chat or email.
+
+## 3b. Getting the workflow onto `main` (needs approval)
+
+`workflow_dispatch` only works for a workflow file that exists on the default branch, so
+this workflow cannot run from `main` until it is there. Nothing has been merged.
+
+Two safe routes, both needing the founder's approval:
+
+- **Route A — minimal PR into `main`.** A new branch containing only
+  `.github/workflows/provision-debug-keystore.yml`, the two-job
+  `.github/workflows/android-ci.yml` and this document, opened directly against `main`.
+  It does not carry the UI redesign or any app code. Between the merge and the first
+  provisioning run, pushes to `main` will show a failing `debug-apk` job with the
+  message that the keystore is not provisioned yet — that is the designed fail-closed
+  behaviour, not a defect.
+- **Route B — merge PR #4 first.** Merge `fix/stable-google-signin-keystore` into
+  `feature/ui-redesign`, then `feature/ui-redesign` into `main`. Slower and it carries
+  the whole redesign, so Route A is recommended.
+
+Never commit directly to `main`, and never dispatch the workflow from a branch other
+than `main`.
+
+## 4. Run the provisioning workflow once (manual)
+
+Actions → **Provision debug signing keystore** → **Run workflow** → branch **`main`**.
+Approve the deployment when prompted.
+
+What it does, in order:
+
+1. mints a one-hour GitHub App installation token, scoped to this repository with
+   `environments: write` only, from an action pinned to a commit SHA;
+2. refuses to run outside `main`;
+3. verifies the **configuration** that must be in place: required reviewers actually
+   configured, and a **custom deployment branch policy listing exactly `main`** with no
+   wildcard and no second branch. The number of protection rules is not treated as
+   proof. Referencing an environment in a workflow can cause GitHub to create it, so
+   this check does not claim the environment existed beforehand — it fails closed when
+   the required configuration is absent;
+4. verifies the token can read the environment secret public key, and fails closed if
+   it cannot;
+5. generates the keystore with randomly generated passwords that nobody sees, under
+   `$RUNNER_TEMP` with `0600` permissions;
+6. prints only the public SHA-1 and SHA-256;
+7. writes the four secrets with values piped on stdin (`--body` only for the
+   non-secret alias);
+8. verifies the four secret **names**;
+9. deletes every temporary file in an `if: always()` step; never uploads an artifact.
+
+## 5. Register the fingerprints in Firebase (manual)
+
+Firebase Console → project `skyplus-money` → Project settings → Your apps → Android
+app `com.skyplus.money` → **Add fingerprint** → SHA-1, then SHA-256. Allow five to ten
+minutes.
+
+---
+
+## APK update compatibility — evidence and blockers
+
+**Question:** can the next APK update the APK already installed on the founder's phone
+without uninstalling it?
+
+**Answer: no, not with a newly generated keystore. This is unresolved and blocks
+distribution.**
+
+Evidence gathered read-only:
+
+| Item | Finding |
+|---|---|
+| Application ID | `com.skyplus.money`, unchanged |
+| Installed APK certificate (diagnostics build, run 44745920493) | SHA-1 `94:68:14:4F:69:F4:BC:F7:0C:F4:89:27:17:14:BA:FE:11:B1:DB:08`, SHA-256 `12:92:31:D3:E5:E3:E2:14:02:4D:82:5E:F4:5B:24:DC:1A:64:FF:87:DC:AD:C9:68:F7:8E:9A:A3:95:E4:A9:E5` — re-extracted from the APK artifact and also shown on-device by the DEBUG diagnostics card |
+| A later CI build (run 44766111158) | SHA-1 `23:B7:F5:50:5E:96:C4:2C:DD:62:9E:8F:A5:BF:D0:11:1D:BD:77:54` — a different certificate |
+| Private key behind either certificate | **not recoverable**: each was generated inside a throw-away CI runner and never stored anywhere |
+| Repository history | contains no `.jks`, `.keystore` or `debug.keystore`; all are git-ignored (`.gitignore` lines 18, 21, 22) |
+| Firebase-registered hash in `google-services.json` | `c10d778e…706c3`, matching neither build |
+
+**Conclusion.** The installed certificate is *known*, but the private key behind it is
+*lost*. Android requires an identical signing certificate for an update, so a new
+keystore produces an APK that can only be installed fresh. Per the audit instruction,
+no replacement key may be generated for the purpose of updating the existing install.
+
+**How to obtain the installed APK's fingerprints safely**, without a computer:
+
+1. Install the diagnostics build whose DEBUG card prints its own signing SHA-1 and
+   SHA-256 (that is how `94:68:14…` was confirmed on the device), or
+2. compute them from any APK file with `apksigner verify --print-certs` or
+   `keytool -printcert -jarfile`, or
+3. read the same values from the CI job log where the APK was built.
+
+None of these needs root, ADB or a third-party app.
+
+**The two possible outcomes, both requiring founder approval:**
+
+- **A. Recover the original key.** Only possible if a copy exists outside the CI
+  runner. The evidence says it does not. If you believe you still have an APK signed
+  with a key you own, tell me and I will verify it before anything else.
+- **B. Accept one reinstall.** The founder uninstalls the current debug build and
+  installs the new stable-key APK once. Local app data is lost, which for this build
+  is test data only: sign-in never succeeded, so no financial records were ever
+  created. After that single reinstall, every future build updates normally because
+  the certificate never changes again.
+
+## Versioning
+
+Current state in `app/build.gradle.kts`: `applicationId = "com.skyplus.money"`,
+`versionCode = 1`, `versionName = "1.0"`.
+
+Rules that must hold for every distributed APK:
+
+- application ID never changes;
+- `versionCode` strictly increases for each distributed build;
+- signing certificate identical to the previously installed build;
+- no destructive database migration and no app-data reset.
+
+Proposed approach (needs approval, not yet applied): set `versionCode = 2` for the
+first stable-key build, then increment by one for every distributed build, and let
+`versionName` carry the human-readable number (`1.0.1`, `1.1`, …). One line changes in
+`app/build.gradle.kts`.
+
+## Test APK for pull requests
+
+Today `debug-apk` runs only on `main`, so pull requests produce no installable APK.
+
+**Rejected as unsafe:** attaching the `debug-signing` environment to pull-request jobs.
+The environment's branch policy is `main` only, so using it on a PR would mean
+relaxing that policy, and every PR run would then need an approval — while a fork PR
+must never reach signing secrets at all.
+
+**Proposed (not implemented):** add a separate `preview-apk` job that runs on pull
+requests, builds with the standard throw-away debug keystore and uploads
+`skyplus-money-preview-apk`. It uses **no secrets at all**, so nothing can leak. Its
+artifact is clearly labelled as a preview that cannot update the stable install and on
+which Google Sign-In will fail, because its certificate is random.
+
+That gives review builds without weakening secret protection. It needs approval
+before implementation.
+
+## Post-provisioning verification checklist
+
+Run these in order after the provisioning workflow succeeds and before anyone tests
+Google Sign-In.
+
+1. **Fingerprints exist.** The provisioning run printed one `SHA1:` and one `SHA256:`
+   line. Record them; they are public.
+2. **APK signature verified by CI.** The `debug-apk` job compares the APK certificate
+   with the keystore certificate and fails if they differ. Do not distribute an APK
+   from a run where that step did not pass.
+3. **APK fingerprint matches the keystore.** Read `keystore SHA-1` and `APK SHA-1`
+   from the verify step log; they must be identical, and the same for SHA-256.
+4. **Firebase registration.** Add both fingerprints to the Android app
+   `com.skyplus.money` in project `skyplus-money`, then wait five to ten minutes.
+5. **Version code.** The first stable APK must carry `versionCode = 2` or higher —
+   it is 2 in this branch — because the installed debug build is version 1.
+6. **Install and test.** Install the verified APK, then try Google Sign-In. Sign-in
+   must not be tested on any APK whose certificate is not the registered one.
+
+## Failure behaviour
+
+- Missing secret → clear error; no replacement keystore is generated.
+- Environment missing, unprotected, without reviewers, or not restricted to `main` →
+  fail before generating anything.
+- Token cannot reach the secret API → fail before generating anything, with the exact
+  remedy printed.
+- APK certificate differs from the keystore → fail; nothing is uploaded.
+- Temporary material always removed, on success and on failure.
+
+## Release signing
+
+Untouched. The `release` config still reads `KEYSTORE_PATH`, `STORE_PASSWORD` and
+`KEY_PASSWORD`. No release key exists or was changed.

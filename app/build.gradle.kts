@@ -15,10 +15,14 @@ android {
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
+    // applicationId never changes. versionCode strictly increases for every distributed
+    // APK so an update installs over the previous build: 1 was the throw-away-keystore
+    // debug build already installed on the test phone, so the first stable-keystore APK
+    // is 2. Increment by one before each future distribution.
     applicationId = "com.skyplus.money"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
+    versionCode = 2
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -34,11 +38,24 @@ android {
       keyAlias = "upload"
       keyPassword = System.getenv("KEY_PASSWORD")
     }
+    // Debug signing. CI supplies ONE stable debug keystore through environment
+    // variables so every debug APK keeps the same SHA-1/SHA-256 and Google Sign-In
+    // stays registered. Local and AI Studio builds that do not set these variables
+    // keep using the git-ignored ./debug.keystore exactly as before.
+    // No secret is written to BuildConfig, resources or logs.
     create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
+      val stableKeystorePath = System.getenv("SKYPLUS_DEBUG_KEYSTORE_PATH")
+      if (!stableKeystorePath.isNullOrBlank()) {
+        storeFile = file(stableKeystorePath)
+        storePassword = System.getenv("SKYPLUS_DEBUG_STORE_PASSWORD")
+        keyAlias = System.getenv("SKYPLUS_DEBUG_KEY_ALIAS")
+        keyPassword = System.getenv("SKYPLUS_DEBUG_KEY_PASSWORD")
+      } else {
+        storeFile = file("${rootDir}/debug.keystore")
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
+      }
     }
   }
 

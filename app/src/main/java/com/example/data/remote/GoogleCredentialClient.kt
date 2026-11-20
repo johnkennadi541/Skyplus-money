@@ -79,8 +79,29 @@ constructor(private val credentialManager: CredentialManager) : GoogleCredential
     } catch (e: CancellationException) {
       throw e
     } catch (e: GetCredentialCancellationException) {
-      Log.w(TAG, "Google Sign-In cancelled or dismissed: ${e.type}")
-      GoogleCredentialResult.Cancelled
+      // Credential Manager raises this exception for a real dismissal AND for provider
+      // rejections, so the cause is classified instead of being reported as a cancel.
+      when (classifyFailure(e)) {
+        SignInFailureKind.USER_CANCELLED -> {
+          Log.w(TAG, "Google Sign-In dismissed by the user")
+          GoogleCredentialResult.Cancelled
+        }
+        SignInFailureKind.NETWORK -> {
+          Log.w(TAG, "Google Sign-In could not reach Google")
+          GoogleCredentialResult.Failure(AuthError.NetworkError)
+        }
+        SignInFailureKind.PROVIDER_CONFIGURATION -> {
+          Log.e(
+            TAG,
+            "Google Sign-In rejected by the provider; verify the signing certificate registration",
+          )
+          GoogleCredentialResult.Failure(AuthError.ProviderConfigurationError)
+        }
+        else -> {
+          Log.e(TAG, "Google Sign-In failed before a credential was returned")
+          GoogleCredentialResult.Failure(AuthError.CredentialRetrievalFailed)
+        }
+      }
     } catch (_: NoCredentialException) {
       Log.w(TAG, "No Google account credential available on device")
       GoogleCredentialResult.Failure(AuthError.NoGoogleAccount)
@@ -94,13 +115,19 @@ constructor(private val credentialManager: CredentialManager) : GoogleCredential
       Log.e(TAG, "Failed to parse Google ID token payload")
       GoogleCredentialResult.Failure(AuthError.MissingIdToken)
     } catch (e: GetCredentialException) {
-      val message = e.message.orEmpty().lowercase()
-      if ("network" in message || "timeout" in message || "unable to resolve host" in message) {
-        Log.w(TAG, "Credential retrieval failed due to network error")
-        GoogleCredentialResult.Failure(AuthError.NetworkError)
-      } else {
-        Log.e(TAG, "Credential retrieval failed: ${e.type}")
-        GoogleCredentialResult.Failure(AuthError.CredentialRetrievalFailed)
+      when (classifyFailure(e)) {
+        SignInFailureKind.NETWORK -> {
+          Log.w(TAG, "Credential retrieval failed due to network error")
+          GoogleCredentialResult.Failure(AuthError.NetworkError)
+        }
+        SignInFailureKind.PROVIDER_CONFIGURATION -> {
+          Log.e(TAG, "Credential retrieval failed: provider configuration problem")
+          GoogleCredentialResult.Failure(AuthError.ProviderConfigurationError)
+        }
+        else -> {
+          Log.e(TAG, "Credential retrieval failed: ${e.type}")
+          GoogleCredentialResult.Failure(AuthError.CredentialRetrievalFailed)
+        }
       }
     } catch (_: Exception) {
       Log.e(TAG, "Unexpected credential retrieval failure")
@@ -116,6 +143,21 @@ constructor(private val credentialManager: CredentialManager) : GoogleCredential
         Log.w(TAG, "Unable to clear Credential Manager state: ${e::class.simpleName}")
       }
     }
+  }
+
+  /**
+   * Classifies a failure without logging any token, account identity or full payload.
+   * Only the kind, the Google status code and the Credential Manager type are recorded.
+   */
+  private fun classifyFailure(error: Throwable): SignInFailureKind {
+    val snapshot = SignInFailureClassifier.snapshotFrom(error)
+    val kind = SignInFailureClassifier.classify(snapshot)
+    Log.w(
+      TAG,
+      "sign-in failure kind=$kind statusCode=${snapshot.statusCode ?: "-"} " +
+        "type=${snapshot.credentialType ?: "-"} exception=${snapshot.exceptionClassName}",
+    )
+    return kind
   }
 
   private tailrec fun Context.findActivity(): Activity? =

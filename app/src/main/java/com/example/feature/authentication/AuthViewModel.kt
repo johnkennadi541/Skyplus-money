@@ -313,5 +313,6 @@ constructor(
       AuthError.FirebaseAuthenticationFailed -> R.string.auth_error_firebase_failed
       AuthError.AccountLinkingRequiresOwnershipVerification ->
         R.string.auth_error_linking_verification
+      AuthError.ProviderConfigurationError -> R.string.auth_error_provider_configuration
     }
 }
