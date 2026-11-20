@@ -16,7 +16,7 @@ import com.example.domain.model.ShoppingStorePriceRecord
 import com.example.domain.model.ThemePreference
 import com.example.domain.usecase.ShoppingCalculationEngine
 import com.example.domain.usecase.ShoppingWorkspaceSnapshot
-import com.example.feature.dashboard.HomeFoundationUiState
+import com.example.feature.dashboard.HomeUiState
 import com.example.feature.shopping.ShoppingItemFilter
 import com.example.feature.shopping.ShoppingListContent
 import com.example.navigation.SkyplusAppShell
@@ -61,7 +61,7 @@ class Phase3ShoppingUiAndNavigationRobolectricTest {
     composeTestRule.setContent {
       SkyplusOceanTheme(themePreference = ThemePreference.LIGHT) {
         SkyplusAppShell(
-          homeUiState = HomeFoundationUiState(),
+          homeUiState = HomeUiState(),
           themePreference = ThemePreference.LIGHT,
           onToggleTheme = {},
           onSelectTheme = {},

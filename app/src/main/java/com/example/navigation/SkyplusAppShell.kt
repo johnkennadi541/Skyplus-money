@@ -79,7 +79,7 @@ import com.example.feature.budgets.BudgetsScreen
 import com.example.feature.budgets.BudgetsViewModel
 import com.example.feature.consent.LegalConsentPreviewScreen
 import com.example.feature.consent.LegalConsentScreen
-import com.example.feature.dashboard.HomeFoundationUiState
+import com.example.feature.dashboard.HomeUiState
 import com.example.feature.dashboard.HomeScreen
 import com.example.feature.investments.InvestmentDetailContent
 import com.example.feature.investments.InvestmentDetailScreen
@@ -125,7 +125,7 @@ import com.example.feature.transactions.TransactionsViewModel
 @Composable
 fun SkyplusAuthGateRoot(
   authUiState: AuthUiState,
-  homeUiState: HomeFoundationUiState,
+  homeUiState: HomeUiState,
   themePreference: ThemePreference,
   onContinueWithGoogle: (android.content.Context) -> Unit,
   onDismissAuthFeedback: () -> Unit,
@@ -134,6 +134,8 @@ fun SkyplusAuthGateRoot(
   onSelectTheme: (ThemePreference) -> Unit,
   onAcceptConsent: () -> Unit,
   modifier: Modifier = Modifier,
+  onHomeRetryLoad: () -> Unit = {},
+  onSelectHomeCurrency: (String) -> Unit = {},
   onRetryConsentCheck: (() -> Unit)? = null,
   databaseSecurityError: DatabaseSecurityException? = null,
   onRetryDatabaseInit: (() -> Unit)? = null,
@@ -184,6 +186,8 @@ fun SkyplusAuthGateRoot(
             themePreference = themePreference,
             onToggleTheme = onToggleTheme,
             onSelectTheme = onSelectTheme,
+            onHomeRetryLoad = onHomeRetryLoad,
+            onSelectHomeCurrency = onSelectHomeCurrency,
             authenticatedUser = session.user,
             onSignOut = onSignOut,
             accountsViewModel = accountsViewModel,
@@ -260,11 +264,13 @@ private fun DatabaseSecurityErrorScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SkyplusAppShell(
-  homeUiState: HomeFoundationUiState,
+  homeUiState: HomeUiState,
   themePreference: ThemePreference,
   onToggleTheme: () -> Unit,
   onSelectTheme: (ThemePreference) -> Unit,
   modifier: Modifier = Modifier,
+  onHomeRetryLoad: () -> Unit = {},
+  onSelectHomeCurrency: (String) -> Unit = {},
   navController: NavHostController = rememberNavController(),
   authenticatedUser: AuthenticatedUser? = null,
   onSignOut: (() -> Unit)? = null,
@@ -451,6 +457,8 @@ fun SkyplusAppShell(
                 onOpenEmiCalculator = { navController.navigate(SkyplusRoute.EmiCalculator) },
                 onOpenInvestments = { navController.navigate(SkyplusRoute.Investments) },
                 onOpenReports = { navController.navigate(SkyplusRoute.Reports) },
+                onRetryLoad = onHomeRetryLoad,
+                onSelectCurrency = onSelectHomeCurrency,
                 budgets = budgetStatuses,
                 loans = loans,
                 investments = investments,

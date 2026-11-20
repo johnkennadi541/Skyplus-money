@@ -58,6 +58,8 @@ class MainActivity : ComponentActivity() {
           onDismissAuthFeedback = authViewModel::onDismissFeedback,
           onSignOut = authViewModel::onSignOut,
           onToggleTheme = homeViewModel::toggleDarkLightTheme,
+          onHomeRetryLoad = homeViewModel::refresh,
+          onSelectHomeCurrency = homeViewModel::selectCurrency,
           onSelectTheme = settingsViewModel::onThemeSelected,
           onAcceptConsent = authViewModel::onAcceptConsent,
           onRetryConsentCheck = authViewModel::onRetryConsentCheck,

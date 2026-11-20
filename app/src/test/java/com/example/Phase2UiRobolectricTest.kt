@@ -15,7 +15,7 @@ import com.example.domain.model.ThemePreference
 import com.example.domain.model.TransactionDetectionEvent
 import com.example.domain.model.TransactionType
 import com.example.feature.accounts.AccountsContent
-import com.example.feature.dashboard.HomeFoundationUiState
+import com.example.feature.dashboard.HomeUiState
 import com.example.feature.dashboard.HomeScreen
 import com.example.feature.smartdetection.SmsPolicyStatusScreen
 import com.example.feature.smartdetection.TransactionCorrectionDialog
@@ -130,7 +130,7 @@ class Phase2UiRobolectricTest {
     composeTestRule.setContent {
       SkyplusOceanTheme(themePreference = ThemePreference.DARK) {
         HomeScreen(
-          uiState = HomeFoundationUiState(),
+          uiState = HomeUiState(),
           onOpenAuthReadiness = {},
           autoSavedNotice = notice,
           onOpenReviewQueue = { reviewClicked = true },

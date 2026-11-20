@@ -17,7 +17,7 @@ import com.example.domain.model.AuthenticatedUser
 import com.example.domain.model.ConsentRecord
 import com.example.domain.model.ThemePreference
 import com.example.feature.authentication.AuthUiState
-import com.example.feature.dashboard.HomeFoundationUiState
+import com.example.feature.dashboard.HomeUiState
 import com.example.navigation.SkyplusAuthGateRoot
 import org.junit.Rule
 import org.junit.Test
@@ -53,7 +53,7 @@ class LegalConsentGateRobolectricTest {
       SkyplusOceanTheme(themePreference = ThemePreference.DARK) {
         SkyplusAuthGateRoot(
           authUiState = authState,
-          homeUiState = HomeFoundationUiState(),
+          homeUiState = HomeUiState(),
           themePreference = ThemePreference.DARK,
           onContinueWithGoogle = {},
           onDismissAuthFeedback = {},
@@ -120,7 +120,7 @@ class LegalConsentGateRobolectricTest {
       SkyplusOceanTheme(themePreference = ThemePreference.DARK) {
         SkyplusAuthGateRoot(
           authUiState = authState,
-          homeUiState = HomeFoundationUiState(),
+          homeUiState = HomeUiState(),
           themePreference = ThemePreference.DARK,
           onContinueWithGoogle = {},
           onDismissAuthFeedback = {},
@@ -164,7 +164,7 @@ class LegalConsentGateRobolectricTest {
       SkyplusOceanTheme(themePreference = ThemePreference.DARK) {
         SkyplusAuthGateRoot(
           authUiState = authState,
-          homeUiState = HomeFoundationUiState(),
+          homeUiState = HomeUiState(),
           themePreference = ThemePreference.DARK,
           onContinueWithGoogle = {},
           onDismissAuthFeedback = {},
@@ -208,7 +208,7 @@ class LegalConsentGateRobolectricTest {
       SkyplusOceanTheme(themePreference = ThemePreference.DARK) {
         SkyplusAuthGateRoot(
           authUiState = authState,
-          homeUiState = HomeFoundationUiState(),
+          homeUiState = HomeUiState(),
           themePreference = ThemePreference.DARK,
           onContinueWithGoogle = {},
           onDismissAuthFeedback = {},
@@ -247,7 +247,7 @@ class LegalConsentGateRobolectricTest {
       SkyplusOceanTheme(themePreference = ThemePreference.DARK) {
         SkyplusAuthGateRoot(
           authUiState = authState,
-          homeUiState = HomeFoundationUiState(),
+          homeUiState = HomeUiState(),
           themePreference = ThemePreference.DARK,
           onContinueWithGoogle = {},
           onDismissAuthFeedback = {},

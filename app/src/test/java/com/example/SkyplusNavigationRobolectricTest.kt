@@ -8,7 +8,7 @@ import com.example.core.designsystem.theme.SkyplusOceanTheme
 import com.example.domain.model.PhaseDeliveryState
 import com.example.domain.model.RoadmapPhaseItem
 import com.example.domain.model.ThemePreference
-import com.example.feature.dashboard.HomeFoundationUiState
+import com.example.feature.dashboard.HomeUiState
 import com.example.navigation.SkyplusAppShell
 import org.junit.Rule
 import org.junit.Test
@@ -23,7 +23,7 @@ class SkyplusNavigationRobolectricTest {
   @get:Rule val composeTestRule = createComposeRule()
 
   private val sampleState =
-    HomeFoundationUiState(
+    HomeUiState(
       roadmap =
         listOf(
           RoadmapPhaseItem(

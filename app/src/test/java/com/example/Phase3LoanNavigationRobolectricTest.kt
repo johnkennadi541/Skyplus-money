@@ -10,7 +10,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import com.example.core.designsystem.theme.SkyplusOceanTheme
 import com.example.domain.model.ThemePreference
-import com.example.feature.dashboard.HomeFoundationUiState
+import com.example.feature.dashboard.HomeUiState
 import com.example.navigation.SkyplusAppShell
 import org.junit.Rule
 import org.junit.Test
@@ -29,7 +29,7 @@ class Phase3LoanNavigationRobolectricTest {
     composeTestRule.setContent {
       SkyplusOceanTheme(themePreference = ThemePreference.LIGHT) {
         SkyplusAppShell(
-          homeUiState = HomeFoundationUiState(),
+          homeUiState = HomeUiState(),
           themePreference = ThemePreference.LIGHT,
           onToggleTheme = {},
           onSelectTheme = {},

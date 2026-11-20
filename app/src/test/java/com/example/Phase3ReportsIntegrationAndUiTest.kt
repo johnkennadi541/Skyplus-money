@@ -40,7 +40,7 @@ import com.example.domain.usecase.InvestmentCalculationEngine
 import com.example.domain.usecase.ObserveFinancialReportsUseCase
 import com.example.domain.usecase.ReportsCalculationEngine
 import com.example.domain.usecase.ShoppingCalculationEngine
-import com.example.feature.dashboard.HomeFoundationUiState
+import com.example.feature.dashboard.HomeUiState
 import com.example.feature.reports.PreparedEmailPreview
 import com.example.feature.reports.ReportsContent
 import com.example.feature.reports.ReportsScreen
@@ -229,7 +229,7 @@ class Phase3ReportsIntegrationAndUiTest {
     composeTestRule.setContent {
       SkyplusOceanTheme(themePreference = ThemePreference.LIGHT) {
         SkyplusAppShell(
-          homeUiState = HomeFoundationUiState(),
+          homeUiState = HomeUiState(),
           themePreference = ThemePreference.LIGHT,
           onToggleTheme = {},
           onSelectTheme = {},
