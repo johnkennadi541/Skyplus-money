@@ -105,6 +105,7 @@
     <string name="auth_error_session_expired">Your session has expired or is no longer valid. Please sign in again.</string>
     <string name="auth_error_missing_config">Google Sign-In client configuration is unavailable in this build.</string>
     <string name="auth_error_firebase_failed">Authentication could not be completed. Please try again.</string>
+    <string name="auth_error_provider_configuration">Google Sign-In could not be completed on this build. Please update the app and try again, or contact support if it continues.</string>
     <string name="auth_error_linking_verification">An account with this email already exists under another sign-in method. Verified ownership is required before linking accounts.</string>
     <!-- Phase 1D Legal Consent Gate -->
     <string name="legal_consent_badge">Phase 1D • Mandatory Consent</string>

@@ -26,21 +26,6 @@ jobs:
           java-version: 21
           cache: gradle
 
-      # The debug signing config in app/build.gradle.kts points at ./debug.keystore.
-      # That file is git-ignored, so the runner creates a throw-away one. It is only
-      # used for local/CI debug builds and is never used to sign a distributed APK.
-      - name: Create throw-away debug keystore
-        run: |
-          if [ ! -f debug.keystore ]; then
-            keytool -genkeypair -v \
-              -keystore debug.keystore \
-              -storetype JKS \
-              -alias androiddebugkey \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass android -keypass android \
-              -dname "CN=Android Debug,O=Android,C=US"
-          fi
-
       - name: Make the wrapper executable
         run: chmod +x ./gradlew
 
@@ -65,7 +50,85 @@ jobs:
           echo "Test classes executed: $(find "$DIR" -name 'TEST-*.xml' | wc -l)"
           awk -F'"' '/<testsuite /{for(i=1;i<=NF;i++){if($i ~ /tests=$/){t+=$(i+1)} if($i ~ /failures=$/){f+=$(i+1)} if($i ~ /errors=$/){e+=$(i+1)} if($i ~ /skipped=$/){s+=$(i+1)}}} END{printf "tests=%d failures=%d errors=%d skipped=%d\n", t, f, e, s}' "$DIR"/TEST-*.xml
 
+      # The debug keystore is provisioned ONCE by the founder and stored as repository
+      # secrets (see docs/DEBUG_KEYSTORE_SETUP.md). CI never generates one, so every
+      # debug APK keeps the same signing certificate and Google Sign-In stays registered.
+      - name: Validate debug signing secrets
+        env:
+          KEYSTORE_B64: ${{ secrets.SKYPLUS_DEBUG_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.SKYPLUS_DEBUG_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.SKYPLUS_DEBUG_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SKYPLUS_DEBUG_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in SKYPLUS_DEBUG_KEYSTORE_BASE64 SKYPLUS_DEBUG_STORE_PASSWORD SKYPLUS_DEBUG_KEY_PASSWORD SKYPLUS_DEBUG_KEY_ALIAS; do
+            case "$name" in
+              SKYPLUS_DEBUG_KEYSTORE_BASE64) value="$KEYSTORE_B64" ;;
+              SKYPLUS_DEBUG_STORE_PASSWORD) value="$STORE_PASSWORD" ;;
+              SKYPLUS_DEBUG_KEY_PASSWORD) value="$KEY_PASSWORD" ;;
+              SKYPLUS_DEBUG_KEY_ALIAS) value="$KEY_ALIAS" ;;
+            esac
+            if [ -z "${value:-}" ]; then
+              echo "::error::Required repository secret is missing: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::The stable debug keystore is not provisioned. Follow docs/DEBUG_KEYSTORE_SETUP.md. CI will not generate a replacement keystore."
+            exit 1
+          fi
+          echo "All required debug signing secrets are present."
+
+      - name: Restore stable debug keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.SKYPLUS_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          KEYSTORE_PATH="$RUNNER_TEMP/skyplus-debug.jks"
+          umask 077
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+          if [ ! -s "$KEYSTORE_PATH" ]; then
+            echo "::error::Decoded debug keystore is empty."
+            exit 1
+          fi
+          echo "SKYPLUS_DEBUG_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+          echo "Debug keystore restored to a temporary path with 0600 permissions."
+
+      - name: Validate keystore and key alias
+        env:
+          STORE_PASSWORD: ${{ secrets.SKYPLUS_DEBUG_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SKYPLUS_DEBUG_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          keytool -list \
+            -keystore "$SKYPLUS_DEBUG_KEYSTORE_PATH" \
+            -storepass:env STORE_PASSWORD \
+            -alias "$KEY_ALIAS" > /dev/null
+          echo "Keystore opened and alias '$KEY_ALIAS' exists."
+
+      # Public certificate fingerprints only. No password and no key material is printed.
+      - name: Print debug certificate fingerprints
+        env:
+          STORE_PASSWORD: ${{ secrets.SKYPLUS_DEBUG_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SKYPLUS_DEBUG_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          keytool -list -v \
+            -keystore "$SKYPLUS_DEBUG_KEYSTORE_PATH" \
+            -storepass:env STORE_PASSWORD \
+            -alias "$KEY_ALIAS" \
+            | grep -E "SHA1:|SHA256:" \
+            | sed 's/^[[:space:]]*//' > "$RUNNER_TEMP/keystore-fingerprints.txt"
+          cat "$RUNNER_TEMP/keystore-fingerprints.txt"
+          echo "Register these two values in Firebase for com.skyplus.money."
+
       - name: Build debug APK
+        env:
+          SKYPLUS_DEBUG_STORE_PASSWORD: ${{ secrets.SKYPLUS_DEBUG_STORE_PASSWORD }}
+          SKYPLUS_DEBUG_KEY_PASSWORD: ${{ secrets.SKYPLUS_DEBUG_KEY_PASSWORD }}
+          SKYPLUS_DEBUG_KEY_ALIAS: ${{ secrets.SKYPLUS_DEBUG_KEY_ALIAS }}
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
       - name: Report APK details
@@ -80,6 +143,35 @@ jobs:
             "$AAPT2" dump badging "$APK" | grep -E "^package:|^application-label:" | head -3
           fi
 
+      # Proves the APK really was signed with the provisioned keystore, so a silent
+      # fallback to a throw-away key can never ship.
+      - name: Verify APK certificate matches the stable keystore
+        env:
+          STORE_PASSWORD: ${{ secrets.SKYPLUS_DEBUG_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SKYPLUS_DEBUG_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::apksigner was not found in the Android build-tools."
+            exit 1
+          fi
+          normalise() { tr -d ':' | tr 'a-f' 'A-F' | tr -d '[:space:]'; }
+          KEY_SHA1=$(keytool -list -v -keystore "$SKYPLUS_DEBUG_KEYSTORE_PATH" -storepass:env STORE_PASSWORD -alias "$KEY_ALIAS" | grep -m1 "SHA1:" | cut -d: -f2- | normalise)
+          KEY_SHA256=$(keytool -list -v -keystore "$SKYPLUS_DEBUG_KEYSTORE_PATH" -storepass:env STORE_PASSWORD -alias "$KEY_ALIAS" | grep -m1 "SHA256:" | cut -d: -f2- | normalise)
+          APK_SHA1=$("$APKSIGNER" verify --print-certs "$APK" | grep -m1 "SHA-1 digest" | awk '{print $NF}' | normalise)
+          APK_SHA256=$("$APKSIGNER" verify --print-certs "$APK" | grep -m1 "SHA-256 digest" | awk '{print $NF}' | normalise)
+          echo "keystore SHA-1  : $KEY_SHA1"
+          echo "APK      SHA-1  : $APK_SHA1"
+          echo "keystore SHA-256: $KEY_SHA256"
+          echo "APK      SHA-256: $APK_SHA256"
+          if [ "$KEY_SHA1" != "$APK_SHA1" ] || [ "$KEY_SHA256" != "$APK_SHA256" ]; then
+            echo "::error::APK signing certificate does not match the provisioned debug keystore."
+            exit 1
+          fi
+          echo "APK signing certificate matches the stable debug keystore."
+
       - name: Upload debug APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -87,3 +179,10 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
           if-no-files-found: error
+
+      # The keystore must never outlive the job, even when an earlier step failed.
+      - name: Remove temporary signing material
+        if: always()
+        run: |
+          rm -f "${SKYPLUS_DEBUG_KEYSTORE_PATH:-/nonexistent}" "$RUNNER_TEMP/keystore-fingerprints.txt"
+          echo "Temporary signing material removed."

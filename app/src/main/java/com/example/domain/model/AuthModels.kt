@@ -38,6 +38,12 @@ sealed interface AuthError {
   data object FirebaseAuthenticationFailed : AuthError
 
   data object AccountLinkingRequiresOwnershipVerification : AuthError
+
+  /**
+   * Google rejected the request for a configuration reason (unregistered signing
+   * certificate, disabled provider, stale Play services) rather than a user cancel.
+   */
+  data object ProviderConfigurationError : AuthError
 }
 
 sealed interface AuthResult<out T> {

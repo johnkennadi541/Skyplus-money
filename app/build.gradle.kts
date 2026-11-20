@@ -34,11 +34,24 @@ android {
       keyAlias = "upload"
       keyPassword = System.getenv("KEY_PASSWORD")
     }
+    // Debug signing. CI supplies ONE stable debug keystore through environment
+    // variables so every debug APK keeps the same SHA-1/SHA-256 and Google Sign-In
+    // stays registered. Local and AI Studio builds that do not set these variables
+    // keep using the git-ignored ./debug.keystore exactly as before.
+    // No secret is written to BuildConfig, resources or logs.
     create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
+      val stableKeystorePath = System.getenv("SKYPLUS_DEBUG_KEYSTORE_PATH")
+      if (!stableKeystorePath.isNullOrBlank()) {
+        storeFile = file(stableKeystorePath)
+        storePassword = System.getenv("SKYPLUS_DEBUG_STORE_PASSWORD")
+        keyAlias = System.getenv("SKYPLUS_DEBUG_KEY_ALIAS")
+        keyPassword = System.getenv("SKYPLUS_DEBUG_KEY_PASSWORD")
+      } else {
+        storeFile = file("${rootDir}/debug.keystore")
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
+      }
     }
   }
 
