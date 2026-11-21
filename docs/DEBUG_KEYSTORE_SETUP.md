@@ -156,20 +156,29 @@ What it does, in order:
 8. verifies the four secret **names**;
 9. deletes every temporary file in an `if: always()` step; never uploads an artifact.
 
-## 5. Register the fingerprints in Firebase (manual)
+## 5. Firebase fingerprints — already registered
 
-Firebase Console → project `skyplus-money` → Project settings → Your apps → Android
-app `com.skyplus.money` → **Add fingerprint** → SHA-1, then SHA-256. Allow five to ten
-minutes.
+**Owner-confirmed.** The repository owner confirms that both the SHA-1 and the SHA-256 of
+the stable debug keystore have been added to the Android app `com.skyplus.money` in the
+Firebase project `skyplus-money`. The approved SHA-256 registered there is the one
+recorded in "Required repository configuration" below:
+`47:B6:93:4D:D5:B4:2A:D1:79:E4:2C:70:4A:8D:97:7E:4F:35:1E:7C:54:F4:C1:26:E4:4F:D5:F3:4B:42:E2:EB`.
+
+This is the owner's confirmation of a console action. It is **not** an independent live
+verification: no workflow, tool or repository file can read the Firebase Console, so
+nothing here claims one was performed.
+
+For the record, the console path used was: Firebase Console → project `skyplus-money` →
+Project settings → Your apps → Android app `com.skyplus.money` → **Add fingerprint** →
+SHA-1, then SHA-256. Fingerprint changes take five to ten minutes to propagate.
 
 **Where these values live.** The signing fingerprints are project configuration held in
 the Firebase Console. They are *not* stored in `google-services.json`: that file carries
 the project id, API key and client ids, and an Android OAuth client entry without a
 `certificate_hash`, so it cannot tell you which signing certificate Firebase accepts.
 Reading the repository therefore proves nothing about Firebase. The console is the only
-source of truth, and the fingerprints there must be compared by hand against the values
-the provisioning run printed. No repository file records whether that comparison has
-been made, and this document does not claim it has.
+source of truth, and the fingerprints there must be compared by hand against the approved
+values recorded in this document.
 
 ---
 
@@ -193,7 +202,7 @@ Evidence gathered read-only:
 | Private key behind either certificate | **not recoverable**: each was generated inside a throw-away CI runner and never stored anywhere |
 | Repository history | contains no `.jks`, `.keystore` or `debug.keystore`; all are git-ignored (`.gitignore` lines 18, 21, 22) |
 | Signing fingerprints inside `google-services.json` | **none**. The file carries a web client and an Android client with no `certificate_hash` field, so it says nothing about which signing certificate is accepted |
-| Firebase Console registration | **not verified**. SHA-1 and SHA-256 fingerprints are configured in the Firebase project settings, not in `google-services.json`, and cannot be read from this repository. They must be checked in the console |
+| Firebase Console registration | **owner-confirmed**. The repository owner confirms both the SHA-1 and the SHA-256 were added to the Android app in the Firebase Console. This is the owner's statement, not an independent live check: the fingerprints are project configuration held in the Firebase Console, not in `google-services.json`, so they cannot be read from this repository |
 
 **Conclusion.** The installed certificate is *known*, but the private key behind it is
 *lost*. Android requires an identical signing certificate for an update, so a new
@@ -272,8 +281,9 @@ Google Sign-In.
    from a run where that step did not pass.
 3. **APK fingerprint matches the keystore.** Read `keystore SHA-1` and `APK SHA-1`
    from the verify step log; they must be identical, and the same for SHA-256.
-4. **Firebase registration.** Add both fingerprints to the Android app
-   `com.skyplus.money` in project `skyplus-money`, then wait five to ten minutes.
+4. **Firebase registration — done.** Both fingerprints were added to the Android app
+   `com.skyplus.money` in project `skyplus-money` (owner-confirmed). Nothing further is
+   needed here; this item is recorded as completed, not as a task.
 5. **Version code.** The first stable APK must carry `versionCode = 2` or higher —
    it is 2 in this branch — because the installed debug build is version 1.
 6. **Approved fingerprint pinned.** The `debug-apk` job also compares the APK
