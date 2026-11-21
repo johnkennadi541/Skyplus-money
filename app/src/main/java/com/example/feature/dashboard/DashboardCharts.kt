@@ -6,6 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -49,20 +53,22 @@ import kotlin.math.atan2
 import kotlin.math.hypot
 import kotlin.math.min
 
-/** Which of the two series in a month group is selected. */
+/** Which of the two series in a month group is emphasised. */
 enum class TrendSeries { INCOME, EXPENSES }
 
-/** A selected bar: the month plus which series the user touched. */
+/** The selected month plus the series the user is looking at. */
 data class TrendSelection(val monthKey: String, val series: TrendSeries)
 
 /**
- * Grouped income-versus-expense bars, one group per month, with real touch selection.
+ * Grouped income-versus-expense bars, one group per month.
  *
- * Tapping an income bar selects that month's income and tapping an expense bar selects
- * that month's expense; the caller renders the exact figures for whatever is selected.
- * Income is always green and expenses are always red, in both themes. Every bar carries
- * a content description, and the touch area spans the full chart height so a narrow bar
- * is still easy to hit.
+ * Touch targets: each month is ONE tap target at least [MonthColumnWidth] wide and the
+ * full chart height tall, which satisfies the 48 dp guideline on every screen size. The
+ * chart scrolls horizontally rather than squeezing two sub-48 dp bars per month, so the
+ * target size never depends on how many months are shown. The income/expense series is
+ * chosen with the chips above the chart, so a month and a series are both selectable
+ * without a narrow target. Content descriptions are additional information, not a
+ * substitute for the target size.
  */
 @Composable
 fun IncomeExpenseTrendChart(
@@ -80,11 +86,13 @@ fun IncomeExpenseTrendChart(
     remember(trends) {
       trends.maxOfOrNull { point -> maxOf(point.income.minorUnits, point.expenses.minorUnits) } ?: 0L
     }
+  val scrollState = rememberScrollState()
 
   Column(modifier = modifier.fillMaxWidth()) {
     Row(
-      modifier = Modifier.fillMaxWidth().height(chartHeight),
-      horizontalArrangement = Arrangement.spacedBy(OceanSpacing.sm),
+      modifier =
+        Modifier.fillMaxWidth().height(chartHeight).horizontalScroll(scrollState),
+      horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
       verticalAlignment = Alignment.Bottom,
     ) {
       trends.forEach { point ->
@@ -98,57 +106,66 @@ fun IncomeExpenseTrendChart(
             animationSpec = tween(400),
             label = "expenseBar",
           )
+        val isSelectedMonth = selection?.monthKey == point.monthKey
+        val description =
+          "${point.label}. Income ${point.income.formatted}, expenses " +
+            "${point.expenses.formatted}. Select to show the exact figures."
 
-        val incomeSelected =
-          selection?.monthKey == point.monthKey && selection.series == TrendSeries.INCOME
-        val expenseSelected =
-          selection?.monthKey == point.monthKey && selection.series == TrendSeries.EXPENSES
-
-        Row(
-          modifier = Modifier.weight(1f).fillMaxHeight(),
-          horizontalArrangement = Arrangement.spacedBy(3.dp),
-          verticalAlignment = Alignment.Bottom,
+        Column(
+          modifier =
+            Modifier.width(MonthColumnWidth)
+              .fillMaxHeight()
+              .testTag("home_trend_month_${point.monthKey}")
+              .semantics {
+                contentDescription = description
+                role = Role.Button
+                selected = isSelectedMonth
+              }
+              .clickable {
+                val series = selection?.series ?: TrendSeries.INCOME
+                onSelect(TrendSelection(point.monthKey, series))
+              },
+          verticalArrangement = Arrangement.Bottom,
         ) {
-          TrendBar(
-            fraction = incomeBar,
-            colour = incomeColor,
-            selected = incomeSelected,
-            description =
-              "${point.label} income ${point.income.formatted}. Select to show the exact figures.",
-            onSelect = { onSelect(TrendSelection(point.monthKey, TrendSeries.INCOME)) },
-            modifier = Modifier.weight(1f),
-          )
-          TrendBar(
-            fraction = expenseBar,
-            colour = expenseColor,
-            selected = expenseSelected,
-            description =
-              "${point.label} expenses ${point.expenses.formatted}. Select to show the exact figures.",
-            onSelect = { onSelect(TrendSelection(point.monthKey, TrendSeries.EXPENSES)) },
-            modifier = Modifier.weight(1f),
+          Row(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.Bottom,
+          ) {
+            Box(
+              modifier =
+                Modifier.weight(1f)
+                  .fillMaxHeight(incomeBar.coerceAtLeast(0.02f))
+                  .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                  .background(
+                    if (!isSelectedMonth || selection?.series == TrendSeries.INCOME) incomeColor
+                    else incomeColor.copy(alpha = 0.45f)
+                  )
+            )
+            Box(
+              modifier =
+                Modifier.weight(1f)
+                  .fillMaxHeight(expenseBar.coerceAtLeast(0.02f))
+                  .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                  .background(
+                    if (!isSelectedMonth || selection?.series == TrendSeries.EXPENSES) expenseColor
+                    else expenseColor.copy(alpha = 0.45f)
+                  )
+            )
+          }
+          Text(
+            text = point.label,
+            modifier = Modifier.fillMaxWidth().padding(top = OceanSpacing.xxs),
+            style = MaterialTheme.typography.labelSmall,
+            color =
+              if (isSelectedMonth) MaterialTheme.colorScheme.onSurface
+              else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (isSelectedMonth) FontWeight.SemiBold else FontWeight.Normal,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
           )
         }
-      }
-    }
-
-    Row(
-      modifier = Modifier.fillMaxWidth().padding(top = OceanSpacing.xxs),
-      horizontalArrangement = Arrangement.spacedBy(OceanSpacing.sm),
-    ) {
-      trends.forEach { point ->
-        val isSelectedMonth = selection?.monthKey == point.monthKey
-        Text(
-          text = point.label,
-          modifier = Modifier.weight(1f),
-          style = MaterialTheme.typography.labelSmall,
-          color =
-            if (isSelectedMonth) MaterialTheme.colorScheme.onSurface
-            else MaterialTheme.colorScheme.onSurfaceVariant,
-          fontWeight = if (isSelectedMonth) FontWeight.SemiBold else FontWeight.Normal,
-          textAlign = TextAlign.Center,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
       }
     }
 
@@ -159,40 +176,17 @@ fun IncomeExpenseTrendChart(
     ) {
       ChartLegendItem(color = incomeColor, label = "Income")
       ChartLegendItem(color = expenseColor, label = "Expenses")
+      Text(
+        text = "Swipe for more months",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
     }
   }
 }
 
-@Composable
-private fun TrendBar(
-  fraction: Float,
-  colour: Color,
-  selected: Boolean,
-  description: String,
-  onSelect: () -> Unit,
-  modifier: Modifier = Modifier,
-) {
-  Box(
-    modifier =
-      modifier
-        .fillMaxHeight()
-        .semantics {
-          contentDescription = description
-          role = Role.Button
-          this.selected = selected
-        }
-        .clickable(onClick = onSelect),
-    contentAlignment = Alignment.BottomCenter,
-  ) {
-    Box(
-      modifier =
-        Modifier.fillMaxWidth()
-          .fillMaxHeight(fraction.coerceAtLeast(0.02f))
-          .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-          .background(if (selected) colour else colour.copy(alpha = 0.55f))
-    )
-  }
-}
+/** Width of one month tap target. Wider than the 48 dp minimum on purpose. */
+private val MonthColumnWidth = 56.dp
 
 @Composable
 fun ChartLegendItem(color: Color, label: String, modifier: Modifier = Modifier) {
@@ -215,8 +209,12 @@ fun ChartLegendItem(color: Color, label: String, modifier: Modifier = Modifier) 
  *
  * Colours come from [PortfolioPalette.assign], so each category keeps its colour across
  * recompositions, refreshes and app restarts, and no two categories on the ring share
- * one. Tapping a segment selects that category and reports its key; the selected arc is
- * drawn thicker and fully opaque. The centre total always stays visible.
+ * one. Tapping a segment selects that category and reports its canonical key; the
+ * selected arc is drawn thicker and fully opaque. The centre total always stays visible.
+ *
+ * TalkBack: the ring carries a summary, and the caller's legend rows are the per-category
+ * accessible interface — each is a focusable button with its own description, selection
+ * state and click label. The ring itself is not the only way to reach a category.
  */
 @Composable
 fun AllocationRing(
@@ -231,7 +229,10 @@ fun AllocationRing(
 ) {
   if (slices.isEmpty()) return
 
-  val colors = remember(slices, isDark) { PortfolioPalette.assign(slices.map { it.colorKey }, isDark) }
+  val colors =
+    remember(slices, isDark) {
+      PortfolioPalette.assign(slices.map { it.colorKey }, isDark)
+    }
   val totalMinor = remember(slices) { slices.sumOf { it.value.minorUnits }.coerceAtLeast(0L) }
   val description =
     remember(slices) {
@@ -257,7 +258,6 @@ fun AllocationRing(
             val inner = outer - stroke
             if (distance < inner || distance > outer || totalMinor <= 0L) return@detectTapGestures
 
-            // Angle measured clockwise from 12 o'clock, matching the arc start at -90°.
             val fromTop = ((Math.toDegrees(atan2(dy, dx).toDouble()).toFloat() + 90f) + 360f) % 360f
             var swept = 0f
             slices.forEach { slice ->
@@ -293,8 +293,9 @@ fun AllocationRing(
       slices.forEach { slice ->
         val sweep = (slice.value.minorUnits.toFloat() / totalMinor.toFloat()) * 360f
         val drawnSweep = (sweep - 2f).coerceAtLeast(0.6f)
-        val baseColour = colors[slice.colorKey] ?: PortfolioPalette.colorFor(slice.colorKey, isDark)
-        val isSelected = slice.colorKey == selectedKey
+        val canonical = PortfolioPalette.canonical(slice.colorKey)
+        val baseColour = colors[canonical] ?: PortfolioPalette.colorFor(slice.colorKey, isDark)
+        val isSelected = canonical == selectedKey
         val colour =
           when {
             selectedKey == null -> baseColour

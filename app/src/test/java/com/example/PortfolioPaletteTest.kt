@@ -107,9 +107,35 @@ class PortfolioPaletteTest {
         listOf("STOCKS", "STOCKS", "  ", "", "GOLD", " gold ", "STOCKS"),
         isDark = false,
       )
+    // Keys come back canonicalised, so every caller can look a colour up reliably.
     assertEquals(2, assigned.size)
-    assertEquals(setOf("STOCKS", "GOLD"), assigned.keys)
+    assertEquals(setOf("stocks", "gold"), assigned.keys)
     assertEquals(2, assigned.values.toSet().size)
+  }
+
+  @Test
+  fun caseVariantsAreOrderIndependent() {
+    val forward = PortfolioPalette.assign(listOf("GOLD", "gold"), isDark = false)
+    val reverse = PortfolioPalette.assign(listOf("gold", "GOLD"), isDark = false)
+    assertEquals(forward, reverse)
+    assertEquals(1, forward.size)
+
+    // A mixed set must also be stable in both directions.
+    val a = PortfolioPalette.assign(listOf("GOLD", "gold", "STOCKS", "Stocks"), isDark = true)
+    val b = PortfolioPalette.assign(listOf("Stocks", "gold", "STOCKS", "GOLD"), isDark = true)
+    assertEquals(a, b)
+    assertEquals(2, a.size)
+  }
+
+  @Test
+  fun canonicalKeysAreTrimmedAndLowerCased() {
+    assertEquals("gold", PortfolioPalette.canonical("  GOLD "))
+    assertEquals("stocks:reliance", PortfolioPalette.canonical("Stocks:Reliance"))
+    assertEquals("", PortfolioPalette.canonical("   "))
+
+    // The colour for a key is the colour for its canonical form.
+    val assigned = PortfolioPalette.assign(listOf("  GOLD "), isDark = false)
+    assertEquals(assigned["gold"], PortfolioPalette.colorFor("gold", isDark = false))
   }
 
   @Test

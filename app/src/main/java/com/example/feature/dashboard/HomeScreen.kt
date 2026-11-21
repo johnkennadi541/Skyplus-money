@@ -57,9 +57,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.core.designsystem.component.OceanCard
@@ -891,6 +893,28 @@ private fun HomeTrendCard(
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Spacer(modifier = Modifier.height(OceanSpacing.sm))
+
+    // The series is chosen here, so each bar in the chart can be a full-size month
+    // target instead of two narrow ones.
+    Row(horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs)) {
+      TrendSeriesChip(
+        label = "Income",
+        selected = selection?.series != TrendSeries.EXPENSES,
+        onClick = {
+          selection = TrendSelection(selection?.monthKey ?: latest?.monthKey ?: "", TrendSeries.INCOME)
+        },
+      )
+      TrendSeriesChip(
+        label = "Expenses",
+        selected = selection?.series == TrendSeries.EXPENSES,
+        onClick = {
+          selection =
+            TrendSelection(selection?.monthKey ?: latest?.monthKey ?: "", TrendSeries.EXPENSES)
+        },
+      )
+    }
+    Spacer(modifier = Modifier.height(OceanSpacing.xs))
+
     IncomeExpenseTrendChart(
       trends = trends,
       selection = selection,
@@ -906,6 +930,20 @@ private fun HomeTrendCard(
       )
     }
   }
+}
+
+@Composable
+private fun TrendSeriesChip(label: String, selected: Boolean, onClick: () -> Unit) {
+  FilterChip(
+    selected = selected,
+    onClick = onClick,
+    label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+    colors =
+      FilterChipDefaults.filterChipColors(
+        selectedContainerColor = MaterialTheme.colorScheme.primary,
+        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+      ),
+  )
 }
 
 /** The tooltip panel: the selected month, with the selected series emphasised. */
@@ -927,6 +965,7 @@ private fun SelectedTrendPanel(
     Column(modifier = Modifier.fillMaxWidth().padding(OceanSpacing.sm)) {
       Text(
         text = point.label,
+        modifier = Modifier.testTag("home_trend_selection_month"),
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
@@ -998,7 +1037,10 @@ private fun HomeAllocationCard(
     com.example.core.designsystem.theme.PortfolioPalette.assign(slices.map { it.colorKey }, extended.isDark)
   }
   var selectedKey by remember(slices) { mutableStateOf<String?>(null) }
-  val selectedSlice = slices.firstOrNull { it.colorKey == selectedKey }
+  val selectedSlice =
+    slices.firstOrNull {
+      com.example.core.designsystem.theme.PortfolioPalette.canonical(it.colorKey) == selectedKey
+    }
 
   OceanCard(modifier = modifier) {
     Text(
@@ -1032,20 +1074,28 @@ private fun HomeAllocationCard(
         verticalArrangement = Arrangement.spacedBy(OceanSpacing.xxs),
       ) {
         slices.forEach { slice ->
-          val isSelected = slice.colorKey == selectedKey
+          val canonicalKey =
+            com.example.core.designsystem.theme.PortfolioPalette.canonical(slice.colorKey)
+          val isSelected = canonicalKey == selectedKey
           val rowDescription =
             "${slice.categoryName}, ${slice.sharePercent}% of portfolio, ${slice.value.formatted}"
           Row(
             modifier =
               Modifier.fillMaxWidth()
                 .clip(MaterialTheme.shapes.small)
-                .semantics {
+                .testTag("home_allocation_row_$canonicalKey")
+                .semantics(mergeDescendants = true) {
                   contentDescription = rowDescription
                   role = Role.Button
                   selected = isSelected
+                  stateDescription = if (isSelected) "Selected" else "Not selected"
+                  onClick(label = if (isSelected) "Clear selection" else "Show details") {
+                    selectedKey = if (isSelected) null else canonicalKey
+                    true
+                  }
                 }
                 .clickable {
-                  selectedKey = if (isSelected) null else slice.colorKey
+                  selectedKey = if (isSelected) null else canonicalKey
                 }
                 .padding(vertical = OceanSpacing.xxs, horizontal = OceanSpacing.xxs),
             horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
@@ -1055,7 +1105,7 @@ private fun HomeAllocationCard(
               modifier =
                 Modifier.size(if (isSelected) 10.dp else 8.dp)
                   .clip(CircleShape)
-                  .background(colors[slice.colorKey] ?: MaterialTheme.colorScheme.primary)
+                  .background(colors[canonicalKey] ?: MaterialTheme.colorScheme.primary)
             )
             Text(
               text = slice.categoryName,
@@ -1097,7 +1147,11 @@ private fun HomeAllocationCard(
             modifier =
               Modifier.size(10.dp)
                 .clip(CircleShape)
-                .background(colors[selectedSlice.colorKey] ?: MaterialTheme.colorScheme.primary)
+                .background(
+                  colors[com.example.core.designsystem.theme.PortfolioPalette.canonical(
+                    selectedSlice.colorKey
+                  )] ?: MaterialTheme.colorScheme.primary
+                )
           )
           Column(modifier = Modifier.weight(1f)) {
             Text(

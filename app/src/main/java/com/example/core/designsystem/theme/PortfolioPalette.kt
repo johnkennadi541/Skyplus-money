@@ -75,6 +75,15 @@ object PortfolioPalette {
 
   fun seriesFor(isDark: Boolean): List<Color> = if (isDark) dark else light
 
+  /**
+   * The canonical form of a key: trimmed and lower-cased.
+   *
+   * [assign] keys its result by this form, so two spellings of the same category can
+   * never end up with two colours, and the answer cannot depend on input order. Callers
+   * look a colour up with `colors[PortfolioPalette.canonical(slice.colorKey)]`.
+   */
+  fun canonical(key: String): String = key.trim().lowercase()
+
   /** Stable 32-bit hash of a key. Exposed so tests can pin the mapping. */
   fun stableHash(key: String): Int {
     var hash = 2166136261L.toInt()
@@ -110,10 +119,9 @@ object PortfolioPalette {
    *   quietly repeating a colour.
    */
   fun assign(keys: List<String>, isDark: Boolean): Map<String, Color> {
-    // Trim, drop blanks, and collapse keys that differ only by case: "GOLD" and " gold "
-    // are the same category and must not end up with two colours.
-    val ordered =
-      keys.map { it.trim() }.filter { it.isNotEmpty() }.distinctBy { it.lowercase() }.sorted()
+    // Canonicalise first, so ["GOLD", "gold"] and ["gold", "GOLD"] are the same input
+    // and cannot produce different results.
+    val ordered = keys.map { canonical(it) }.filter { it.isNotEmpty() }.distinct().sorted()
     val capacity = capacityPalette(isDark)
     require(ordered.size <= capacity.size) {
       "PortfolioPalette can give at most ${capacity.size} distinct colours; " +
