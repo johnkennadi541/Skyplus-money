@@ -129,6 +129,15 @@ Firebase Console → project `skyplus-money` → Project settings → Your apps 
 app `com.skyplus.money` → **Add fingerprint** → SHA-1, then SHA-256. Allow five to ten
 minutes.
 
+**Where these values live.** The signing fingerprints are project configuration held in
+the Firebase Console. They are *not* stored in `google-services.json`: that file carries
+the project id, API key and client ids, and an Android OAuth client entry without a
+`certificate_hash`, so it cannot tell you which signing certificate Firebase accepts.
+Reading the repository therefore proves nothing about Firebase. The console is the only
+source of truth, and the fingerprints there must be compared by hand against the values
+the provisioning run printed. No repository file records whether that comparison has
+been made, and this document does not claim it has.
+
 ---
 
 ## APK update compatibility — evidence and blockers
@@ -148,7 +157,8 @@ Evidence gathered read-only:
 | A later CI build (run 44766111158) | SHA-1 `23:B7:F5:50:5E:96:C4:2C:DD:62:9E:8F:A5:BF:D0:11:1D:BD:77:54` — a different certificate |
 | Private key behind either certificate | **not recoverable**: each was generated inside a throw-away CI runner and never stored anywhere |
 | Repository history | contains no `.jks`, `.keystore` or `debug.keystore`; all are git-ignored (`.gitignore` lines 18, 21, 22) |
-| Firebase-registered hash in `google-services.json` | `c10d778e…706c3`, matching neither build |
+| Signing fingerprints inside `google-services.json` | **none**. The file carries a web client and an Android client with no `certificate_hash` field, so it says nothing about which signing certificate is accepted |
+| Firebase Console registration | **not verified**. SHA-1 and SHA-256 fingerprints are configured in the Firebase project settings, not in `google-services.json`, and cannot be read from this repository. They must be checked in the console |
 
 **Conclusion.** The installed certificate is *known*, but the private key behind it is
 *lost*. Android requires an identical signing certificate for an update, so a new
@@ -227,7 +237,11 @@ Google Sign-In.
    `com.skyplus.money` in project `skyplus-money`, then wait five to ten minutes.
 5. **Version code.** The first stable APK must carry `versionCode = 2` or higher —
    it is 2 in this branch — because the installed debug build is version 1.
-6. **Install and test.** Install the verified APK, then try Google Sign-In. Sign-in
+6. **Approved fingerprint pinned.** The `debug-apk` job also compares the APK
+   certificate against the repository variable `DEBUG_CERT_SHA256`. A missing variable,
+   an unreadable certificate or a different fingerprint fails the job before upload. See
+   "Required repository configuration" below.
+7. **Install and test.** Install the verified APK, then try Google Sign-In. Sign-in
    must not be tested on any APK whose certificate is not the registered one.
 
 ## Failure behaviour
@@ -238,9 +252,51 @@ Google Sign-In.
 - Token cannot reach the secret API → fail before generating anything, with the exact
   remedy printed.
 - APK certificate differs from the keystore → fail; nothing is uploaded.
+- APK certificate differs from `DEBUG_CERT_SHA256` → fail; nothing is uploaded.
+- `DEBUG_CERT_SHA256` is unset or is not 64 hex characters → fail; nothing is uploaded.
+- The provisioning guard finds an existing `SKYPLUS_DEBUG_KEYSTORE_BASE64` → the
+  provisioning run stops before any key is generated, and no secret is overwritten.
 - Temporary material always removed, on success and on failure.
 
 ## Release signing
 
 Untouched. The `release` config still reads `KEYSTORE_PATH`, `STORE_PASSWORD` and
 `KEY_PASSWORD`. No release key exists or was changed.
+
+## Required repository configuration
+
+Two things must be configured by the repository owner. Neither is set by any workflow,
+and neither is stored in this repository.
+
+### 1. Repository variable `DEBUG_CERT_SHA256`
+
+The `debug-apk` job refuses to upload an APK unless its signing certificate SHA-256
+equals this variable.
+
+- Settings → Secrets and variables → Actions → **Variables** → New repository variable.
+- Name: `DEBUG_CERT_SHA256`
+- Value: the approved stable debug certificate SHA-256, 64 hex characters. Colons,
+  spaces and lower case are accepted and normalised before comparison. The approved
+  value for the current stable keystore is
+  `4E:3E:86:D3:93:03:06:7B:A6:E9:0F:A8:FC:1F:78:CE:9C:F0:BD:95:F5:5B:07:62:A2:35:18:23:F0:D3:47:E3`.
+- Take the value from the `SHA256:` line the provisioning run printed, or from
+  `keytool -list -v` on the keystore. It is a public value; it is never a secret.
+
+Until this variable exists, the `debug-apk` job fails on purpose and uploads nothing.
+That is the intended behaviour, not a broken build: an unverifiable APK must not ship.
+
+### 2. The provisioning guard is one-time
+
+`provision-debug-keystore.yml` now lists the environment secrets before generating
+anything and stops if `SKYPLUS_DEBUG_KEYSTORE_BASE64` already exists. Replacing the
+signing identity is therefore no longer possible by simply running the workflow again.
+
+If the identity ever has to change, that is a deliberate, reviewed procedure, not a
+re-run:
+
+1. Accept that every installed APK becomes non-updatable and needs one uninstall.
+2. Record the current fingerprints and the reason for the change in this document.
+3. Update `DEBUG_CERT_SHA256` and the Firebase Console fingerprints together, in the
+   same maintenance window.
+4. Only then remove the four `SKYPLUS_DEBUG_*` environment secrets by hand and run the
+   provisioning workflow once more.
