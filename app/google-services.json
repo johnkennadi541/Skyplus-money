@@ -14,11 +14,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "735404789471-boqqld7mhvamfrk47oetf31vg2pbi5e0.apps.googleusercontent.com",
+          "client_id": "735404789471-vr1om10pprsrlkahv6lho7frbk0m54lc.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.skyplus.money",
-            "certificate_hash": "c10d778ec3c0fa2e4617d50234a1dc22cbb706c3"
+            "certificate_hash": "d6962eb4e9950fb76544fae195321b6b7e929d4a"
           }
         },
         {
