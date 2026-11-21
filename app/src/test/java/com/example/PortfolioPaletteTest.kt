@@ -65,6 +65,73 @@ class PortfolioPaletteTest {
   }
 
   @Test
+  fun everyChartSizeUpToTwelveKeepsColoursUnique() {
+    listOf(1, 6, 7, 8, 10, 12).forEach { size ->
+      val keys = (1..size).map { "KEY-$it" }
+      listOf(false, true).forEach { isDark ->
+        val assigned = PortfolioPalette.assign(keys, isDark)
+        assertEquals("size $size dark=$isDark", size, assigned.size)
+        assertEquals("size $size dark=$isDark", size, assigned.values.toSet().size)
+      }
+    }
+  }
+
+  @Test
+  fun overflowKeepsWorkingBeyondTheSixApprovedColours() {
+    // 12 keys force the six overflow hues; 20 force the first blended tier.
+    listOf(13, 20, 24).forEach { size ->
+      val keys = (1..size).map { "SERIES-$it" }
+      val assigned = PortfolioPalette.assign(keys, isDark = false)
+      assertEquals(size, assigned.values.toSet().size)
+    }
+    val many = PortfolioPalette.assign((1..PortfolioPalette.CAPACITY).map { "K$it" }, isDark = true)
+    assertEquals(PortfolioPalette.CAPACITY, many.values.toSet().size)
+  }
+
+  @Test
+  fun askingForMoreThanTheCapacityFailsLoudlyInsteadOfRepeating() {
+    val tooMany = (1..(PortfolioPalette.CAPACITY + 1)).map { "K$it" }
+    var thrown = false
+    try {
+      PortfolioPalette.assign(tooMany, isDark = false)
+    } catch (error: IllegalArgumentException) {
+      thrown = true
+    }
+    assertTrue("assign() must refuse to repeat a colour", thrown)
+  }
+
+  @Test
+  fun blankAndDuplicateKeysAreHandledSafely() {
+    val assigned =
+      PortfolioPalette.assign(
+        listOf("STOCKS", "STOCKS", "  ", "", "GOLD", " gold ", "STOCKS"),
+        isDark = false,
+      )
+    assertEquals(2, assigned.size)
+    assertEquals(setOf("STOCKS", "GOLD"), assigned.keys)
+    assertEquals(2, assigned.values.toSet().size)
+  }
+
+  @Test
+  fun repeatedCallsGiveTheSameColours() {
+    val keys = listOf("STOCKS", "GOLD", "ETFS", "OTHER", "FIXED_DEPOSITS", "MUTUAL_FUNDS", "X")
+    val first = PortfolioPalette.assign(keys, isDark = false)
+    repeat(3) { assertEquals(first, PortfolioPalette.assign(keys, isDark = false)) }
+    repeat(3) { assertEquals(PortfolioPalette.assign(keys, true), PortfolioPalette.assign(keys, true)) }
+  }
+
+  @Test
+  fun overflowColoursNeverBecomeTheSemanticGreenOrRed() {
+    val all = PortfolioPalette.capacityPalette(isDark = false) + PortfolioPalette.capacityPalette(isDark = true)
+    all.forEach { colour ->
+      assertNotEquals(SkyplusIncome, colour)
+      assertNotEquals(SkyplusExpense, colour)
+    }
+    assertEquals(PortfolioPalette.CAPACITY, PortfolioPalette.capacityPalette(false).toSet().size)
+    assertEquals(PortfolioPalette.CAPACITY, PortfolioPalette.capacityPalette(true).toSet().size)
+  }
+
+  @Test
   fun assignmentDoesNotDependOnInputOrder() {
     val a = PortfolioPalette.assign(listOf("GOLD", "STOCKS", "ETFS"), isDark = false)
     val b = PortfolioPalette.assign(listOf("ETFS", "GOLD", "STOCKS"), isDark = false)

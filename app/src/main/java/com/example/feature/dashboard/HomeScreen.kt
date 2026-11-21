@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,7 +45,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +55,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.core.designsystem.component.OceanCard
@@ -863,6 +871,13 @@ private fun HomeTrendCard(
   val extended = OceanTheme.colors
   val latest = trends.lastOrNull()
 
+  // Selection is real state: tapping a bar changes what this panel shows.
+  var selection by remember(trends) {
+    mutableStateOf<TrendSelection?>(latest?.let { TrendSelection(it.monthKey, TrendSeries.INCOME) })
+  }
+  val selectedPoint =
+    trends.firstOrNull { it.monthKey == selection?.monthKey } ?: latest
+
   OceanCard(modifier = modifier) {
     Text(
       text = "Income vs expenses · $currencyCode",
@@ -871,40 +886,103 @@ private fun HomeTrendCard(
       fontWeight = FontWeight.SemiBold,
     )
     Text(
-      text = "Last ${trends.size} month${if (trends.size == 1) "" else "s"}",
+      text = "Tap a bar to see that month's exact figures",
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Spacer(modifier = Modifier.height(OceanSpacing.sm))
-    IncomeExpenseTrendChart(trends = trends)
+    IncomeExpenseTrendChart(
+      trends = trends,
+      selection = selection,
+      onSelect = { tapped -> selection = tapped },
+    )
 
-    if (latest != null) {
+    if (selectedPoint != null) {
       Spacer(modifier = Modifier.height(OceanSpacing.sm))
+      SelectedTrendPanel(
+        point = selectedPoint,
+        selection = selection,
+        modifier = Modifier.testTag("home_trend_selection"),
+      )
+    }
+  }
+}
+
+/** The tooltip panel: the selected month, with the selected series emphasised. */
+@Composable
+private fun SelectedTrendPanel(
+  point: HomeTrendPoint,
+  selection: TrendSelection?,
+  modifier: Modifier = Modifier,
+) {
+  val extended = OceanTheme.colors
+  val incomeSelected = selection?.series == TrendSeries.INCOME
+  val expensesSelected = selection?.series == TrendSeries.EXPENSES
+
+  Surface(
+    modifier = modifier.fillMaxWidth(),
+    shape = MaterialTheme.shapes.medium,
+    color = MaterialTheme.colorScheme.surfaceVariant,
+  ) {
+    Column(modifier = Modifier.fillMaxWidth().padding(OceanSpacing.sm)) {
+      Text(
+        text = point.label,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      Spacer(modifier = Modifier.height(OceanSpacing.xxs))
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(OceanSpacing.sm),
       ) {
-        HomeMiniStat(
-          label = "${latest.label} income",
-          value = latest.income.formatted,
+        TrendValueRow(
+          label = "Income",
+          value = point.income.formatted,
           tint = extended.positive,
+          selected = incomeSelected,
           modifier = Modifier.weight(1f),
         )
-        HomeMiniStat(
-          label = "${latest.label} expenses",
-          value = latest.expenses.formatted,
+        TrendValueRow(
+          label = "Expenses",
+          value = point.expenses.formatted,
           tint = extended.negative,
+          selected = expensesSelected,
           modifier = Modifier.weight(1f),
         )
-        HomeMiniStat(
+        TrendValueRow(
           label = "Saved",
-          value = latest.savings.formatted,
-          tint =
-            if (latest.savings.minorUnits >= 0L) extended.positive else extended.negative,
+          value = point.savings.formatted,
+          tint = if (point.savings.minorUnits >= 0L) extended.positive else extended.negative,
+          selected = false,
           modifier = Modifier.weight(1f),
         )
       }
     }
+  }
+}
+
+@Composable
+private fun TrendValueRow(
+  label: String,
+  value: String,
+  tint: Color,
+  selected: Boolean,
+  modifier: Modifier = Modifier,
+) {
+  Column(modifier = modifier) {
+    Text(
+      text = label,
+      style = MaterialTheme.typography.labelSmall,
+      color = if (selected) tint else MaterialTheme.colorScheme.onSurfaceVariant,
+      fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+    )
+    Text(
+      text = value,
+      style = MaterialTheme.typography.bodyMedium,
+      color = if (selected) tint else MaterialTheme.colorScheme.onSurface,
+      fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+      maxLines = 1,
+    )
   }
 }
 
@@ -919,6 +997,8 @@ private fun HomeAllocationCard(
   val colors = remember(slices, extended.isDark) {
     com.example.core.designsystem.theme.PortfolioPalette.assign(slices.map { it.colorKey }, extended.isDark)
   }
+  var selectedKey by remember(slices) { mutableStateOf<String?>(null) }
+  val selectedSlice = slices.firstOrNull { it.colorKey == selectedKey }
 
   OceanCard(modifier = modifier) {
     Text(
@@ -928,7 +1008,7 @@ private fun HomeAllocationCard(
       fontWeight = FontWeight.SemiBold,
     )
     Text(
-      text = "Share of portfolio value by asset class",
+      text = "Tap a segment or a row to see that category",
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -942,6 +1022,8 @@ private fun HomeAllocationCard(
       AllocationRing(
         slices = slices,
         isDark = extended.isDark,
+        selectedKey = selectedKey,
+        onSelect = { key -> selectedKey = if (selectedKey == key) null else key },
         centerLabel = totalLabel,
         centerCaption = "Total value",
       )
@@ -950,14 +1032,28 @@ private fun HomeAllocationCard(
         verticalArrangement = Arrangement.spacedBy(OceanSpacing.xxs),
       ) {
         slices.forEach { slice ->
+          val isSelected = slice.colorKey == selectedKey
+          val rowDescription =
+            "${slice.categoryName}, ${slice.sharePercent}% of portfolio, ${slice.value.formatted}"
           Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier =
+              Modifier.fillMaxWidth()
+                .clip(MaterialTheme.shapes.small)
+                .semantics {
+                  contentDescription = rowDescription
+                  role = Role.Button
+                  selected = isSelected
+                }
+                .clickable {
+                  selectedKey = if (isSelected) null else slice.colorKey
+                }
+                .padding(vertical = OceanSpacing.xxs, horizontal = OceanSpacing.xxs),
             horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
             verticalAlignment = Alignment.CenterVertically,
           ) {
             Box(
               modifier =
-                Modifier.size(8.dp)
+                Modifier.size(if (isSelected) 10.dp else 8.dp)
                   .clip(CircleShape)
                   .background(colors[slice.colorKey] ?: MaterialTheme.colorScheme.primary)
             )
@@ -966,6 +1062,7 @@ private fun HomeAllocationCard(
               modifier = Modifier.weight(1f),
               style = MaterialTheme.typography.bodySmall,
               color = MaterialTheme.colorScheme.onSurface,
+              fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
               maxLines = 1,
             )
             Text(
@@ -980,6 +1077,57 @@ private fun HomeAllocationCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = OceanSpacing.md),
           )
+        }
+      }
+    }
+
+    if (selectedSlice != null) {
+      Spacer(modifier = Modifier.height(OceanSpacing.xs))
+      Surface(
+        modifier = Modifier.fillMaxWidth().testTag("home_allocation_selection"),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+      ) {
+        Row(
+          modifier = Modifier.fillMaxWidth().padding(OceanSpacing.sm),
+          horizontalArrangement = Arrangement.spacedBy(OceanSpacing.sm),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Box(
+            modifier =
+              Modifier.size(10.dp)
+                .clip(CircleShape)
+                .background(colors[selectedSlice.colorKey] ?: MaterialTheme.colorScheme.primary)
+          )
+          Column(modifier = Modifier.weight(1f)) {
+            Text(
+              text = selectedSlice.categoryName,
+              style = MaterialTheme.typography.labelLarge,
+              color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+              text =
+                "${selectedSlice.holdingCount} holding${if (selectedSlice.holdingCount == 1) "" else "s"}",
+              style = MaterialTheme.typography.labelSmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+          Column(horizontalAlignment = Alignment.End) {
+            Text(
+              text = selectedSlice.value.formatted,
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurface,
+              fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+              text =
+                "${selectedSlice.sharePercent.setScale(1, java.math.RoundingMode.HALF_UP)}% · ${selectedSlice.gainLoss.formatted}",
+              style = MaterialTheme.typography.labelSmall,
+              color =
+                if (selectedSlice.gainLoss.minorUnits >= 0L) extended.positive
+                else extended.negative,
+            )
+          }
         }
       }
     }
