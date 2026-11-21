@@ -3,10 +3,16 @@ package com.example
 import com.example.domain.model.AuthResult
 import com.example.domain.model.AuthSessionState
 import com.example.domain.model.AuthenticatedUser
+import com.example.domain.model.CategoryAllocationItem
 import com.example.domain.model.CurrencyFinancialReport
 import com.example.domain.model.FinancialReportSnapshot
 import com.example.domain.model.IncomeExpenseCurrencyReport
+import com.example.domain.model.InvestmentCategory
+import com.example.domain.model.InvestmentCurrencyReport
+import com.example.domain.model.InvestmentHoldingReportRow
+import com.example.domain.model.MonthlyTrendRow
 import com.example.domain.model.NetWorthCurrencyBreakdown
+import com.example.domain.model.PortfolioCurrencySummary
 import com.example.domain.model.ReportDateWindow
 import com.example.domain.model.ReportPeriodType
 import com.example.domain.model.ThemePreference
@@ -293,6 +299,60 @@ class HomeViewModelTest {
     collector.cancel()
   }
 
+  @Test
+  fun `portfolio allocation trends and holdings are mapped from the snapshot`() = runTest {
+    val viewModel = viewModel(FakeReportsSource(snapshot = portfolioSnapshot()))
+    val collector = launch { viewModel.uiState.collect() }
+    advanceUntilIdle()
+
+    val inr = viewModel.uiState.value.sections.first { it.currencyCode == "INR" }
+
+    // Trends: the existing monthly rows, newest last, formatted per currency.
+    assertEquals(2, inr.trends.size)
+    assertEquals("Jan 2026", inr.trends[0].label)
+    assertEquals(60_000_00L, inr.trends[0].income.minorUnits)
+    assertEquals(25_000_00L, inr.trends[0].expenses.minorUnits)
+    assertEquals("INR", inr.trends[0].income.currencyCode)
+
+    // Allocation: sorted by value, zero-value categories dropped, colours keyed by category.
+    assertEquals(2, inr.allocation.size)
+    assertEquals("Stocks / Equities", inr.allocation[0].categoryName)
+    assertEquals("STOCKS", inr.allocation[0].colorKey)
+    assertEquals(150_000_00L, inr.allocation[0].value.minorUnits)
+    assertEquals("Mutual Funds", inr.allocation[1].categoryName)
+
+    // Holdings: sorted by value, share derived from the real total, stale flag kept.
+    assertEquals(2, inr.holdings.size)
+    assertEquals("Large Cap Fund", inr.holdings[0].name)
+    assertEquals(150_000_00L, inr.holdings[0].value.minorUnits)
+    assertEquals(BigDecimal("60.0"), inr.holdings[0].sharePercent)
+    assertTrue(inr.holdings[0].isStalePrice)
+    assertEquals(BigDecimal("40.0"), inr.holdings[1].sharePercent)
+
+    // Portfolio summary figures still come from the existing portfolio model.
+    assertEquals(250_000_00L, inr.investments?.currentValue?.minorUnits)
+    assertEquals(200_000_00L, inr.investments?.invested?.minorUnits)
+    assertTrue(inr.hasPortfolio)
+
+    collector.cancel()
+  }
+
+  @Test
+  fun `a currency without investments shows no portfolio sections`() = runTest {
+    val viewModel = viewModel(FakeReportsSource(snapshot = twoCurrencySnapshot()))
+    val collector = launch { viewModel.uiState.collect() }
+    advanceUntilIdle()
+
+    val inr = viewModel.uiState.value.sections.first { it.currencyCode == "INR" }
+
+    assertTrue(inr.trends.isEmpty())
+    assertTrue(inr.allocation.isEmpty())
+    assertTrue(inr.holdings.isEmpty())
+    assertFalse(inr.hasPortfolio)
+
+    collector.cancel()
+  }
+
   // ---- fixtures -------------------------------------------------------------
 
   private fun emptySnapshot(): FinancialReportSnapshot =
@@ -364,6 +424,7 @@ class HomeViewModelTest {
     currencyCode: String,
     income: Long,
     expenses: Long,
+    trends: List<MonthlyTrendRow> = emptyList(),
   ): IncomeExpenseCurrencyReport =
     IncomeExpenseCurrencyReport(
       currencyCode = currencyCode,
@@ -380,7 +441,151 @@ class HomeViewModelTest {
       excludedNonCompletedCount = 0,
       expenseByCategory = emptyList(),
       incomeByCategory = emptyList(),
-      monthlyTrends = emptyList(),
+      monthlyTrends = trends,
       transactionsInRange = emptyList(),
     )
+
+  /** One currency with a real portfolio: two categories, two holdings, two months. */
+  private fun portfolioSnapshot(): FinancialReportSnapshot {
+    val portfolio =
+      PortfolioCurrencySummary(
+        currencyCode = "INR",
+        totalInvestedMinor = 200_000_00L,
+        totalBuyCostMinor = 200_000_00L,
+        totalValuationMinor = 250_000_00L,
+        unrealizedPnlMinor = 50_000_00L,
+        realizedPnlMinor = 0L,
+        absoluteReturnMinor = 50_000_00L,
+        returnPercent = BigDecimal("25.0"),
+        lastMarketUpdateMillis = 1L,
+        staleHoldingCount = 1,
+        activeHoldingCount = 2,
+        categoryAllocations =
+          listOf(
+            CategoryAllocationItem(
+              category = InvestmentCategory.MUTUAL_FUNDS,
+              investedMinor = 80_000_00L,
+              valuationMinor = 100_000_00L,
+              unrealizedPnlMinor = 20_000_00L,
+              realizedPnlMinor = 0L,
+              allocationPercent = BigDecimal("40.0"),
+              holdingCount = 1,
+            ),
+            CategoryAllocationItem(
+              category = InvestmentCategory.STOCKS,
+              investedMinor = 120_000_00L,
+              valuationMinor = 150_000_00L,
+              unrealizedPnlMinor = 30_000_00L,
+              realizedPnlMinor = 0L,
+              allocationPercent = BigDecimal("60.0"),
+              holdingCount = 1,
+            ),
+            CategoryAllocationItem(
+              category = InvestmentCategory.GOLD,
+              investedMinor = 0L,
+              valuationMinor = 0L,
+              unrealizedPnlMinor = 0L,
+              realizedPnlMinor = 0L,
+              allocationPercent = BigDecimal.ZERO,
+              holdingCount = 0,
+            ),
+          ),
+        growthPoints = emptyList(),
+      )
+
+    val investments =
+      InvestmentCurrencyReport(
+        currencyCode = "INR",
+        portfolioSummary = portfolio,
+        periodBuyTotalMinor = 0L,
+        periodSellTotalMinor = 0L,
+        periodRealizedPnlMinor = 0L,
+        holdingRows =
+          listOf(
+            InvestmentHoldingReportRow(
+              holdingId = "h2",
+              name = "Index ETF",
+              category = InvestmentCategory.MUTUAL_FUNDS,
+              currencyCode = "INR",
+              investedMinor = 80_000_00L,
+              valuationMinor = 100_000_00L,
+              unrealizedPnlMinor = 20_000_00L,
+              realizedPnlMinor = 0L,
+              returnPercent = BigDecimal("25.0"),
+              lastPriceUpdateDate = 1L,
+              isStalePrice = false,
+            ),
+            InvestmentHoldingReportRow(
+              holdingId = "h1",
+              name = "Large Cap Fund",
+              category = InvestmentCategory.STOCKS,
+              currencyCode = "INR",
+              investedMinor = 120_000_00L,
+              valuationMinor = 150_000_00L,
+              unrealizedPnlMinor = 30_000_00L,
+              realizedPnlMinor = 0L,
+              returnPercent = BigDecimal("25.0"),
+              lastPriceUpdateDate = 1L,
+              isStalePrice = true,
+            ),
+          ),
+      )
+
+    val report =
+      CurrencyFinancialReport(
+        currencyCode = "INR",
+        netWorth =
+          NetWorthCurrencyBreakdown(
+            currencyCode = "INR",
+            cashAndBankAssetsMinor = 125_000_00L,
+            investmentAssetsMinor = 250_000_00L,
+            totalAssetsMinor = 375_000_00L,
+            loanLiabilitiesMinor = 0L,
+            accountOrCardLiabilitiesMinor = 0L,
+            totalLiabilitiesMinor = 0L,
+            netWorthMinor = 375_000_00L,
+            activeAccountCount = 2,
+            activeInvestmentCount = 2,
+            activeOrOverdueLoanCount = 0,
+          ),
+        incomeExpense =
+          incomeExpense(
+            currencyCode = "INR",
+            income = 80_000_00L,
+            expenses = 30_000_00L,
+            trends =
+              listOf(
+                MonthlyTrendRow(
+                  monthKey = "2026-01",
+                  monthLabel = "Jan 2026",
+                  incomeMinor = 60_000_00L,
+                  grossExpenseMinor = 25_000_00L,
+                  refundMinor = 0L,
+                  netExpenseMinor = 25_000_00L,
+                  netSavingsMinor = 35_000_00L,
+                ),
+                MonthlyTrendRow(
+                  monthKey = "2026-02",
+                  monthLabel = "Feb 2026",
+                  incomeMinor = 80_000_00L,
+                  grossExpenseMinor = 30_000_00L,
+                  refundMinor = 0L,
+                  netExpenseMinor = 30_000_00L,
+                  netSavingsMinor = 50_000_00L,
+                ),
+              ),
+          ),
+        budgets = null,
+        loans = null,
+        investments = investments,
+        shopping = null,
+      )
+
+    return FinancialReportSnapshot(
+      window = window,
+      generatedAtMillis = 1L,
+      currencies = listOf("INR"),
+      reportsByCurrency = mapOf("INR" to report),
+    )
+  }
 }

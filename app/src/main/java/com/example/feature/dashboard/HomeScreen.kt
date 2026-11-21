@@ -223,6 +223,16 @@ fun HomeScreen(
           )
         }
 
+        if (section.trends.isNotEmpty()) {
+          item {
+            HomeTrendCard(
+              currencyCode = section.currencyCode,
+              trends = section.trends,
+              modifier = Modifier.widthIn(max = 760.dp).testTag("home_income_expense_chart"),
+            )
+          }
+        }
+
         section.budget?.let { budget ->
           item {
             HomeBudgetOverviewCard(
@@ -249,6 +259,27 @@ fun HomeScreen(
               currencyCode = section.currencyCode,
               investment = investment,
               modifier = Modifier.widthIn(max = 760.dp).testTag("home_investment_overview_card"),
+            )
+          }
+        }
+
+        if (section.allocation.isNotEmpty()) {
+          item {
+            HomeAllocationCard(
+              currencyCode = section.currencyCode,
+              slices = section.allocation,
+              totalLabel = section.investments?.currentValue?.formatted,
+              modifier = Modifier.widthIn(max = 760.dp).testTag("home_allocation_card"),
+            )
+          }
+        }
+
+        if (section.holdings.isNotEmpty()) {
+          item {
+            HomeHoldingsCard(
+              currencyCode = section.currencyCode,
+              holdings = section.holdings,
+              modifier = Modifier.widthIn(max = 760.dp).testTag("home_holdings_card"),
             )
           }
         }
@@ -817,6 +848,222 @@ private fun HomeInvestmentsOverviewCard(
         tint = if (investment.unrealisedPnl.minorUnits >= 0L) extended.positive else extended.negative,
         modifier = Modifier.weight(1f),
       )
+    }
+  }
+}
+
+// ---- Charts and portfolio -------------------------------------------------
+
+@Composable
+private fun HomeTrendCard(
+  currencyCode: String,
+  trends: List<HomeTrendPoint>,
+  modifier: Modifier = Modifier,
+) {
+  val extended = OceanTheme.colors
+  val latest = trends.lastOrNull()
+
+  OceanCard(modifier = modifier) {
+    Text(
+      text = "Income vs expenses · $currencyCode",
+      style = MaterialTheme.typography.titleMedium,
+      color = MaterialTheme.colorScheme.onSurface,
+      fontWeight = FontWeight.SemiBold,
+    )
+    Text(
+      text = "Last ${trends.size} month${if (trends.size == 1) "" else "s"}",
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(modifier = Modifier.height(OceanSpacing.sm))
+    IncomeExpenseTrendChart(trends = trends)
+
+    if (latest != null) {
+      Spacer(modifier = Modifier.height(OceanSpacing.sm))
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(OceanSpacing.sm),
+      ) {
+        HomeMiniStat(
+          label = "${latest.label} income",
+          value = latest.income.formatted,
+          tint = extended.positive,
+          modifier = Modifier.weight(1f),
+        )
+        HomeMiniStat(
+          label = "${latest.label} expenses",
+          value = latest.expenses.formatted,
+          tint = extended.negative,
+          modifier = Modifier.weight(1f),
+        )
+        HomeMiniStat(
+          label = "Saved",
+          value = latest.savings.formatted,
+          tint =
+            if (latest.savings.minorUnits >= 0L) extended.positive else extended.negative,
+          modifier = Modifier.weight(1f),
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun HomeAllocationCard(
+  currencyCode: String,
+  slices: List<HomeAllocationSlice>,
+  totalLabel: String?,
+  modifier: Modifier = Modifier,
+) {
+  val extended = OceanTheme.colors
+  val colors = remember(slices, extended.isDark) {
+    com.example.core.designsystem.theme.PortfolioPalette.assign(slices.map { it.colorKey }, extended.isDark)
+  }
+
+  OceanCard(modifier = modifier) {
+    Text(
+      text = "Portfolio allocation · $currencyCode",
+      style = MaterialTheme.typography.titleMedium,
+      color = MaterialTheme.colorScheme.onSurface,
+      fontWeight = FontWeight.SemiBold,
+    )
+    Text(
+      text = "Share of portfolio value by asset class",
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(modifier = Modifier.height(OceanSpacing.sm))
+
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(OceanSpacing.md),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      AllocationRing(
+        slices = slices,
+        isDark = extended.isDark,
+        centerLabel = totalLabel,
+        centerCaption = "Total value",
+      )
+      Column(
+        modifier = Modifier.weight(1f),
+        verticalArrangement = Arrangement.spacedBy(OceanSpacing.xxs),
+      ) {
+        slices.forEach { slice ->
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Box(
+              modifier =
+                Modifier.size(8.dp)
+                  .clip(CircleShape)
+                  .background(colors[slice.colorKey] ?: MaterialTheme.colorScheme.primary)
+            )
+            Text(
+              text = slice.categoryName,
+              modifier = Modifier.weight(1f),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurface,
+              maxLines = 1,
+            )
+            Text(
+              text = "${slice.sharePercent.setScale(1, java.math.RoundingMode.HALF_UP)}%",
+              style = MaterialTheme.typography.labelSmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+          Text(
+            text = slice.value.formatted,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = OceanSpacing.md),
+          )
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun HomeHoldingsCard(
+  currencyCode: String,
+  holdings: List<HomeHoldingRow>,
+  modifier: Modifier = Modifier,
+) {
+  val extended = OceanTheme.colors
+  val colors = remember(holdings, extended.isDark) {
+    com.example.core.designsystem.theme.PortfolioPalette.assign(
+      holdings.map { it.colorKey },
+      extended.isDark,
+    )
+  }
+
+  OceanCard(modifier = modifier) {
+    Text(
+      text = "Holdings · $currencyCode",
+      style = MaterialTheme.typography.titleMedium,
+      color = MaterialTheme.colorScheme.onSurface,
+      fontWeight = FontWeight.SemiBold,
+    )
+    Text(
+      text = "Largest ${holdings.size} by current value",
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(modifier = Modifier.height(OceanSpacing.sm))
+
+    holdings.forEachIndexed { index, row ->
+      if (index > 0) {
+        Box(
+          modifier =
+            Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant)
+        )
+      }
+      Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = OceanSpacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(OceanSpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Box(
+          modifier =
+            Modifier.size(8.dp)
+              .clip(CircleShape)
+              .background(colors[row.colorKey] ?: MaterialTheme.colorScheme.primary)
+        )
+        Column(modifier = Modifier.weight(1f)) {
+          Text(
+            text = row.name,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+          )
+          Text(
+            text =
+              "${row.categoryName} · ${row.sharePercent.setScale(1, java.math.RoundingMode.HALF_UP)}%" +
+                if (row.isStalePrice) " · price may be stale" else "",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+          )
+        }
+        Column(horizontalAlignment = Alignment.End) {
+          Text(
+            text = row.value.formatted,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Medium,
+          )
+          Text(
+            text =
+              "${row.gainLoss.formatted} (${row.returnPercent.setScale(1, java.math.RoundingMode.HALF_UP)}%)",
+            style = MaterialTheme.typography.labelSmall,
+            color = if (row.gainLoss.minorUnits >= 0L) extended.positive else extended.negative,
+            maxLines = 1,
+          )
+        }
+      }
     }
   }
 }
