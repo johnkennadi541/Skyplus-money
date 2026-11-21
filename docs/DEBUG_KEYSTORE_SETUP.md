@@ -278,7 +278,7 @@ equals this variable.
 - Value: the approved stable debug certificate SHA-256, 64 hex characters. Colons,
   spaces and lower case are accepted and normalised before comparison. The approved
   value for the current stable keystore is
-  `4E:3E:86:D3:93:03:06:7B:A6:E9:0F:A8:FC:1F:78:CE:9C:F0:BD:95:F5:5B:07:62:A2:35:18:23:F0:D3:47:E3`.
+  `47:B6:93:4D:D5:B4:2A:D1:79:E4:2C:70:4A:8D:97:7E:4F:35:1E:7C:54:F4:C1:26:E4:4F:D5:F3:4B:42:E2:EB`.
 - Take the value from the `SHA256:` line the provisioning run printed, or from
   `keytool -list -v` on the keystore. It is a public value; it is never a secret.
 
