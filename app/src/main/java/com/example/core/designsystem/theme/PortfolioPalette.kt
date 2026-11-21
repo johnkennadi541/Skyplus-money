@@ -110,7 +110,10 @@ object PortfolioPalette {
    *   quietly repeating a colour.
    */
   fun assign(keys: List<String>, isDark: Boolean): Map<String, Color> {
-    val ordered = keys.map { it.trim() }.filter { it.isNotEmpty() }.distinct().sorted()
+    // Trim, drop blanks, and collapse keys that differ only by case: "GOLD" and " gold "
+    // are the same category and must not end up with two colours.
+    val ordered =
+      keys.map { it.trim() }.filter { it.isNotEmpty() }.distinctBy { it.lowercase() }.sorted()
     val capacity = capacityPalette(isDark)
     require(ordered.size <= capacity.size) {
       "PortfolioPalette can give at most ${capacity.size} distinct colours; " +
