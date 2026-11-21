@@ -40,21 +40,56 @@ android {
     }
     // Debug signing. CI supplies ONE stable debug keystore through environment
     // variables so every debug APK keeps the same SHA-1/SHA-256 and Google Sign-In
-    // stays registered. Local and AI Studio builds that do not set these variables
-    // keep using the git-ignored ./debug.keystore exactly as before.
-    // No secret is written to BuildConfig, resources or logs.
+    // stays registered.
+    //
+    // The four CI variables are all-or-nothing. If ANY of them is supplied, ALL FOUR must
+    // be non-blank and the keystore must be an existing file; otherwise configuration
+    // fails here, immediately, listing only the missing variable NAMES. CI credentials
+    // are never mixed with the local fallback credentials.
+    //
+    // Only when none of the four is supplied do the local defaults apply
+    // (git-ignored ./debug.keystore with android / androiddebugkey / android), which is
+    // what local and AI Studio builds rely on.
+    //
+    // No secret value is printed, logged, or written to BuildConfig, resources or
+    // APK metadata.
     create("debugConfig") {
-      val stableKeystorePath = System.getenv("SKYPLUS_DEBUG_KEYSTORE_PATH")
-      if (!stableKeystorePath.isNullOrBlank()) {
-        storeFile = file(stableKeystorePath)
-        storePassword = System.getenv("SKYPLUS_DEBUG_STORE_PASSWORD")
-        keyAlias = System.getenv("SKYPLUS_DEBUG_KEY_ALIAS")
-        keyPassword = System.getenv("SKYPLUS_DEBUG_KEY_PASSWORD")
-      } else {
+      val ciNames =
+        listOf(
+          "SKYPLUS_DEBUG_KEYSTORE_PATH",
+          "SKYPLUS_DEBUG_STORE_PASSWORD",
+          "SKYPLUS_DEBUG_KEY_ALIAS",
+          "SKYPLUS_DEBUG_KEY_PASSWORD",
+        )
+      val ciValues = ciNames.associateWith { System.getenv(it) }
+      val supplied = ciValues.filterValues { !it.isNullOrBlank() }
+
+      if (supplied.isEmpty()) {
+        // No CI signing at all: unchanged local / AI Studio behaviour.
         storeFile = file("${rootDir}/debug.keystore")
         storePassword = "android"
         keyAlias = "androiddebugkey"
         keyPassword = "android"
+      } else {
+        val missing = ciNames.filterNot { supplied.containsKey(it) }
+        if (missing.isNotEmpty()) {
+          throw GradleException(
+            "Debug signing is only partly configured. Set all four of " +
+              "SKYPLUS_DEBUG_KEYSTORE_PATH, SKYPLUS_DEBUG_STORE_PASSWORD, " +
+              "SKYPLUS_DEBUG_KEY_ALIAS and SKYPLUS_DEBUG_KEY_PASSWORD, or none of them. " +
+              "Missing: ${missing.joinToString(", ")}"
+          )
+        }
+        val keystore = file(supplied.getValue("SKYPLUS_DEBUG_KEYSTORE_PATH")!!)
+        if (!keystore.isFile) {
+          throw GradleException(
+            "SKYPLUS_DEBUG_KEYSTORE_PATH does not point to an existing file: ${keystore.path}"
+          )
+        }
+        storeFile = keystore
+        storePassword = supplied.getValue("SKYPLUS_DEBUG_STORE_PASSWORD")
+        keyAlias = supplied.getValue("SKYPLUS_DEBUG_KEY_ALIAS")
+        keyPassword = supplied.getValue("SKYPLUS_DEBUG_KEY_PASSWORD")
       }
     }
   }

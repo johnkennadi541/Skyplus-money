@@ -11,6 +11,35 @@ key.
 
 ---
 
+## Current state — the keystore is already provisioned
+
+**Provisioning is finished. Do not run it again.** The stable debug keystore exists, and
+all four signing secrets are already stored in the protected `debug-signing` environment:
+
+- `SKYPLUS_DEBUG_KEYSTORE_BASE64`
+- `SKYPLUS_DEBUG_STORE_PASSWORD`
+- `SKYPLUS_DEBUG_KEY_ALIAS`
+- `SKYPLUS_DEBUG_KEY_PASSWORD`
+
+The repository variable `DEBUG_CERT_SHA256` also already exists and holds the approved
+fingerprint recorded in "Required repository configuration" below.
+
+`SKYPLUS_APP_ID` and `SKYPLUS_APP_PRIVATE_KEY` are **separate GitHub App credentials**,
+used only to mint the short-lived token that the provisioning workflow needs. They are not
+signing material and they are not part of the four signing secrets.
+
+> **NEVER rerun the provisioning workflow.** It could rotate the signing identity, and a
+> new identity breaks every future APK update: an APK signed with a different certificate
+> cannot install over an existing one. The workflow carries a one-time guard that refuses
+> to run when any of the four secrets already exists; that guard is the protection, not
+> an invitation to try again.
+
+The numbered sections below are kept as a record of how the keystore was provisioned and
+what each value means. They are **reference, not a to-do list**. Nothing in them needs to
+be repeated.
+
+---
+
 ## ⚠ Read this before generating any key
 
 **A newly generated keystore cannot update an APK that is already installed under a
@@ -97,7 +126,11 @@ Two safe routes, both needing the founder's approval:
 Never commit directly to `main`, and never dispatch the workflow from a branch other
 than `main`.
 
-## 4. Run the provisioning workflow once (manual)
+## 4. How provisioning was done (already completed — do not repeat)
+
+> This step is finished. It is documented so the mechanism can be audited, not so it can
+> be run again. Rerunning it risks rotating the signing identity and breaking every future
+> APK update.
 
 Actions → **Provision debug signing keystore** → **Run workflow** → branch **`main`**.
 Approve the deployment when prompted.
@@ -145,8 +178,10 @@ been made, and this document does not claim it has.
 **Question:** can the next APK update the APK already installed on the founder's phone
 without uninstalling it?
 
-**Answer: no, not with a newly generated keystore. This is unresolved and blocks
-distribution.**
+**Answer:** not for the build installed today. That build was signed with a throw-away
+key whose private key is lost, so no APK produced now can install over it in place. This
+applies **only** to that one installed build: every build produced from the stable
+keystore shares one certificate, so all builds from now on update each other normally.
 
 Evidence gathered read-only:
 
@@ -180,16 +215,21 @@ None of these needs root, ADB or a third-party app.
 - **A. Recover the original key.** Only possible if a copy exists outside the CI
   runner. The evidence says it does not. If you believe you still have an APK signed
   with a key you own, tell me and I will verify it before anything else.
-- **B. Accept one reinstall.** The founder uninstalls the current debug build and
-  installs the new stable-key APK once. Local app data is lost, which for this build
-  is test data only: sign-in never succeeded, so no financial records were ever
-  created. After that single reinstall, every future build updates normally because
+- **B. The installed build is replaced, once.** Only the owner decides this, and only
+  after checking what is actually stored in that install. This document does **not**
+  state that the installed app can be removed safely and does **not** state that its
+  local data is disposable — that is the owner's decision, not an assumption to make on
+  their behalf. After any such replacement, every later build updates normally, because
   the certificate never changes again.
 
 ## Versioning
 
-Current state in `app/build.gradle.kts`: `applicationId = "com.skyplus.money"`,
-`versionCode = 1`, `versionName = "1.0"`.
+Current state in `app/build.gradle.kts` **on this PR branch
+(`fix/stable-google-signin-keystore`)**: `applicationId = "com.skyplus.money"`,
+`versionCode = 2`, `versionName = "1.0"`.
+
+The `versionCode` on `main` is still 1; this branch raises it to 2 for the first build
+signed with the stable keystore. Merge that decision deliberately, not by accident.
 
 Rules that must hold for every distributed APK:
 
@@ -198,10 +238,9 @@ Rules that must hold for every distributed APK:
 - signing certificate identical to the previously installed build;
 - no destructive database migration and no app-data reset.
 
-Proposed approach (needs approval, not yet applied): set `versionCode = 2` for the
-first stable-key build, then increment by one for every distributed build, and let
-`versionName` carry the human-readable number (`1.0.1`, `1.1`, …). One line changes in
-`app/build.gradle.kts`.
+Applied on this branch: `versionCode = 2` for the first stable-key build. From here,
+increment by one for every distributed build, and let `versionName` carry the
+human-readable number (`1.0.1`, `1.1`, …).
 
 ## Test APK for pull requests
 
@@ -254,8 +293,9 @@ Google Sign-In.
 - APK certificate differs from the keystore → fail; nothing is uploaded.
 - APK certificate differs from `DEBUG_CERT_SHA256` → fail; nothing is uploaded.
 - `DEBUG_CERT_SHA256` is unset or is not 64 hex characters → fail; nothing is uploaded.
-- The provisioning guard finds an existing `SKYPLUS_DEBUG_KEYSTORE_BASE64` → the
-  provisioning run stops before any key is generated, and no secret is overwritten.
+- The provisioning guard finds **any one** of the four `SKYPLUS_DEBUG_*` environment
+  secrets already present → the provisioning run stops before any key is generated, and
+  no secret is overwritten. A failed secret listing stops the run as well (fail closed).
 - Temporary material always removed, on success and on failure.
 
 ## Release signing
@@ -265,8 +305,9 @@ Untouched. The `release` config still reads `KEYSTORE_PATH`, `STORE_PASSWORD` an
 
 ## Required repository configuration
 
-Two things must be configured by the repository owner. Neither is set by any workflow,
-and neither is stored in this repository.
+Both items below are **already configured** by the repository owner. Neither is set by
+any workflow and neither is stored in this repository. They are recorded here so they can
+be checked, not so they can be created again.
 
 ### 1. Repository variable `DEBUG_CERT_SHA256`
 
@@ -277,19 +318,23 @@ equals this variable.
 - Name: `DEBUG_CERT_SHA256`
 - Value: the approved stable debug certificate SHA-256, 64 hex characters. Colons,
   spaces and lower case are accepted and normalised before comparison. The approved
-  value for the current stable keystore is
-  `4E:3E:86:D3:93:03:06:7B:A6:E9:0F:A8:FC:1F:78:CE:9C:F0:BD:95:F5:5B:07:62:A2:35:18:23:F0:D3:47:E3`.
-- Take the value from the `SHA256:` line the provisioning run printed, or from
-  `keytool -list -v` on the keystore. It is a public value; it is never a secret.
+  value is
+  `47:B6:93:4D:D5:B4:2A:D1:79:E4:2C:70:4A:8D:97:7E:4F:35:1E:7C:54:F4:C1:26:E4:4F:D5:F3:4B:42:E2:EB`.
+  This value is fixed by the owner. It must not be replaced by any other fingerprint.
+- It is a public value; it is never a secret. Do not derive it from a `keytool` run on a
+  different keystore — a fingerprint taken from the wrong keystore will silently lock the
+  `debug-apk` job into failing.
 
-Until this variable exists, the `debug-apk` job fails on purpose and uploads nothing.
-That is the intended behaviour, not a broken build: an unverifiable APK must not ship.
+If this variable is ever missing, or holds anything other than the approved fingerprint,
+the `debug-apk` job fails on purpose and uploads nothing. That is the intended behaviour,
+not a broken build: an unverifiable APK must not ship.
 
 ### 2. The provisioning guard is one-time
 
-`provision-debug-keystore.yml` now lists the environment secrets before generating
-anything and stops if `SKYPLUS_DEBUG_KEYSTORE_BASE64` already exists. Replacing the
-signing identity is therefore no longer possible by simply running the workflow again.
+`provision-debug-keystore.yml` lists the environment secrets before generating anything
+and stops if **any one** of the four `SKYPLUS_DEBUG_*` secrets already exists — which it
+does, so every future dispatch stops at the guard. Replacing the signing identity is
+therefore not possible by simply running the workflow again.
 
 If the identity ever has to change, that is a deliberate, reviewed procedure, not a
 re-run:
