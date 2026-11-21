@@ -153,7 +153,7 @@ Evidence gathered read-only:
 | Item | Finding |
 |---|---|
 | Application ID | `com.skyplus.money`, unchanged |
-| Installed APK certificate (diagnostics build, run 44745920493) | SHA-1 `94:68:14:4F:69:F4:BC:F7:0C:F4:89:27:17:14:BA:FE:11:B1:DB:08`, SHA-256 `12:92:31:D3:E5:E3:E2:14:02:4D:82:5E:F4:5B:24:DC:1A:64:FF:87:DC:AD:C9:68:F7:8E:9A:A3:95:E4:A9:E5` — re-extracted from the APK artifact and also shown on-device by the DEBUG diagnostics card |
+| Installed APK certificate (diagnostics build, run 44745920493) | SHA-1 `E7:57:BB:12:2E:65:76:81:5E:69:20:F2:F5:C5:46:34:C9:72:0B:A3`, SHA-256 `47:B6:93:4D:D5:B4:2A:D1:79:E4:2C:70:4A:8D:97:7E:4F:35:1E:7C:54:F4:C1:26:E4:4F:D5:F3:4B:42:E2:EB` — re-extracted from the APK artifact and also shown on-device by the DEBUG diagnostics card |
 | A later CI build (run 44766111158) | SHA-1 `23:B7:F5:50:5E:96:C4:2C:DD:62:9E:8F:A5:BF:D0:11:1D:BD:77:54` — a different certificate |
 | Private key behind either certificate | **not recoverable**: each was generated inside a throw-away CI runner and never stored anywhere |
 | Repository history | contains no `.jks`, `.keystore` or `debug.keystore`; all are git-ignored (`.gitignore` lines 18, 21, 22) |
