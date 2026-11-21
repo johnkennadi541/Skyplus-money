@@ -169,29 +169,62 @@ jobs:
             "$AAPT2" dump badging "$APK" | grep -E "^package:|^application-label:" | head -3
           fi
 
-      # Proves the APK really was signed with the provisioned keystore, so a silent
-      # fallback to a throw-away key can never ship.
-      - name: Verify APK certificate matches the stable keystore
+      # Two independent checks must both pass before the artifact is uploaded:
+      #   1. the APK certificate equals the approved fingerprint in DEBUG_CERT_SHA256,
+      #      so a replaced keystore cannot ship even if the APK and keystore agree;
+      #   2. the APK certificate equals the provisioned keystore, so a silent fallback
+      #      to a throw-away key cannot ship.
+      # Every value printed here is a public certificate fingerprint. No password and
+      # no key material is ever printed.
+      - name: Verify APK certificate against the approved fingerprint and the keystore
         env:
           STORE_PASSWORD: ${{ secrets.SKYPLUS_DEBUG_STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.SKYPLUS_DEBUG_KEY_ALIAS }}
+          EXPECTED_FINGERPRINT: ${{ vars.DEBUG_CERT_SHA256 }}
         run: |
           set -euo pipefail
           APK=app/build/outputs/apk/debug/app-debug.apk
+          normalise() { tr -d ':' | tr 'a-f' 'A-F' | tr -d '[:space:]'; }
+
+          if [ -z "${EXPECTED_FINGERPRINT:-}" ]; then
+            echo "::error::Repository variable DEBUG_CERT_SHA256 is not set. Set it to the approved debug certificate SHA-256 before distributing any APK."
+            exit 1
+          fi
+          EXPECTED=$(printf '%s' "$EXPECTED_FINGERPRINT" | normalise)
+          if ! printf '%s' "$EXPECTED" | grep -qE '^[0-9A-F]{64}$'; then
+            echo "::error::DEBUG_CERT_SHA256 is not a valid SHA-256 fingerprint (64 hex characters expected). Refusing to continue."
+            exit 1
+          fi
+
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
           if [ -z "$APKSIGNER" ]; then
             echo "::error::apksigner was not found in the Android build-tools."
             exit 1
           fi
-          normalise() { tr -d ':' | tr 'a-f' 'A-F' | tr -d '[:space:]'; }
-          KEY_SHA1=$(keytool -list -v -keystore "$SKYPLUS_DEBUG_KEYSTORE_PATH" -storepass:env STORE_PASSWORD -alias "$KEY_ALIAS" | grep -m1 "SHA1:" | cut -d: -f2- | normalise)
-          KEY_SHA256=$(keytool -list -v -keystore "$SKYPLUS_DEBUG_KEYSTORE_PATH" -storepass:env STORE_PASSWORD -alias "$KEY_ALIAS" | grep -m1 "SHA256:" | cut -d: -f2- | normalise)
+
           APK_SHA1=$("$APKSIGNER" verify --print-certs "$APK" | grep -m1 "SHA-1 digest" | awk '{print $NF}' | normalise)
           APK_SHA256=$("$APKSIGNER" verify --print-certs "$APK" | grep -m1 "SHA-256 digest" | awk '{print $NF}' | normalise)
-          echo "keystore SHA-1  : $KEY_SHA1"
+          if [ -z "$APK_SHA1" ] || [ -z "$APK_SHA256" ]; then
+            echo "::error::The APK signing certificate could not be read."
+            exit 1
+          fi
+
+          KEY_SHA1=$(keytool -list -v -keystore "$SKYPLUS_DEBUG_KEYSTORE_PATH" -storepass:env STORE_PASSWORD -alias "$KEY_ALIAS" | grep -m1 "SHA1:" | cut -d: -f2- | normalise)
+          KEY_SHA256=$(keytool -list -v -keystore "$SKYPLUS_DEBUG_KEYSTORE_PATH" -storepass:env STORE_PASSWORD -alias "$KEY_ALIAS" | grep -m1 "SHA256:" | cut -d: -f2- | normalise)
+
+          echo "approved SHA-256  : $EXPECTED"
           echo "APK      SHA-1  : $APK_SHA1"
-          echo "keystore SHA-256: $KEY_SHA256"
           echo "APK      SHA-256: $APK_SHA256"
+          echo "keystore SHA-1  : $KEY_SHA1"
+          echo "keystore SHA-256: $KEY_SHA256"
+
+          if [ "$APK_SHA256" != "$EXPECTED" ]; then
+            echo "::error::The APK signing certificate does not match the approved fingerprint DEBUG_CERT_SHA256."
+            echo "::error::The provisioned keystore is not the approved signing identity. Nothing will be uploaded."
+            exit 1
+          fi
+          echo "APK certificate matches the approved fingerprint."
+
           if [ "$KEY_SHA1" != "$APK_SHA1" ] || [ "$KEY_SHA256" != "$APK_SHA256" ]; then
             echo "::error::APK signing certificate does not match the provisioned debug keystore."
             exit 1
