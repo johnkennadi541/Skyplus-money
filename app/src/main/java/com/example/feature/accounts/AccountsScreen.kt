@@ -235,8 +235,10 @@ fun AccountsContent(
           .align(Alignment.BottomEnd)
           .padding(OceanSpacing.lg)
           .testTag("add_account_fab"),
-      containerColor = OceanTheme.colors.gold,
-      contentColor = Color.Black,
+      // Yellow is a small accent only and must never fill a primary action, so the
+      // add-account FAB uses the brand primary instead of the accent.
+      containerColor = MaterialTheme.colorScheme.primary,
+      contentColor = MaterialTheme.colorScheme.onPrimary,
     ) {
       Icon(imageVector = Icons.Rounded.Add, contentDescription = "Add Account")
     }

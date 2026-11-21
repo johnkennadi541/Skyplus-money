@@ -5,14 +5,21 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 /**
- * SKYPLUS MONEY — approved design tokens (Phase 1).
+ * SKYPLUS MONEY — approved design tokens.
  *
- * The approved palette is indigo + teal + gold on a slate base:
+ * The approved palette is indigo + teal + yellow on a slate base. The old gold
+ * accent is gone: yellow #FACC15 is a SMALL accent only and is never a dominant
+ * background, a primary button, or light-mode text.
  *
- * Light: primary #1E3A8A, teal #0D9488, gold #D6B45A, background #F8FAFC,
- *        cards #FFFFFF, border #E2E8F0, primary text #0F172A, secondary text #64748B.
+ * Light: primary #1E3A8A, teal #0D9488, accent #FACC15 (deep #854D0E for text),
+ *        background #F8FAFC, cards #FFFFFF, border #E2E8F0, primary text #0F172A,
+ *        secondary text #64748B.
  * Dark:  background #0B1120, surface #1E293B, primary text #F1F5F9,
- *        secondary text #94A3B8, teal #2DD4BF, gold #D6B45A.
+ *        secondary text #94A3B8, teal #2DD4BF, accent #FACC15.
+ *
+ * Contrast, measured: #FACC15 on #FFFFFF is 1.53:1 and must never carry text;
+ * on #0B1120 it is 12.30:1 and on #1E293B it is 9.55:1, both safe. #854D0E on
+ * #FFFFFF is 6.85:1, which is why light-mode accent text uses the deep value.
  *
  * The semantic names below (DeepOceanNavy, OceanMistBackground, …) are historical:
  * they are used by every existing screen, so they are kept as the public API and
@@ -30,10 +37,24 @@ val SkyplusIndigoLight = Color(0xFF818CF8)
 
 val SkyplusTeal = Color(0xFF0D9488)
 val SkyplusTealBright = Color(0xFF2DD4BF)
-val SkyplusGold = Color(0xFFD6B45A)
 
-/** Deeper gold for text on light surfaces (contrast on #FFFFFF). */
-val SkyplusGoldDeep = Color(0xFFA8863C)
+/**
+ * Approved small accent. Badges, chart points and one highlight per screen only.
+ * Never a dominant background, never a primary button, never light-mode text.
+ */
+val SkyplusYellow = Color(0xFFFACC15)
+
+/** Deep yellow for accent text and icons on light surfaces (6.85:1 on #FFFFFF). */
+val SkyplusYellowDeep = Color(0xFF854D0E)
+
+/**
+ * Historical accent name. Kept so every existing call site keeps compiling, and
+ * now carries the approved yellow. Prefer [SkyplusYellow] in new code.
+ */
+val SkyplusGold = SkyplusYellow
+
+/** Historical deep-accent name; now the accessible deep yellow. */
+val SkyplusGoldDeep = SkyplusYellowDeep
 
 val SkyplusLightBackground = Color(0xFFF8FAFC)
 val SkyplusLightSurface = Color(0xFFFFFFFF)
@@ -48,16 +69,31 @@ val SkyplusDarkTextPrimary = Color(0xFFF1F5F9)
 val SkyplusDarkTextSecondary = Color(0xFF94A3B8)
 
 // ---- Semantic status colours --------------------------------------------------
+//
+// Income is ALWAYS green and expenses are ALWAYS red, everywhere: cards, charts,
+// legends, indicators and summaries. These two values are never swapped.
 
-val OceanPositive = Color(0xFF10B981)
+/** Income, light and dark. Approved #16A34A. */
+val SkyplusIncome = Color(0xFF16A34A)
+
+/** Income accent, for secondary marks and chart emphasis. Approved #22C55E. */
+val SkyplusIncomeAccent = Color(0xFF22C55E)
+
+/** Expense, light and dark. Approved #DC2626. */
+val SkyplusExpense = Color(0xFFDC2626)
+
+/** Expense accent. Approved #EF4444. */
+val SkyplusExpenseAccent = Color(0xFFEF4444)
+
+val OceanPositive = SkyplusIncome
 val OceanPositiveContainerDark = Color(0xFF0B352A)
-val OceanPositiveContainerLight = Color(0xFFD1FAE5)
+val OceanPositiveContainerLight = Color(0xFFDCFCE7)
 
 val OceanWarning = Color(0xFFF59E0B)
 val OceanWarningContainerDark = Color(0xFF3A2809)
 val OceanWarningContainerLight = Color(0xFFFEF3C7)
 
-val OceanNegative = Color(0xFFEF4444)
+val OceanNegative = SkyplusExpense
 val OceanNegativeContainerDark = Color(0xFF3D1419)
 val OceanNegativeContainerLight = Color(0xFFFEE2E2)
 
@@ -151,9 +187,9 @@ val DarkOceanExtendedColors =
   OceanExtendedColors(
     cardSubtle = DeepOceanSurface,
     cardBorder = SkyplusDarkBorder,
-    gold = SkyplusGold,
+    gold = SkyplusYellow,
     onGold = SkyplusDarkBackground,
-    positive = OceanPositive,
+    positive = SkyplusIncome,
     positiveContainer = OceanPositiveContainerDark,
     warning = OceanWarning,
     warningContainer = OceanWarningContainerDark,
@@ -168,11 +204,11 @@ val LightOceanExtendedColors =
   OceanExtendedColors(
     cardSubtle = SkyplusLightSurface,
     cardBorder = SkyplusLightBorder,
-    // Approved token: gold is #D6B45A in both modes. SkyplusGoldDeep stays
-    // available where a darker gold is needed for small text on white.
-    gold = SkyplusGold,
+    // Light mode uses the deep accent so text and icons stay readable on white
+    // (6.85:1). The bright #FACC15 fails contrast on white and is never used here.
+    gold = SkyplusYellowDeep,
     onGold = Color.White,
-    positive = Color(0xFF059669),
+    positive = SkyplusIncome,
     positiveContainer = OceanPositiveContainerLight,
     warning = Color(0xFFD97706),
     warningContainer = OceanWarningContainerLight,

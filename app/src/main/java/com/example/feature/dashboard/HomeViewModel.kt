@@ -62,6 +62,39 @@ data class HomeInvestmentSection(
   val returnPercent: BigDecimal,
 )
 
+/** One month of the income-versus-expense trend. Income is green, expenses are red. */
+data class HomeTrendPoint(
+  val monthKey: String,
+  val label: String,
+  val income: HomeAmount,
+  val expenses: HomeAmount,
+  val savings: HomeAmount,
+)
+
+/** One slice of the portfolio allocation ring. [colorKey] drives the stable colour. */
+data class HomeAllocationSlice(
+  val categoryName: String,
+  val colorKey: String,
+  val value: HomeAmount,
+  val gainLoss: HomeAmount,
+  val sharePercent: BigDecimal,
+  val holdingCount: Int,
+)
+
+/** One row of the holdings breakdown. [colorKey] drives the stable colour. */
+data class HomeHoldingRow(
+  val id: String,
+  val name: String,
+  val categoryName: String,
+  val colorKey: String,
+  val value: HomeAmount,
+  val invested: HomeAmount,
+  val gainLoss: HomeAmount,
+  val returnPercent: BigDecimal,
+  val sharePercent: BigDecimal,
+  val isStalePrice: Boolean,
+)
+
 /**
  * Everything the Home dashboard shows for ONE currency.
  * Currencies are never combined: each section carries exactly one currency code.
@@ -78,7 +111,14 @@ data class HomeCurrencySection(
   val budget: HomeBudgetSection? = null,
   val loans: HomeLoanSection? = null,
   val investments: HomeInvestmentSection? = null,
+  val trends: List<HomeTrendPoint> = emptyList(),
+  val allocation: List<HomeAllocationSlice> = emptyList(),
+  val holdings: List<HomeHoldingRow> = emptyList(),
 ) {
+  /** True when this currency has anything portfolio-related to show. */
+  val hasPortfolio: Boolean
+    get() = investments != null || allocation.isNotEmpty() || holdings.isNotEmpty()
+
   /** Share of the income-versus-expense bar taken by expenses, 0f..1f. */
   val expenseShare: Float
     get() {
@@ -132,6 +172,14 @@ constructor(
   private val reportsSource: HomeFinancialReportsSource,
   private val reportsCalculationEngine: ReportsCalculationEngine,
 ) : ViewModel() {
+
+  private companion object {
+    /** Bars stay legible with at most six months on a phone width. */
+    const val MAX_TREND_MONTHS = 6
+
+    /** The breakdown shows the largest eight holdings; the full list lives in Investments. */
+    const val MAX_HOLDING_ROWS = 8
+  }
 
   private val window = MutableStateFlow(buildWindow())
   private val selectedCurrency = MutableStateFlow<String?>(null)
@@ -225,6 +273,8 @@ constructor(
         val netWorth = report.netWorth
         val incomeExpense = report.incomeExpense
 
+        val portfolioSummary = report.investments?.portfolioSummary
+
         HomeCurrencySection(
           currencyCode = currencyCode,
           netWorth = amount(netWorth.netWorthMinor, currencyCode),
@@ -255,8 +305,7 @@ constructor(
               )
             },
           investments =
-            report.investments?.let { investment ->
-              val portfolio = investment.portfolioSummary
+            portfolioSummary?.let { portfolio ->
               HomeInvestmentSection(
                 currentValue = amount(portfolio.totalValuationMinor, currencyCode),
                 invested = amount(portfolio.totalInvestedMinor, currencyCode),
@@ -265,6 +314,14 @@ constructor(
                 returnPercent = portfolio.returnPercent,
               )
             },
+          trends = mapTrends(incomeExpense.monthlyTrends, currencyCode),
+          allocation = mapAllocation(portfolioSummary, currencyCode),
+          holdings =
+            mapHoldings(
+              rows = report.investments?.holdingRows.orEmpty(),
+              totalValuationMinor = portfolioSummary?.totalValuationMinor ?: 0L,
+              currencyCode = currencyCode,
+            ),
         )
       }
 
@@ -283,6 +340,73 @@ constructor(
         },
     )
   }
+
+  /** Last [MAX_TREND_MONTHS] months only, so the bars stay readable on a phone. */
+  private fun mapTrends(
+    rows: List<com.example.domain.model.MonthlyTrendRow>,
+    currencyCode: String,
+  ): List<HomeTrendPoint> =
+    rows.takeLast(MAX_TREND_MONTHS).map { row ->
+      HomeTrendPoint(
+        monthKey = row.monthKey,
+        label = row.monthLabel,
+        income = amount(row.incomeMinor, currencyCode),
+        expenses = amount(row.netExpenseMinor, currencyCode),
+        savings = amount(row.netSavingsMinor, currencyCode),
+      )
+    }
+
+  private fun mapAllocation(
+    portfolio: com.example.domain.model.PortfolioCurrencySummary?,
+    currencyCode: String,
+  ): List<HomeAllocationSlice> =
+    portfolio?.categoryAllocations.orEmpty()
+      .filter { it.valuationMinor > 0L }
+      .sortedByDescending { it.valuationMinor }
+      .map { item ->
+        HomeAllocationSlice(
+          categoryName = item.category.displayName,
+          colorKey = item.category.name,
+          value = amount(item.valuationMinor, currencyCode),
+          gainLoss = amount(item.unrealizedPnlMinor, currencyCode),
+          sharePercent = item.allocationPercent,
+          holdingCount = item.holdingCount,
+        )
+      }
+
+  /**
+   * Holdings are ordered by value, largest first. [sharePercent] is derived here from
+   * the existing total valuation; when that total is zero the share is zero rather
+   * than an invented number.
+   */
+  private fun mapHoldings(
+    rows: List<com.example.domain.model.InvestmentHoldingReportRow>,
+    totalValuationMinor: Long,
+    currencyCode: String,
+  ): List<HomeHoldingRow> =
+    rows.sortedByDescending { it.valuationMinor }
+      .take(MAX_HOLDING_ROWS)
+      .map { row ->
+        HomeHoldingRow(
+          id = row.holdingId,
+          name = row.name,
+          categoryName = row.category.displayName,
+          colorKey = row.category.name + ":" + row.name,
+          value = amount(row.valuationMinor, currencyCode),
+          invested = amount(row.investedMinor, currencyCode),
+          gainLoss = amount(row.unrealizedPnlMinor, currencyCode),
+          returnPercent = row.returnPercent,
+          sharePercent =
+            if (totalValuationMinor > 0L) {
+              BigDecimal(row.valuationMinor)
+                .multiply(BigDecimal(100))
+                .divide(BigDecimal(totalValuationMinor), 1, java.math.RoundingMode.HALF_UP)
+            } else {
+              BigDecimal.ZERO
+            },
+          isStalePrice = row.isStalePrice,
+        )
+      }
 
   private fun amount(minorUnits: Long, currencyCode: String): HomeAmount =
     HomeAmount(

@@ -17,7 +17,12 @@ import com.example.core.designsystem.theme.OceanTextMutedDark
 import com.example.core.designsystem.theme.OceanTextMutedLight
 import com.example.core.designsystem.theme.SkyplusDarkBackground
 import com.example.core.designsystem.theme.SkyplusDarkSurface
+import com.example.core.designsystem.theme.SkyplusExpense
+import com.example.core.designsystem.theme.SkyplusExpenseAccent
 import com.example.core.designsystem.theme.SkyplusGold
+import com.example.core.designsystem.theme.SkyplusGoldDeep
+import com.example.core.designsystem.theme.SkyplusIncome
+import com.example.core.designsystem.theme.SkyplusIncomeAccent
 import com.example.core.designsystem.theme.SkyplusIndigo
 import com.example.core.designsystem.theme.SkyplusLightBackground
 import com.example.core.designsystem.theme.SkyplusLightBorder
@@ -26,6 +31,8 @@ import com.example.core.designsystem.theme.SkyplusLightTextPrimary
 import com.example.core.designsystem.theme.SkyplusLightTextSecondary
 import com.example.core.designsystem.theme.SkyplusTeal
 import com.example.core.designsystem.theme.SkyplusTealBright
+import com.example.core.designsystem.theme.SkyplusYellow
+import com.example.core.designsystem.theme.SkyplusYellowDeep
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -47,7 +54,7 @@ class OceanDesignTokensTest {
   fun lightPaletteMatchesApprovedTokens() {
     assertEquals(Color(0xFF1E3A8A), OceanPrimaryLightMode)
     assertEquals(Color(0xFF0D9488), OceanTeal)
-    assertEquals(Color(0xFFD6B45A), SkyplusGold)
+    assertEquals(Color(0xFFFACC15), SkyplusGold)
     assertEquals(Color(0xFFF8FAFC), OceanMistBackground)
     assertEquals(Color(0xFFFFFFFF), OceanMistSurface)
     assertEquals(Color(0xFFE2E8F0), OceanMistBorder)
@@ -62,7 +69,7 @@ class OceanDesignTokensTest {
     assertEquals(Color(0xFFF1F5F9), OceanTextLight)
     assertEquals(Color(0xFF94A3B8), OceanTextMutedDark)
     assertEquals(Color(0xFF2DD4BF), OceanTealBright)
-    assertEquals(Color(0xFFD6B45A), SkyplusGold)
+    assertEquals(Color(0xFFFACC15), SkyplusGold)
   }
 
   @Test
@@ -84,9 +91,34 @@ class OceanDesignTokensTest {
     assertTrue(DarkOceanExtendedColors.isDark)
     assertFalse(LightOceanExtendedColors.isDark)
 
-    assertEquals(SkyplusGold, DarkOceanExtendedColors.gold)
-    assertEquals(SkyplusGold, LightOceanExtendedColors.gold)
+    // Dark mode can use the bright accent; light mode must use the deep one, because
+    // #FACC15 on white is 1.53:1 and would fail contrast for text and icons.
+    assertEquals(SkyplusYellow, DarkOceanExtendedColors.gold)
+    assertEquals(SkyplusYellowDeep, LightOceanExtendedColors.gold)
     assertEquals(Color(0xFFFFFFFF), LightOceanExtendedColors.cardSubtle)
     assertEquals(SkyplusDarkSurface, DarkOceanExtendedColors.cardSubtle)
+  }
+
+  @Test
+  fun theApprovedYellowAndItsDeepVariantAreExact() {
+    assertEquals(Color(0xFFFACC15), SkyplusYellow)
+    assertEquals(Color(0xFF854D0E), SkyplusYellowDeep)
+    assertEquals(SkyplusYellow, SkyplusGold)
+    assertEquals(SkyplusYellowDeep, SkyplusGoldDeep)
+  }
+
+  @Test
+  fun incomeIsAlwaysGreenAndExpenseIsAlwaysRed() {
+    assertEquals(Color(0xFF16A34A), SkyplusIncome)
+    assertEquals(Color(0xFF22C55E), SkyplusIncomeAccent)
+    assertEquals(Color(0xFFDC2626), SkyplusExpense)
+    assertEquals(Color(0xFFEF4444), SkyplusExpenseAccent)
+
+    // The extended colours every screen reads must follow the same semantics, in both
+    // modes, so income can never render red or expenses green.
+    assertEquals(SkyplusIncome, DarkOceanExtendedColors.positive)
+    assertEquals(SkyplusIncome, LightOceanExtendedColors.positive)
+    assertEquals(SkyplusExpense, DarkOceanExtendedColors.negative)
+    assertEquals(SkyplusExpense, LightOceanExtendedColors.negative)
   }
 }
