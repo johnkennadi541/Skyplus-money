@@ -4,7 +4,10 @@ on:
   push:
     branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop ]
+    # feature/ui-redesign is included so pull requests into the redesign branch get a
+    # normal automatic CI run. The workflow that GitHub loads for a pull request comes
+    # from the BASE branch, so this change must live on feature/ui-redesign itself.
+    branches: [ main, develop, 'feature/ui-redesign' ]
 
 permissions:
   contents: read
