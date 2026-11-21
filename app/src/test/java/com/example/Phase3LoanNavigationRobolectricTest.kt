@@ -10,7 +10,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import com.example.core.designsystem.theme.SkyplusOceanTheme
 import com.example.domain.model.ThemePreference
-import com.example.feature.dashboard.HomeFoundationUiState
+import com.example.feature.dashboard.HomeUiState
 import com.example.navigation.SkyplusAppShell
 import org.junit.Rule
 import org.junit.Test
@@ -29,7 +29,7 @@ class Phase3LoanNavigationRobolectricTest {
     composeTestRule.setContent {
       SkyplusOceanTheme(themePreference = ThemePreference.LIGHT) {
         SkyplusAppShell(
-          homeUiState = HomeFoundationUiState(),
+          homeUiState = HomeUiState(),
           themePreference = ThemePreference.LIGHT,
           onToggleTheme = {},
           onSelectTheme = {},
@@ -46,7 +46,10 @@ class Phase3LoanNavigationRobolectricTest {
     composeTestRule.onNodeWithTag("nav_tab_shopping_list").assertIsDisplayed()
 
     // Scroll to Quick Actions and open EMI Calculator directly
-    composeTestRule.onNodeWithTag("home_emi_calculator_button").performScrollTo().performClick()
+    composeTestRule
+      .onNodeWithTag("home_screen")
+      .performScrollToNode(hasTestTag("home_emi_calculator_button"))
+    composeTestRule.onNodeWithTag("home_emi_calculator_button").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("emi_calculator_screen").assertIsDisplayed()
     composeTestRule.onNodeWithTag("emi_calculator_list").performScrollToNode(hasTestTag("emi_results_card"))

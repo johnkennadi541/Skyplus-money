@@ -19,7 +19,7 @@ import com.example.domain.model.MarketSyncSettings
 import com.example.domain.model.PriceSourceType
 import com.example.domain.model.ThemePreference
 import com.example.domain.usecase.InvestmentCalculationEngine
-import com.example.feature.dashboard.HomeFoundationUiState
+import com.example.feature.dashboard.HomeUiState
 import com.example.feature.investments.InvestmentDetailContent
 import com.example.feature.investments.InvestmentsContent
 import com.example.navigation.SkyplusAppShell
@@ -42,7 +42,7 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
     composeTestRule.setContent {
       SkyplusOceanTheme(themePreference = ThemePreference.LIGHT) {
         SkyplusAppShell(
-          homeUiState = HomeFoundationUiState(),
+          homeUiState = HomeUiState(),
           themePreference = ThemePreference.LIGHT,
           onToggleTheme = {},
           onSelectTheme = {},
@@ -59,7 +59,10 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
     composeTestRule.onNodeWithTag("nav_tab_shopping_list").assertIsDisplayed()
 
     // Open Investments from Home Quick Action
-    composeTestRule.onNodeWithTag("home_investments_button").performScrollTo().performClick()
+    composeTestRule
+      .onNodeWithTag("home_screen")
+      .performScrollToNode(hasTestTag("home_investments_button"))
+    composeTestRule.onNodeWithTag("home_investments_button").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("investments_screen").assertIsDisplayed()
     composeTestRule.onNodeWithTag("investments_back_button").performClick()

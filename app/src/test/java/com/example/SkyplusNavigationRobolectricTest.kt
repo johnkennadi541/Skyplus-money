@@ -5,10 +5,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import com.example.core.designsystem.theme.SkyplusOceanTheme
-import com.example.domain.model.PhaseDeliveryState
-import com.example.domain.model.RoadmapPhaseItem
 import com.example.domain.model.ThemePreference
-import com.example.feature.dashboard.HomeFoundationUiState
+import com.example.feature.dashboard.HomeUiState
 import com.example.navigation.SkyplusAppShell
 import org.junit.Rule
 import org.junit.Test
@@ -22,18 +20,7 @@ class SkyplusNavigationRobolectricTest {
 
   @get:Rule val composeTestRule = createComposeRule()
 
-  private val sampleState =
-    HomeFoundationUiState(
-      roadmap =
-        listOf(
-          RoadmapPhaseItem(
-            0,
-            "Phase 0 — Foundation",
-            "Clean foundation",
-            PhaseDeliveryState.COMPLETE_IN_PROGRESS,
-          )
-        )
-    )
+  private val sampleState = HomeUiState()
 
   @Test
   fun `navigate across four tabs and profile menu`() {
