@@ -133,9 +133,15 @@ class PortfolioPaletteTest {
     assertEquals("stocks:reliance", PortfolioPalette.canonical("Stocks:Reliance"))
     assertEquals("", PortfolioPalette.canonical("   "))
 
-    // The colour for a key is the colour for its canonical form.
+    // assign() keys its result by the canonical form, and a padded key and its clean
+    // form must produce exactly the same map. Note that colorFor() is deliberately NOT
+    // comparable here: it resolves one key over the twelve base colours, while assign()
+    // spreads keys over the full capacity so that no two keys collide.
     val assigned = PortfolioPalette.assign(listOf("  GOLD "), isDark = false)
-    assertEquals(assigned["gold"], PortfolioPalette.colorFor("gold", isDark = false))
+    val canonicalAssigned = PortfolioPalette.assign(listOf("gold"), isDark = false)
+
+    assertEquals(setOf("gold"), assigned.keys)
+    assertEquals(canonicalAssigned, assigned)
   }
 
   @Test
