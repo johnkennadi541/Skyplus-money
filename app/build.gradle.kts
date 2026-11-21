@@ -35,10 +35,20 @@ android {
       keyPassword = System.getenv("KEY_PASSWORD")
     }
     create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
+      // CI restores one stable debug keystore and exports these four variables, so
+      // every debug APK keeps the same signing certificate and the Firebase
+      // fingerprint stays valid. Local and AI Studio builds that do not set them keep
+      // the previous behaviour. No value is written to BuildConfig, resources or logs.
+      val keystorePath =
+        System.getenv("SKYPLUS_DEBUG_KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
+          ?: "${rootDir}/debug.keystore"
+      storeFile = file(keystorePath)
+      storePassword =
+        System.getenv("SKYPLUS_DEBUG_STORE_PASSWORD")?.takeIf { it.isNotBlank() } ?: "android"
+      keyAlias =
+        System.getenv("SKYPLUS_DEBUG_KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "androiddebugkey"
+      keyPassword =
+        System.getenv("SKYPLUS_DEBUG_KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: "android"
     }
   }
 
