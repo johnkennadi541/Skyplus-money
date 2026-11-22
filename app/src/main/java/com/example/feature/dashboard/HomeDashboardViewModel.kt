@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -27,8 +28,8 @@ import kotlinx.coroutines.launch
  * That use case already scopes every query to the signed-in user's UID and is covered by the
  * existing calculation tests, so the dashboard shows real ledger data and never invents figures.
  *
- * The card layout is stored in [DashboardLayoutPreferencesDataSource], keyed by UID, so a custom
- * order survives app restarts and is never shared between accounts.
+ * Card layout changes go through [DashboardLayoutEditor], which keeps one working layout per UID
+ * and serialises the writes. No action is ever computed from a stale snapshot of the UI state.
  */
 @HiltViewModel
 class HomeDashboardViewModel
@@ -43,6 +44,15 @@ constructor(
 
   private val monthlyWindow = calculationEngine.buildDateWindow(ReportPeriodType.MONTHLY)
 
+  private val layoutEditor =
+    DashboardLayoutEditor { uid, layout ->
+      layoutPreferences.saveLayout(
+        userId = uid,
+        orderRaw = DashboardLayoutPolicy.encodeOrder(layout.order),
+        hiddenRaw = DashboardLayoutPolicy.encodeHidden(layout.hidden),
+      )
+    }
+
   /** The UID whose layout the actions should write to. Set by the session flow below. */
   private var activeUid: String? = null
 
@@ -56,11 +66,16 @@ constructor(
         if (uid == null) {
           flowOf(HomeDashboardUiState(isLoading = false, isEmpty = true))
         } else {
+          val layoutFlow =
+            layoutPreferences
+              .observeLayout(uid)
+              .onEach { saved -> layoutEditor.seed(uid, DashboardLayoutPolicy.decode(saved)) }
+              .flatMapLatest { layoutEditor.observe(uid) }
+
           combine(
             observeFinancialReportsUseCase(uid, flowOf(monthlyWindow)),
-            layoutPreferences.observeLayout(uid),
-          ) { snapshot, savedLayout ->
-            val layout = DashboardLayoutPolicy.decode(savedLayout)
+            layoutFlow,
+          ) { snapshot, layout ->
             HomeDashboardMapper.map(
               snapshot = snapshot,
               preferredCurrencyCode = null,
@@ -79,30 +94,23 @@ constructor(
 
   fun toggleCardVisibility(card: HomeCardId) {
     val uid = activeUid ?: return
-    persist(uid, DashboardLayoutPolicy.toggle(currentLayout(), card))
+    viewModelScope.launch {
+      layoutEditor.update(uid) { layout -> DashboardLayoutPolicy.toggle(layout, card) }
+    }
   }
 
   fun moveCard(card: HomeCardId, moveUp: Boolean) {
     val uid = activeUid ?: return
-    persist(uid, DashboardLayoutPolicy.move(currentLayout(), card, moveUp))
+    viewModelScope.launch {
+      layoutEditor.update(uid) { layout -> DashboardLayoutPolicy.move(layout, card, moveUp) }
+    }
   }
 
   /** Restores the default order, shows every card, and writes that reset to disk. */
   fun resetCardLayout() {
     val uid = activeUid ?: return
-    persist(uid, DashboardLayoutPolicy.reset(currentLayout()))
-  }
-
-  private fun currentLayout(): DashboardLayout =
-    DashboardLayout(order = uiState.value.cards, hidden = uiState.value.hiddenCards)
-
-  private fun persist(uid: String, layout: DashboardLayout) {
     viewModelScope.launch {
-      layoutPreferences.saveLayout(
-        userId = uid,
-        orderRaw = DashboardLayoutPolicy.encodeOrder(layout.order),
-        hiddenRaw = DashboardLayoutPolicy.encodeHidden(layout.hidden),
-      )
+      layoutEditor.update(uid) { layout -> DashboardLayoutPolicy.reset(layout) }
     }
   }
 }
