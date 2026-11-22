@@ -12,6 +12,7 @@ import com.example.core.security.DatabaseSecurityMonitor
 import com.example.feature.accounts.AccountsViewModel
 import com.example.feature.authentication.AuthViewModel
 import com.example.feature.budgets.BudgetsViewModel
+import com.example.feature.cards.CardsViewModel
 import com.example.feature.dashboard.HomeDashboardViewModel
 import com.example.feature.dashboard.HomeViewModel
 import com.example.feature.investments.InvestmentsViewModel
@@ -36,6 +37,7 @@ class MainActivity : ComponentActivity() {
       val authViewModel: AuthViewModel = hiltViewModel()
       val homeViewModel: HomeViewModel = hiltViewModel()
       val homeDashboardViewModel: HomeDashboardViewModel = hiltViewModel()
+      val cardsViewModel: CardsViewModel = hiltViewModel()
       val settingsViewModel: SettingsViewModel = hiltViewModel()
       val accountsViewModel: AccountsViewModel = hiltViewModel()
       val transactionsViewModel: TransactionsViewModel = hiltViewModel()
@@ -74,6 +76,7 @@ class MainActivity : ComponentActivity() {
           shoppingViewModel = shoppingViewModel,
           reportsViewModel = reportsViewModel,
           homeDashboardViewModel = homeDashboardViewModel,
+          cardsViewModel = cardsViewModel,
         )
       }
     }

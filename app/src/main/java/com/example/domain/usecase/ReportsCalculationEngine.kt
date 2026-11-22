@@ -220,10 +220,16 @@ class ReportsCalculationEngine @Inject constructor(
     for (acc in accounts) {
       if (!acc.isActive) continue
       activeAccountCount++
-      if (acc.currentBalanceMinor >= 0L) {
+      if (acc.isCreditCardLiability()) {
+        // A credit card is a liability whatever the sign of its balance, so it can never be
+        // counted as an asset and can never be counted twice.
+        accountOrCardLiabilities =
+          Math.addExact(accountOrCardLiabilities, liabilityMagnitude(acc.currentBalanceMinor))
+      } else if (acc.currentBalanceMinor >= 0L) {
         cashAndBankAssets = Math.addExact(cashAndBankAssets, acc.currentBalanceMinor)
       } else {
-        accountOrCardLiabilities = Math.addExact(accountOrCardLiabilities, abs(acc.currentBalanceMinor))
+        accountOrCardLiabilities =
+          Math.addExact(accountOrCardLiabilities, liabilityMagnitude(acc.currentBalanceMinor))
       }
     }
 
@@ -264,6 +270,17 @@ class ReportsCalculationEngine @Inject constructor(
       activeOrOverdueLoanCount = activeOrOverdueLoans,
     )
   }
+
+  /**
+   * Debt magnitude that can never go negative.
+   *
+   * `abs(Long.MIN_VALUE)` returns `Long.MIN_VALUE` in Kotlin, which would silently *reduce* the
+   * liability by an enormous amount and under-report debt. Such a balance cannot come from real
+   * data, so it saturates at `Long.MAX_VALUE` and stays a liability. Any total that then overflows
+   * is caught by `Math.addExact`, which fails fast rather than showing a wrong number.
+   */
+  private fun liabilityMagnitude(balanceMinor: Long): Long =
+    if (balanceMinor == Long.MIN_VALUE) Long.MAX_VALUE else abs(balanceMinor)
 
   fun computeIncomeExpenseReport(
     currencyCode: String,

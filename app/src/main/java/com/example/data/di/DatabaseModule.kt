@@ -78,6 +78,7 @@ object DatabaseModule {
           DatabaseMigrations.MIGRATION_4_5,
           DatabaseMigrations.MIGRATION_5_6,
           DatabaseMigrations.MIGRATION_6_7,
+          DatabaseMigrations.MIGRATION_7_8,
         )
 
     if (factoryHolder.delegate != null || factoryHolder.lastError != null) {
@@ -109,6 +110,7 @@ object DatabaseModule {
           DatabaseMigrations.MIGRATION_4_5,
           DatabaseMigrations.MIGRATION_5_6,
           DatabaseMigrations.MIGRATION_6_7,
+          DatabaseMigrations.MIGRATION_7_8,
         )
 
     val encryptedFactory =

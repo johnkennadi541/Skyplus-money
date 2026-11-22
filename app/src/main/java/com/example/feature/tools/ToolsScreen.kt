@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.Assessment
 import androidx.compose.material.icons.rounded.Calculate
+import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.PieChart
 import androidx.compose.material.icons.rounded.Settings
@@ -56,6 +57,7 @@ fun ToolsScreen(
   onOpenReports: () -> Unit,
   onOpenInvestments: () -> Unit,
   onOpenSettings: () -> Unit,
+  onOpenCards: () -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
   Column(
@@ -87,6 +89,13 @@ fun ToolsScreen(
         subtitle = "Monthly limits and spending alerts",
         testTag = "tools_budgets_item",
         onClick = onOpenBudgets,
+      )
+      ToolRow(
+        icon = Icons.Rounded.CreditCard,
+        title = "Credit cards",
+        subtitle = "Limits, outstanding balances and utilisation",
+        testTag = "tools_cards_item",
+        onClick = onOpenCards,
       )
       ToolRow(
         icon = Icons.Rounded.ShoppingCart,

@@ -78,6 +78,8 @@ import com.example.feature.budgets.BudgetsScreen
 import com.example.feature.budgets.BudgetsViewModel
 import com.example.feature.consent.LegalConsentPreviewScreen
 import com.example.feature.consent.LegalConsentScreen
+import com.example.feature.cards.CardsScreen
+import com.example.feature.cards.CardsViewModel
 import com.example.feature.dashboard.HomeDashboardScreen
 import com.example.feature.dashboard.HomeDashboardUiState
 import com.example.feature.dashboard.HomeDashboardViewModel
@@ -148,6 +150,7 @@ fun SkyplusAuthGateRoot(
   shoppingViewModel: ShoppingViewModel? = null,
   reportsViewModel: ReportsViewModel? = null,
   homeDashboardViewModel: HomeDashboardViewModel? = null,
+  cardsViewModel: CardsViewModel? = null,
 ) {
   if (databaseSecurityError != null) {
     DatabaseSecurityErrorScreen(
@@ -198,6 +201,7 @@ fun SkyplusAuthGateRoot(
             shoppingViewModel = shoppingViewModel,
             reportsViewModel = reportsViewModel,
             homeDashboardViewModel = homeDashboardViewModel,
+            cardsViewModel = cardsViewModel,
             modifier = modifier,
           )
         }
@@ -281,6 +285,7 @@ fun SkyplusAppShell(
   shoppingViewModel: ShoppingViewModel? = null,
   reportsViewModel: ReportsViewModel? = null,
   homeDashboardViewModel: HomeDashboardViewModel? = null,
+  cardsViewModel: CardsViewModel? = null,
 ) {
   val backStackEntry by navController.currentBackStackEntryAsState()
   val currentDestination = backStackEntry?.destination
@@ -443,6 +448,11 @@ fun SkyplusAppShell(
                 },
               )
             }
+            composable<SkyplusRoute.Cards> {
+              if (cardsViewModel != null) {
+                CardsScreen(viewModel = cardsViewModel)
+              }
+            }
             composable<SkyplusRoute.Tools> {
               ToolsScreen(
                 onOpenAccounts = { navController.navigate(SkyplusRoute.Accounts) },
@@ -454,6 +464,7 @@ fun SkyplusAppShell(
                 onOpenReports = { navigateToTab(TopLevelTab.REPORTS) },
                 onOpenInvestments = { navigateToTab(TopLevelTab.PORTFOLIO) },
                 onOpenSettings = { navController.navigate(SkyplusRoute.Settings) },
+                onOpenCards = { navController.navigate(SkyplusRoute.Cards) },
               )
             }
             composable<SkyplusRoute.Transactions> {
