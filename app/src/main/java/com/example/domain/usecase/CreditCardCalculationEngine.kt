@@ -116,6 +116,15 @@ class CreditCardCalculationEngine @Inject constructor() {
       .sortedByDescending { it.outstandingMinor }
   }
 
+  /**
+   * Sums outstanding amounts, failing fast on overflow.
+   *
+   * `sumOf` wraps silently at the Long boundary and would report a wrong liability; `addExact`
+   * raises [ArithmeticException] instead.
+   */
+  fun totalOutstandingMinor(summaries: List<CreditCardSummary>): Long =
+    summaries.fold(0L) { total, summary -> Math.addExact(total, summary.outstandingMinor) }
+
   private companion object {
     val HUNDRED: BigDecimal = BigDecimal.valueOf(100)
   }

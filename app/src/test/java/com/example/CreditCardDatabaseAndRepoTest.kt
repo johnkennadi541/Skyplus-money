@@ -23,6 +23,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -121,6 +122,24 @@ class CreditCardDatabaseAndRepoTest {
       creditLimitMinor = limitMinor,
       currencyCode = currency,
     )
+
+  private suspend fun insertTransaction(accountId: String, transactionId: String) {
+    val transaction =
+      com.example.domain.model.FinancialTransaction(
+        id = transactionId,
+        userId = userA,
+        accountId = accountId,
+        type = com.example.domain.model.TransactionType.EXPENSE,
+        amountMinor = 10_000L,
+        currencyCode = "INR",
+        category = "Shopping",
+      )
+    database
+      .financialTransactionDao()
+      .insertTransaction(
+        com.example.data.local.db.entity.FinancialTransactionEntity.fromDomain(transaction)
+      )
+  }
 
   @Test
   fun `a card is created and associated with its credit card account`() = runTest {
@@ -326,6 +345,91 @@ class CreditCardDatabaseAndRepoTest {
     assertTrue(result.isFailure)
     // A rejected update must leave the stored card untouched.
     assertEquals(aprBefore, cardRepository.getCard(userA, created.id)?.aprPercent)
+  }
+
+  @Test
+  fun `the type of a card-linked account cannot be changed`() = runTest {
+    val account = createAccount(userA, "acc_card_type")
+    cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
+
+    val result = accountRepository.updateAccount(userA, account.copy(type = AccountType.BANK))
+
+    assertTrue(result.isFailure)
+    assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("Cannot change the type"))
+    assertEquals(
+      AccountType.CREDIT_CARD,
+      accountRepository.getAccountById(userA, account.id)?.type,
+    )
+  }
+
+  @Test
+  fun `the currency of a card-linked account cannot be changed`() = runTest {
+    val account = createAccount(userA, "acc_card_cur")
+    cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
+
+    val result = accountRepository.updateAccount(userA, account.copy(currencyCode = "USD"))
+
+    assertTrue(result.isFailure)
+    assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("Cannot change the currency"))
+    assertEquals("INR", accountRepository.getAccountById(userA, account.id)?.currencyCode)
+  }
+
+  @Test
+  fun `other fields of a card-linked account can still be edited`() = runTest {
+    val account = createAccount(userA, "acc_card_name")
+    cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
+
+    accountRepository.updateAccount(userA, account.copy(name = "Renamed card")).getOrThrow()
+
+    assertEquals("Renamed card", accountRepository.getAccountById(userA, account.id)?.name)
+    assertEquals(1, cardRepository.observeCards(userA).first().size)
+  }
+
+  @Test
+  fun `an account without a card can still change its type`() = runTest {
+    val bank = createAccount(userA, "acc_bank_free", type = AccountType.BANK)
+
+    accountRepository.updateAccount(userA, bank.copy(type = AccountType.SAVINGS)).getOrThrow()
+
+    assertEquals(AccountType.SAVINGS, accountRepository.getAccountById(userA, bank.id)?.type)
+  }
+
+  @Test
+  fun `deleting an account removes its card record`() = runTest {
+    val account = createAccount(userA, "acc_card_del")
+    cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
+
+    accountRepository.deleteAccount(userA, account.id, deleteLinkedTransactions = false).getOrThrow()
+
+    assertNull(accountRepository.getAccountById(userA, account.id))
+    assertTrue(cardRepository.observeCards(userA).first().isEmpty())
+  }
+
+  @Test
+  fun `deleting an account with transactions still requires confirmation and keeps the card`() = runTest {
+    val account = createAccount(userA, "acc_card_guard", balanceMinor = -10_000L)
+    cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
+    insertTransaction(account.id, "txn_guard")
+
+    val refused = accountRepository.deleteAccount(userA, account.id, deleteLinkedTransactions = false)
+
+    assertTrue(refused.isFailure)
+    assertNotNull(accountRepository.getAccountById(userA, account.id))
+    assertEquals(1, cardRepository.observeCards(userA).first().size)
+    assertNotNull(database.financialTransactionDao().getTransactionById(userA, "txn_guard"))
+  }
+
+  @Test
+  fun `a confirmed account deletion removes the card and its transactions together`() = runTest {
+    val account = createAccount(userA, "acc_card_full", balanceMinor = -10_000L)
+    cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
+    insertTransaction(account.id, "txn_full")
+
+    accountRepository.deleteAccount(userA, account.id, deleteLinkedTransactions = true).getOrThrow()
+
+    assertNull(accountRepository.getAccountById(userA, account.id))
+    assertTrue(cardRepository.observeCards(userA).first().isEmpty())
+    assertNull(database.financialTransactionDao().getTransactionById(userA, "txn_full"))
   }
 
   @Test

@@ -3,6 +3,7 @@ package com.example
 import com.example.domain.model.AccountType
 import com.example.domain.model.CreditCard
 import com.example.domain.model.CreditCardNetwork
+import com.example.domain.model.CreditCardSummary
 import com.example.domain.model.FinancialAccount
 import com.example.domain.usecase.CreditCardCalculationEngine
 import org.junit.Assert.assertEquals
@@ -221,6 +222,49 @@ class CreditCardCalculationEngineTest {
     val summaries = engine.summariseAll(cards, accounts)
 
     assertEquals(listOf("large", "small"), summaries.map { it.card.accountId })
+  }
+
+  @Test
+  fun `total outstanding sums every card`() {
+    val cards =
+      listOf(
+        card(accountId = "a", limitMinor = 100_000L),
+        card(accountId = "b", limitMinor = 100_000L),
+        card(accountId = "c", limitMinor = 100_000L),
+      )
+    val accounts =
+      listOf(
+        account(id = "a", balanceMinor = -10_000L),
+        account(id = "b", balanceMinor = -20_000L),
+        account(id = "c", balanceMinor = -30_000L),
+      )
+
+    val summaries = engine.summariseAll(cards, accounts)
+
+    assertEquals(60_000L, engine.totalOutstandingMinor(summaries))
+  }
+
+  @Test
+  fun `total outstanding of an empty list is zero`() {
+    assertEquals(0L, engine.totalOutstandingMinor(emptyList()))
+  }
+
+  @Test
+  fun `total outstanding fails fast instead of wrapping on overflow`() {
+    val huge =
+      CreditCardSummary(
+        card = card(accountId = "a"),
+        account = account(id = "a", balanceMinor = -1L),
+        outstandingMinor = Long.MAX_VALUE,
+        availableCreditMinor = 0L,
+        utilisationPercent = BigDecimal.ZERO,
+      )
+    val alsoHuge = huge.copy(card = card(accountId = "b"))
+
+    val failed = runCatching { engine.totalOutstandingMinor(listOf(huge, alsoHuge)) }
+
+    assertTrue(failed.isFailure)
+    assertTrue(failed.exceptionOrNull() is ArithmeticException)
   }
 
   @Test

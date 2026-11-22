@@ -101,7 +101,7 @@ constructor(
     val account = accounts.value.firstOrNull { it.id == accountId } ?: return
 
     viewModelScope.launch {
-      val limitMinor = parseMoneyToMinor(limitDecimal)
+      val limitMinor = parseAmountToMinor(limitDecimal, account.currencyCode)
       if (limitMinor == null) {
         _userMessage.value = "Enter a valid credit limit"
         _isErrorMessage.value = true
@@ -138,7 +138,7 @@ constructor(
   ) {
     val uid = currentUid() ?: return
     viewModelScope.launch {
-      val limitMinor = parseMoneyToMinor(limitDecimal)
+      val limitMinor = parseAmountToMinor(limitDecimal, card.currencyCode)
       if (limitMinor == null) {
         _userMessage.value = "Enter a valid credit limit"
         _isErrorMessage.value = true
@@ -174,18 +174,4 @@ constructor(
   }
 
   private fun currentUid(): String? = activeUid
-
-  /** Exact minor units from a decimal string, with no floating point anywhere. */
-  private fun parseMoneyToMinor(text: String): Long? {
-    val trimmed = text.trim()
-    if (trimmed.isEmpty()) return 0L
-    val decimal = trimmed.toBigDecimalOrNull() ?: return null
-    if (decimal < java.math.BigDecimal.ZERO) return null
-    return runCatching {
-      decimal
-        .setScale(2, java.math.RoundingMode.HALF_EVEN)
-        .movePointRight(2)
-        .longValueExact()
-    }.getOrNull()
-  }
 }

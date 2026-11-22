@@ -93,6 +93,6 @@ constructor(
       calculationEngine
         .summariseAll(cards, accounts)
         .groupBy { it.card.currencyCode }
-        .mapValues { (_, summaries) -> summaries.sumOf { it.outstandingMinor } }
+        .mapValues { (_, summaries) -> calculationEngine.totalOutstandingMinor(summaries) }
     }
 }
