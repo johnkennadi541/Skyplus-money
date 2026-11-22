@@ -72,10 +72,12 @@ class Phase3ShoppingUiAndNavigationRobolectricTest {
 
     composeTestRule.onNodeWithTag("nav_tab_home").assertIsDisplayed()
     composeTestRule.onNodeWithTag("nav_tab_transactions").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("nav_tab_budget").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("nav_tab_shopping_list").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("nav_tab_portfolio").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("nav_tab_tools").assertIsDisplayed()
 
-    composeTestRule.onNodeWithTag("nav_tab_shopping_list").performClick()
+    composeTestRule.onNodeWithTag("nav_tab_tools").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("tools_shopping_item").performScrollTo().performClick()
     composeTestRule.waitForIdle()
 
     composeTestRule.onNodeWithTag("shopping_screen").assertIsDisplayed()

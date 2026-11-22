@@ -241,8 +241,8 @@ class Phase3ReportsIntegrationAndUiTest {
     // Verify exact 4 bottom navigation tabs remain intact
     composeTestRule.onNodeWithTag("nav_tab_home").assertIsDisplayed()
     composeTestRule.onNodeWithTag("nav_tab_transactions").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("nav_tab_budget").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("nav_tab_shopping_list").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("nav_tab_portfolio").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("nav_tab_tools").assertIsDisplayed()
 
     // Navigate via Transactions -> Financial Reports button
     composeTestRule.onNodeWithTag("nav_tab_transactions").performClick()
