@@ -16,7 +16,8 @@ import com.example.domain.model.TransactionDetectionEvent
 import com.example.domain.model.TransactionType
 import com.example.feature.accounts.AccountsContent
 import com.example.feature.dashboard.HomeFoundationUiState
-import com.example.feature.dashboard.HomeScreen
+import com.example.feature.dashboard.HomeDashboardScreen
+import com.example.feature.dashboard.HomeDashboardUiState
 import com.example.feature.smartdetection.SmsPolicyStatusScreen
 import com.example.feature.smartdetection.TransactionCorrectionDialog
 import com.example.feature.transactions.TransactionsContent
@@ -129,11 +130,20 @@ class Phase2UiRobolectricTest {
 
     composeTestRule.setContent {
       SkyplusOceanTheme(themePreference = ThemePreference.DARK) {
-        HomeScreen(
-          uiState = HomeFoundationUiState(),
-          onOpenAuthReadiness = {},
-          autoSavedNotice = notice,
+        HomeDashboardScreen(
+          uiState = HomeDashboardUiState(isLoading = false, isEmpty = true),
+          onOpenAccounts = {},
+          onOpenTransactions = {},
+          onOpenPortfolio = {},
+          onOpenReports = {},
+          onOpenEmiCalculator = {},
+          onOpenLoans = {},
+          onOpenSmartDetection = {},
           onOpenReviewQueue = { reviewClicked = true },
+          onToggleCard = {},
+          onMoveCard = { _, _ -> },
+          onResetLayout = {},
+          autoSavedNotice = notice,
         )
       }
     }

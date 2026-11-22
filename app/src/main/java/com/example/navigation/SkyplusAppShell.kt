@@ -29,9 +29,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
@@ -62,6 +59,8 @@ import com.example.core.designsystem.component.BadgeTone
 import com.example.core.designsystem.component.OceanCard
 import com.example.core.designsystem.component.OceanStatusBadge
 import com.example.core.designsystem.theme.OceanSpacing
+import com.example.core.designsystem.component.SkyplusNavItem
+import com.example.core.designsystem.component.SkyplusNavigationBar
 import com.example.core.designsystem.theme.OceanTheme
 import com.example.core.security.DatabaseSecurityException
 import com.example.domain.model.AuthSessionState
@@ -79,6 +78,9 @@ import com.example.feature.budgets.BudgetsScreen
 import com.example.feature.budgets.BudgetsViewModel
 import com.example.feature.consent.LegalConsentPreviewScreen
 import com.example.feature.consent.LegalConsentScreen
+import com.example.feature.dashboard.HomeDashboardScreen
+import com.example.feature.dashboard.HomeDashboardUiState
+import com.example.feature.dashboard.HomeDashboardViewModel
 import com.example.feature.dashboard.HomeFoundationUiState
 import com.example.feature.dashboard.HomeScreen
 import com.example.feature.investments.InvestmentDetailContent
@@ -116,6 +118,7 @@ import com.example.feature.transactions.IncomeManagementScreen
 import com.example.feature.transactions.TransactionsContent
 import com.example.feature.transactions.TransactionsFilterState
 import com.example.feature.transactions.TransactionsScreen
+import com.example.feature.tools.ToolsScreen
 import com.example.feature.transactions.TransactionsViewModel
 
 /**
@@ -145,6 +148,7 @@ fun SkyplusAuthGateRoot(
   investmentsViewModel: InvestmentsViewModel? = null,
   shoppingViewModel: ShoppingViewModel? = null,
   reportsViewModel: ReportsViewModel? = null,
+  homeDashboardViewModel: HomeDashboardViewModel? = null,
 ) {
   if (databaseSecurityError != null) {
     DatabaseSecurityErrorScreen(
@@ -194,6 +198,7 @@ fun SkyplusAuthGateRoot(
             investmentsViewModel = investmentsViewModel,
             shoppingViewModel = shoppingViewModel,
             reportsViewModel = reportsViewModel,
+            homeDashboardViewModel = homeDashboardViewModel,
             modifier = modifier,
           )
         }
@@ -276,6 +281,7 @@ fun SkyplusAppShell(
   investmentsViewModel: InvestmentsViewModel? = null,
   shoppingViewModel: ShoppingViewModel? = null,
   reportsViewModel: ReportsViewModel? = null,
+  homeDashboardViewModel: HomeDashboardViewModel? = null,
 ) {
   val backStackEntry by navController.currentBackStackEntryAsState()
   val currentDestination = backStackEntry?.destination
@@ -351,44 +357,24 @@ fun SkyplusAppShell(
       },
       bottomBar = {
         if (showTopLevelNav && !useNavigationRail) {
-          NavigationBar(
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 4.dp,
-            modifier = Modifier.testTag("bottom_navigation_bar"),
-          ) {
-            TopLevelTab.entries.forEach { tab ->
-              val selected = currentDestination?.hasRoute(tab.route::class) == true
-              val label = stringResource(tab.labelRes)
-              NavigationBarItem(
-                selected = selected,
-                onClick = { navigateToTab(tab) },
-                modifier = Modifier.testTag(tab.testTag),
-                icon = {
-                  Icon(
-                    imageVector = if (selected) tab.selectedIcon else tab.unselectedIcon,
-                    contentDescription = label,
-                  )
-                },
-                label = {
-                  Text(
-                    text = label,
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis,
-                  )
-                },
-                colors =
-                  NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    selectedTextColor = MaterialTheme.colorScheme.secondary,
-                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                  ),
-              )
+          val selectedTabIndex =
+            TopLevelTab.entries.indexOfFirst { tab ->
+              currentDestination?.hasRoute(tab.route::class) == true
             }
-          }
+          SkyplusNavigationBar(
+            items =
+              TopLevelTab.entries.map { tab ->
+                SkyplusNavItem(
+                  label = stringResource(tab.labelRes),
+                  selectedIcon = tab.selectedIcon,
+                  unselectedIcon = tab.unselectedIcon,
+                  testTag = tab.testTag,
+                )
+              },
+            selectedIndex = if (selectedTabIndex < 0) 0 else selectedTabIndex,
+            onSelect = { index -> navigateToTab(TopLevelTab.entries[index]) },
+            modifier = Modifier.testTag("bottom_navigation_bar"),
+          )
         }
       },
     ) { innerPadding ->
@@ -431,29 +417,44 @@ fun SkyplusAppShell(
             exitTransition = { fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMedium)) },
           ) {
             composable<SkyplusRoute.Home> {
-              HomeScreen(
-                uiState = homeUiState,
-                onOpenAuthReadiness = { navController.navigate(SkyplusRoute.AuthReadiness) },
-                authenticatedUser = authenticatedUser,
-                accounts = accounts,
-                recentTransactions = transactions,
-                reviewQueueCount = reviewQueue.size,
-                autoSavedNotice = autoSavedNotice,
-                onDismissAutoSavedNotice = { smartDetectionViewModel?.dismissAutoSavedNotice() },
+              val dashboardState =
+                homeDashboardViewModel
+                  ?.uiState
+                  ?.collectAsStateWithLifecycle()
+                  ?.value
+                  ?: HomeDashboardUiState(isLoading = false, isEmpty = true)
+              HomeDashboardScreen(
+                uiState = dashboardState,
                 onOpenAccounts = { navController.navigate(SkyplusRoute.Accounts) },
                 onOpenTransactions = { navigateToTab(TopLevelTab.TRANSACTIONS) },
-                onOpenBudgets = { navigateToTab(TopLevelTab.BUDGET) },
-                onOpenIncomeManagement = { navController.navigate(SkyplusRoute.IncomeManagement) },
-                onOpenExpenseManagement = { navController.navigate(SkyplusRoute.ExpenseManagement) },
+                onOpenPortfolio = { navigateToTab(TopLevelTab.PORTFOLIO) },
+                onOpenReports = { navigateToTab(TopLevelTab.REPORTS) },
+                onOpenEmiCalculator = { navController.navigate(SkyplusRoute.EmiCalculator) },
+                onOpenLoans = { navController.navigate(SkyplusRoute.Loans) },
                 onOpenSmartDetection = { navController.navigate(SkyplusRoute.SmartDetectionSettings) },
                 onOpenReviewQueue = { navController.navigate(SkyplusRoute.ReviewQueue) },
+                onToggleCard = { card -> homeDashboardViewModel?.toggleCardVisibility(card) },
+                onMoveCard = { card, moveUp ->
+                  homeDashboardViewModel?.moveCard(card, moveUp)
+                },
+                onResetLayout = { homeDashboardViewModel?.resetCardLayout() },
+                autoSavedNotice = autoSavedNotice,
+                onDismissAutoSavedNotice = {
+                  smartDetectionViewModel?.dismissAutoSavedNotice()
+                },
+              )
+            }
+            composable<SkyplusRoute.Tools> {
+              ToolsScreen(
+                onOpenAccounts = { navController.navigate(SkyplusRoute.Accounts) },
+                onOpenBudgets = { navController.navigate(SkyplusRoute.Budgets) },
                 onOpenLoans = { navController.navigate(SkyplusRoute.Loans) },
                 onOpenEmiCalculator = { navController.navigate(SkyplusRoute.EmiCalculator) },
-                onOpenInvestments = { navController.navigate(SkyplusRoute.Investments) },
-                onOpenReports = { navController.navigate(SkyplusRoute.Reports) },
-                budgets = budgetStatuses,
-                loans = loans,
-                investments = investments,
+                onOpenShoppingList = { navController.navigate(SkyplusRoute.ShoppingList) },
+                onOpenSmartDetection = { navController.navigate(SkyplusRoute.SmartDetectionSettings) },
+                onOpenReports = { navigateToTab(TopLevelTab.REPORTS) },
+                onOpenInvestments = { navigateToTab(TopLevelTab.PORTFOLIO) },
+                onOpenSettings = { navController.navigate(SkyplusRoute.Settings) },
               )
             }
             composable<SkyplusRoute.Transactions> {

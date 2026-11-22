@@ -64,7 +64,7 @@ class HomeViewModelTest {
     assertEquals("com.skyplus.money", viewModel.uiState.value.packageId)
     assertTrue(viewModel.uiState.value.mandatoryAuthEnforced)
     assertTrue(viewModel.uiState.value.zeroGuestMode)
-    assertEquals(8, viewModel.uiState.value.roadmap.size)
+    assertEquals(7, viewModel.uiState.value.roadmap.size)
     assertEquals(ThemePreference.DARK, viewModel.uiState.value.themePreference)
 
     viewModel.toggleDarkLightTheme()

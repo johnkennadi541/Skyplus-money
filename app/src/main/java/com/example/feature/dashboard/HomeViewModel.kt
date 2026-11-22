@@ -83,13 +83,7 @@ constructor(
       ),
       RoadmapPhaseItem(
         6,
-        "Phase 6 — Family Finance",
-        "Family groups, equal Co-Admin permissions, shared ledgers, and FCM notifications.",
-        PhaseDeliveryState.SCHEDULED,
-      ),
-      RoadmapPhaseItem(
-        7,
-        "Phase 7 — Final Release",
+        "Phase 6 — Final Release",
         "Regression suite, security & migration audit, APK signature verification, release.",
         PhaseDeliveryState.SCHEDULED,
       ),

@@ -42,8 +42,8 @@ class Phase3LoanNavigationRobolectricTest {
     // Verify exact 4 bottom navigation tabs exist
     composeTestRule.onNodeWithTag("nav_tab_home").assertIsDisplayed()
     composeTestRule.onNodeWithTag("nav_tab_transactions").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("nav_tab_budget").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("nav_tab_shopping_list").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("nav_tab_portfolio").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("nav_tab_tools").assertIsDisplayed()
 
     // Scroll to Quick Actions and open EMI Calculator directly
     composeTestRule.onNodeWithTag("home_emi_calculator_button").performScrollTo().performClick()

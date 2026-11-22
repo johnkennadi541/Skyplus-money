@@ -15,6 +15,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import androidx.compose.ui.test.assertExists
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -36,7 +37,7 @@ class SkyplusNavigationRobolectricTest {
     )
 
   @Test
-  fun `navigate across four tabs and profile menu`() {
+  fun `navigate across the six sections and the profile menu`() {
     composeTestRule.setContent {
       SkyplusOceanTheme(themePreference = ThemePreference.DARK) {
         SkyplusAppShell(
@@ -55,13 +56,11 @@ class SkyplusNavigationRobolectricTest {
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("transactions_screen").assertIsDisplayed()
 
-    composeTestRule.onNodeWithTag("nav_tab_budget").performClick()
+    composeTestRule.onNodeWithTag("nav_tab_tools").performClick()
     composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("budgets_screen").assertIsDisplayed()
-
-    composeTestRule.onNodeWithTag("nav_tab_shopping_list").performClick()
-    composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("shopping_screen").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("tools_screen").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("tools_budgets_item").assertExists()
+    composeTestRule.onNodeWithTag("tools_shopping_item").assertExists()
 
     composeTestRule.onNodeWithTag("profile_menu_button").performClick()
     composeTestRule.waitForIdle()
@@ -77,6 +76,6 @@ class SkyplusNavigationRobolectricTest {
 
     composeTestRule.onNodeWithTag("profile_back_button").performClick()
     composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("shopping_screen").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("tools_screen").assertIsDisplayed()
   }
 }

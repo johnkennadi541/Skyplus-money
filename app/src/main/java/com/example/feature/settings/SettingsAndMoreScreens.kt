@@ -76,12 +76,6 @@ fun MoreScreen(
         4,
         "Planned purchase budgets and item lists",
       ),
-      DomainModuleDescriptor(
-        "Family Finance",
-        "feature/family",
-        6,
-        "Co-Admin equal access, shared ledgers, FCM",
-      ),
     )
 
   Column(
