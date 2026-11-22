@@ -115,9 +115,12 @@ fun SavingsGoalsContent(
           horizontalArrangement = Arrangement.SpaceBetween,
           verticalAlignment = Alignment.CenterVertically,
         ) {
+          // OceanSectionHeader fills its width internally, so it needs a weight here or it
+          // would push the New goal button off the row entirely.
           OceanSectionHeader(
             title = "Savings goals",
             subtitle = "Saved amounts are always calculated from your contributions",
+            modifier = Modifier.weight(1f),
           )
           SkyplusPrimaryButton(
             text = "New goal",
