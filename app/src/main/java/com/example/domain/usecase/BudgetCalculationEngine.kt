@@ -8,6 +8,8 @@ import com.example.domain.model.FinancialTransaction
 import com.example.domain.model.Money
 import com.example.domain.model.TransactionStatus
 import com.example.domain.model.TransactionType
+import java.math.BigDecimal
+import java.math.RoundingMode
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
@@ -21,6 +23,7 @@ class BudgetCalculationEngine @Inject constructor() {
   fun calculateBudgetStatus(
     budget: Budget,
     transactions: List<FinancialTransaction>,
+    nowMillis: Long = System.currentTimeMillis(),
   ): BudgetStatus {
     var totalExpensesMinor = 0L
     var totalRefundsMinor = 0L
@@ -55,18 +58,25 @@ class BudgetCalculationEngine @Inject constructor() {
     val remainingMinor = budget.amountMinor - netSpentMinor
     val overspendingMinor = max(0L, netSpentMinor - budget.amountMinor)
 
-    val percentageConsumed =
+    // Exact percentage: the alert bands must never be decided by a rounded Double.
+    val percentageExact =
       if (budget.amountMinor > 0L) {
-        (netSpentMinor.toDouble() / budget.amountMinor.toDouble()) * 100.0
+        BigDecimal.valueOf(netSpentMinor)
+          .multiply(HUNDRED)
+          .divide(BigDecimal.valueOf(budget.amountMinor), 4, RoundingMode.HALF_EVEN)
       } else {
-        0.0
+        BigDecimal.ZERO
       }
+    val percentageConsumed = percentageExact.toDouble()
+
+    val isStale = nowMillis > budget.endDate
 
     val alertStatus =
       when {
-        percentageConsumed >= 100.0 -> BudgetAlertStatus.EXCEEDED_100
-        percentageConsumed >= 90.0 -> BudgetAlertStatus.WARNING_90
-        percentageConsumed >= 75.0 -> BudgetAlertStatus.APPROACHING_75
+        isStale -> BudgetAlertStatus.PERIOD_ENDED
+        percentageExact >= HUNDRED -> BudgetAlertStatus.EXCEEDED_100
+        percentageExact >= NINETY -> BudgetAlertStatus.WARNING_90
+        percentageExact >= SEVENTY_FIVE -> BudgetAlertStatus.APPROACHING_75
         else -> BudgetAlertStatus.NORMAL
       }
 
@@ -79,7 +89,15 @@ class BudgetCalculationEngine @Inject constructor() {
       overspendingMoney = Money.fromMinorUnits(overspendingMinor, budget.currencyCode),
       alertStatus = alertStatus,
       transactionCount = matchingTxnCount,
+      isStale = isStale,
+      percentageConsumedExact = percentageExact,
     )
+  }
+
+  private companion object {
+    val HUNDRED: BigDecimal = BigDecimal.valueOf(100)
+    val NINETY: BigDecimal = BigDecimal.valueOf(90)
+    val SEVENTY_FIVE: BigDecimal = BigDecimal.valueOf(75)
   }
 
   /**
@@ -95,7 +113,10 @@ class BudgetCalculationEngine @Inject constructor() {
         val totalRemaining = totalAllocated - totalSpent
         val avgUtilization =
           if (totalAllocated > 0L) {
-            (totalSpent.toDouble() / totalAllocated.toDouble()) * 100.0
+            BigDecimal.valueOf(totalSpent)
+              .multiply(HUNDRED)
+              .divide(BigDecimal.valueOf(totalAllocated), 4, RoundingMode.HALF_EVEN)
+              .toDouble()
           } else {
             0.0
           }

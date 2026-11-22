@@ -12,6 +12,7 @@ import com.example.data.local.db.dao.ShoppingDao
 import com.example.data.local.db.dao.TransactionDetectionEventDao
 import com.example.data.local.db.entity.AccountMappingRuleEntity
 import com.example.data.local.db.entity.BudgetEntity
+import com.example.data.local.db.entity.BudgetPeriodEntity
 import com.example.data.local.db.entity.FinancialAccountEntity
 import com.example.data.local.db.entity.FinancialTransactionEntity
 import com.example.data.local.db.entity.InvestmentHoldingEntity
@@ -31,6 +32,7 @@ import com.example.data.local.db.entity.TransactionDetectionEventEntity
     TransactionDetectionEventEntity::class,
     AccountMappingRuleEntity::class,
     BudgetEntity::class,
+    BudgetPeriodEntity::class,
     LoanEntity::class,
     LoanPaymentEntity::class,
     InvestmentHoldingEntity::class,
@@ -40,7 +42,7 @@ import com.example.data.local.db.entity.TransactionDetectionEventEntity
     ShoppingItemEntity::class,
     ShoppingStorePriceEntity::class,
   ],
-  version = 6,
+  version = 7,
   exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

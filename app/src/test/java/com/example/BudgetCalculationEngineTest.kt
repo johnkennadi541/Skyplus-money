@@ -77,7 +77,7 @@ class BudgetCalculationEngineTest {
         createTxn(type = TransactionType.EXPENSE, amountMinor = 20_00L),
       )
 
-    val status = engine.calculateBudgetStatus(budget, transactions)
+    val status = engine.calculateBudgetStatus(budget, transactions, nowMillis = withinRangeTime)
     assertEquals(50_00L, status.spentMoney.minorUnits)
     assertEquals(50_00L, status.remainingMoney.minorUnits)
     assertEquals(50.0, status.percentageConsumed, 0.001)
@@ -100,7 +100,7 @@ class BudgetCalculationEngineTest {
         createTxn(type = TransactionType.FAILED, amountMinor = 70_00L),
       )
 
-    val status = engine.calculateBudgetStatus(budget, transactions)
+    val status = engine.calculateBudgetStatus(budget, transactions, nowMillis = withinRangeTime)
     assertEquals(25_00L, status.spentMoney.minorUnits)
     assertEquals(75_00L, status.remainingMoney.minorUnits)
     assertEquals(25.0, status.percentageConsumed, 0.001)
@@ -117,7 +117,7 @@ class BudgetCalculationEngineTest {
         createTxn(type = TransactionType.REVERSAL, amountMinor = 5_00L),
       )
 
-    val status = engine.calculateBudgetStatus(budget, transactions)
+    val status = engine.calculateBudgetStatus(budget, transactions, nowMillis = withinRangeTime)
     assertEquals(30_00L, status.spentMoney.minorUnits) // 50 - 15 - 5 = 30
     assertEquals(70_00L, status.remainingMoney.minorUnits)
     assertEquals(30.0, status.percentageConsumed, 0.001)
@@ -133,7 +133,7 @@ class BudgetCalculationEngineTest {
         createTxn(type = TransactionType.REFUND, amountMinor = 50_00L),
       )
 
-    val status = engine.calculateBudgetStatus(budget, transactions)
+    val status = engine.calculateBudgetStatus(budget, transactions, nowMillis = withinRangeTime)
     assertEquals(0L, status.spentMoney.minorUnits)
     assertEquals(100_00L, status.remainingMoney.minorUnits)
     assertEquals(0.0, status.percentageConsumed, 0.001)
@@ -151,7 +151,7 @@ class BudgetCalculationEngineTest {
         createTxn(type = TransactionType.EXPENSE, amountMinor = 60_00L, userId = otherUserId), // OTHER USER
       )
 
-    val status = engine.calculateBudgetStatus(budget, transactions)
+    val status = engine.calculateBudgetStatus(budget, transactions, nowMillis = withinRangeTime)
     assertEquals(20_00L, status.spentMoney.minorUnits)
     assertEquals(80_00L, status.remainingMoney.minorUnits)
     assertEquals(1, status.transactionCount)
@@ -162,7 +162,7 @@ class BudgetCalculationEngineTest {
     val budget = createBudget(amountMinor = 100_00L)
     val transactions = listOf(createTxn(type = TransactionType.EXPENSE, amountMinor = 75_00L))
 
-    val status = engine.calculateBudgetStatus(budget, transactions)
+    val status = engine.calculateBudgetStatus(budget, transactions, nowMillis = withinRangeTime)
     assertEquals(75.0, status.percentageConsumed, 0.001)
     assertEquals(BudgetAlertStatus.APPROACHING_75, status.alertStatus)
   }
@@ -172,7 +172,7 @@ class BudgetCalculationEngineTest {
     val budget = createBudget(amountMinor = 100_00L)
     val transactions = listOf(createTxn(type = TransactionType.EXPENSE, amountMinor = 92_50L))
 
-    val status = engine.calculateBudgetStatus(budget, transactions)
+    val status = engine.calculateBudgetStatus(budget, transactions, nowMillis = withinRangeTime)
     assertEquals(92.5, status.percentageConsumed, 0.001)
     assertEquals(BudgetAlertStatus.WARNING_90, status.alertStatus)
   }
@@ -182,7 +182,7 @@ class BudgetCalculationEngineTest {
     val budget = createBudget(amountMinor = 100_00L)
     val transactions = listOf(createTxn(type = TransactionType.EXPENSE, amountMinor = 135_00L))
 
-    val status = engine.calculateBudgetStatus(budget, transactions)
+    val status = engine.calculateBudgetStatus(budget, transactions, nowMillis = withinRangeTime)
     assertEquals(135.0, status.percentageConsumed, 0.001)
     assertEquals(BudgetAlertStatus.EXCEEDED_100, status.alertStatus)
     assertEquals(-35_00L, status.remainingMoney.minorUnits)
@@ -204,9 +204,9 @@ class BudgetCalculationEngineTest {
 
     val statuses =
       listOf(
-        engine.calculateBudgetStatus(usdBudget, transactions),
-        engine.calculateBudgetStatus(inrBudget, transactions),
-        engine.calculateBudgetStatus(kwdBudget, transactions),
+        engine.calculateBudgetStatus(usdBudget, transactions, nowMillis = withinRangeTime),
+        engine.calculateBudgetStatus(inrBudget, transactions, nowMillis = withinRangeTime),
+        engine.calculateBudgetStatus(kwdBudget, transactions, nowMillis = withinRangeTime),
       )
 
     val summaries = engine.calculateSummaries(statuses)

@@ -308,4 +308,64 @@ object DatabaseMigrations {
         )
       }
     }
+  /**
+   * Stage 3 PR 1 — budget renewal.
+   *
+   * Additive only: one new archive table plus two columns on `budgets`. No row is inserted,
+   * deleted, or changed in any other column, so every existing budget and transaction survives.
+   *
+   * `isRecurring` is added with a default of 0 and then switched on ONLY for budgets that are
+   * genuinely eligible: a MONTHLY period type (case-insensitive, trimmed), a positive limit and a
+   * sane window. Every CUSTOM, zero-limit or malformed budget stays non-recurring.
+   */
+  val MIGRATION_6_7: Migration =
+    object : Migration(6, 7) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS budget_periods (
+            id TEXT NOT NULL PRIMARY KEY,
+            userId TEXT NOT NULL,
+            budgetId TEXT NOT NULL,
+            category TEXT NOT NULL,
+            currencyCode TEXT NOT NULL,
+            periodType TEXT NOT NULL,
+            periodStart INTEGER NOT NULL,
+            periodEnd INTEGER NOT NULL,
+            allocatedMinor INTEGER NOT NULL,
+            spentMinor INTEGER NOT NULL,
+            remainingMinor INTEGER NOT NULL,
+            alertStatus TEXT NOT NULL,
+            closedAt INTEGER NOT NULL
+          )
+          """.trimIndent()
+        )
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS index_budget_periods_userId ON budget_periods(userId)"
+        )
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS index_budget_periods_userId_budgetId ON budget_periods(userId, budgetId)"
+        )
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS index_budget_periods_userId_periodEnd ON budget_periods(userId, periodEnd)"
+        )
+
+        db.execSQL(
+          "ALTER TABLE budgets ADD COLUMN isRecurring INTEGER NOT NULL DEFAULT 0"
+        )
+        db.execSQL(
+          "ALTER TABLE budgets ADD COLUMN lastRenewedAt INTEGER NOT NULL DEFAULT 0"
+        )
+
+        db.execSQL(
+          """
+          UPDATE budgets
+          SET isRecurring = 1
+          WHERE upper(trim(periodType)) = 'MONTHLY'
+            AND amountMinor > 0
+            AND endDate > startDate
+          """.trimIndent()
+        )
+      }
+    }
 }
