@@ -54,7 +54,8 @@ class DashboardLayoutEditorTest {
     advanceUntilIdle()
 
     val final = editor.currentLayout(UID_A)!!
-    assertEquals(HomeCardId.CASH_FLOW, final.order[0])
+    assertEquals(HomeCardId.NET_WORTH, final.order[0])
+    assertEquals(HomeCardId.CASH_FLOW, final.order[1])
     assertEquals(HomeCardId.SUMMARY, final.order[2])
     assertEquals(defaultLayout().order.toSet(), final.order.toSet())
     assertEquals(final, writes.last())
