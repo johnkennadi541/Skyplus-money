@@ -81,6 +81,8 @@ import com.example.feature.consent.LegalConsentScreen
 import com.example.feature.cards.CardsScreen
 import com.example.feature.cards.CardsViewModel
 import com.example.feature.dashboard.HomeDashboardScreen
+import com.example.feature.goals.SavingsGoalsScreen
+import com.example.feature.goals.SavingsGoalsViewModel
 import com.example.feature.dashboard.HomeDashboardUiState
 import com.example.feature.dashboard.HomeDashboardViewModel
 import com.example.feature.dashboard.HomeFoundationUiState
@@ -151,6 +153,7 @@ fun SkyplusAuthGateRoot(
   reportsViewModel: ReportsViewModel? = null,
   homeDashboardViewModel: HomeDashboardViewModel? = null,
   cardsViewModel: CardsViewModel? = null,
+  savingsGoalsViewModel: SavingsGoalsViewModel? = null,
 ) {
   if (databaseSecurityError != null) {
     DatabaseSecurityErrorScreen(
@@ -202,6 +205,7 @@ fun SkyplusAuthGateRoot(
             reportsViewModel = reportsViewModel,
             homeDashboardViewModel = homeDashboardViewModel,
             cardsViewModel = cardsViewModel,
+            savingsGoalsViewModel = savingsGoalsViewModel,
             modifier = modifier,
           )
         }
@@ -286,6 +290,7 @@ fun SkyplusAppShell(
   reportsViewModel: ReportsViewModel? = null,
   homeDashboardViewModel: HomeDashboardViewModel? = null,
   cardsViewModel: CardsViewModel? = null,
+  savingsGoalsViewModel: SavingsGoalsViewModel? = null,
 ) {
   val backStackEntry by navController.currentBackStackEntryAsState()
   val currentDestination = backStackEntry?.destination
@@ -448,6 +453,11 @@ fun SkyplusAppShell(
                 },
               )
             }
+            composable<SkyplusRoute.SavingsGoals> {
+              if (savingsGoalsViewModel != null) {
+                SavingsGoalsScreen(viewModel = savingsGoalsViewModel)
+              }
+            }
             composable<SkyplusRoute.Cards> {
               if (cardsViewModel != null) {
                 CardsScreen(viewModel = cardsViewModel)
@@ -465,6 +475,7 @@ fun SkyplusAppShell(
                 onOpenInvestments = { navigateToTab(TopLevelTab.PORTFOLIO) },
                 onOpenSettings = { navController.navigate(SkyplusRoute.Settings) },
                 onOpenCards = { navController.navigate(SkyplusRoute.Cards) },
+                onOpenSavingsGoals = { navController.navigate(SkyplusRoute.SavingsGoals) },
               )
             }
             composable<SkyplusRoute.Transactions> {

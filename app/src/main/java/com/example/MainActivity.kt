@@ -13,6 +13,7 @@ import com.example.feature.accounts.AccountsViewModel
 import com.example.feature.authentication.AuthViewModel
 import com.example.feature.budgets.BudgetsViewModel
 import com.example.feature.cards.CardsViewModel
+import com.example.feature.goals.SavingsGoalsViewModel
 import com.example.feature.dashboard.HomeDashboardViewModel
 import com.example.feature.dashboard.HomeViewModel
 import com.example.feature.investments.InvestmentsViewModel
@@ -38,6 +39,7 @@ class MainActivity : ComponentActivity() {
       val homeViewModel: HomeViewModel = hiltViewModel()
       val homeDashboardViewModel: HomeDashboardViewModel = hiltViewModel()
       val cardsViewModel: CardsViewModel = hiltViewModel()
+      val savingsGoalsViewModel: SavingsGoalsViewModel = hiltViewModel()
       val settingsViewModel: SettingsViewModel = hiltViewModel()
       val accountsViewModel: AccountsViewModel = hiltViewModel()
       val transactionsViewModel: TransactionsViewModel = hiltViewModel()
@@ -77,6 +79,7 @@ class MainActivity : ComponentActivity() {
           reportsViewModel = reportsViewModel,
           homeDashboardViewModel = homeDashboardViewModel,
           cardsViewModel = cardsViewModel,
+          savingsGoalsViewModel = savingsGoalsViewModel,
         )
       }
     }

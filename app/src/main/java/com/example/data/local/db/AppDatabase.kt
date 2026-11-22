@@ -9,6 +9,7 @@ import com.example.data.local.db.dao.FinancialAccountDao
 import com.example.data.local.db.dao.FinancialTransactionDao
 import com.example.data.local.db.dao.InvestmentDao
 import com.example.data.local.db.dao.LoanDao
+import com.example.data.local.db.dao.SavingsGoalDao
 import com.example.data.local.db.dao.ShoppingDao
 import com.example.data.local.db.dao.TransactionDetectionEventDao
 import com.example.data.local.db.entity.AccountMappingRuleEntity
@@ -23,6 +24,8 @@ import com.example.data.local.db.entity.InvestmentTransactionEntity
 import com.example.data.local.db.entity.LoanEntity
 import com.example.data.local.db.entity.LoanPaymentEntity
 import com.example.data.local.db.entity.ShoppingItemEntity
+import com.example.data.local.db.entity.SavingsContributionEntity
+import com.example.data.local.db.entity.SavingsGoalEntity
 import com.example.data.local.db.entity.ShoppingListEntity
 import com.example.data.local.db.entity.ShoppingStorePriceEntity
 import com.example.data.local.db.entity.TransactionDetectionEventEntity
@@ -36,6 +39,8 @@ import com.example.data.local.db.entity.TransactionDetectionEventEntity
     BudgetEntity::class,
     BudgetPeriodEntity::class,
     CreditCardEntity::class,
+    SavingsGoalEntity::class,
+    SavingsContributionEntity::class,
     LoanEntity::class,
     LoanPaymentEntity::class,
     InvestmentHoldingEntity::class,
@@ -45,7 +50,7 @@ import com.example.data.local.db.entity.TransactionDetectionEventEntity
     ShoppingItemEntity::class,
     ShoppingStorePriceEntity::class,
   ],
-  version = 8,
+  version = 9,
   exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -55,6 +60,7 @@ abstract class AppDatabase : RoomDatabase() {
   abstract fun accountMappingRuleDao(): AccountMappingRuleDao
   abstract fun budgetDao(): BudgetDao
   abstract fun creditCardDao(): CreditCardDao
+  abstract fun savingsGoalDao(): SavingsGoalDao
   abstract fun loanDao(): LoanDao
   abstract fun investmentDao(): InvestmentDao
   abstract fun shoppingDao(): ShoppingDao
