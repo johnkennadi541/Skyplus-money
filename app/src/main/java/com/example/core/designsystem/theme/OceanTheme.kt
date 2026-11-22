@@ -20,10 +20,11 @@ private val DarkOceanColorScheme =
     onSecondary = DeepOceanNavy,
     secondaryContainer = Color(0xFF0A3E3A),
     onSecondaryContainer = Color(0xFFCCFBF1),
-    tertiary = OceanGoldBright,
-    onTertiary = DeepOceanNavy,
-    tertiaryContainer = Color(0xFF3E300B),
-    onTertiaryContainer = Color(0xFFFEF3C7),
+    // tertiary carries the yellow accent
+    tertiary = SkyplusYellowBright,
+    onTertiary = SkyplusOnYellow,
+    tertiaryContainer = SkyplusYellowContainerDark,
+    onTertiaryContainer = SkyplusYellowBright,
     background = DeepOceanNavy,
     onBackground = OceanTextLight,
     surface = DeepOceanSurface,
@@ -49,9 +50,10 @@ private val LightOceanColorScheme =
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFCCFBF1),
     onSecondaryContainer = Color(0xFF063D38),
-    tertiary = OceanGoldDeep,
+    // deep amber keeps yellow readable on white surfaces
+    tertiary = SkyplusYellowDeep,
     onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFFEF3C7),
+    tertiaryContainer = SkyplusYellowContainerLight,
     onTertiaryContainer = Color(0xFF423103),
     background = OceanMistBackground,
     onBackground = OceanTextDark,
@@ -71,6 +73,9 @@ private val LightOceanColorScheme =
 object OceanTheme {
   val colors: OceanExtendedColors
     @Composable @ReadOnlyComposable get() = LocalOceanColors.current
+
+  val chartPalette: SkyplusChartPalette
+    @Composable @ReadOnlyComposable get() = LocalSkyplusChartPalette.current
 }
 
 @Composable
@@ -87,8 +92,12 @@ fun SkyplusOceanTheme(
 
   val colorScheme = if (useDarkTheme) DarkOceanColorScheme else LightOceanColorScheme
   val extendedColors = if (useDarkTheme) DarkOceanExtendedColors else LightOceanExtendedColors
+  val chartPalette = if (useDarkTheme) DarkSkyplusChartPalette else LightSkyplusChartPalette
 
-  CompositionLocalProvider(LocalOceanColors provides extendedColors) {
+  CompositionLocalProvider(
+    LocalOceanColors provides extendedColors,
+    LocalSkyplusChartPalette provides chartPalette,
+  ) {
     MaterialTheme(
       colorScheme = colorScheme,
       typography = OceanTypography,
