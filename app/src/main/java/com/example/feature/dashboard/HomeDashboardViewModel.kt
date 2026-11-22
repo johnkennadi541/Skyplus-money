@@ -2,6 +2,7 @@ package com.example.feature.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.local.DashboardLayoutPreferencesDataSource
 import com.example.domain.model.AuthSessionState
 import com.example.domain.model.ReportPeriodType
 import com.example.domain.repository.AuthRepository
@@ -11,21 +12,23 @@ import com.example.domain.usecase.ReportsCalculationEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 /**
  * Home dashboard state, built on the same [ObserveFinancialReportsUseCase] the Reports screen uses.
  *
  * That use case already scopes every query to the signed-in user's UID and is covered by the
  * existing calculation tests, so the dashboard shows real ledger data and never invents figures.
+ *
+ * The card layout is stored in [DashboardLayoutPreferencesDataSource], keyed by UID, so a custom
+ * order survives app restarts and is never shared between accounts.
  */
 @HiltViewModel
 class HomeDashboardViewModel
@@ -35,12 +38,13 @@ constructor(
   private val observeFinancialReportsUseCase: ObserveFinancialReportsUseCase,
   calculationEngine: ReportsCalculationEngine,
   private val formatMoneyUseCase: FormatMoneyUseCase,
+  private val layoutPreferences: DashboardLayoutPreferencesDataSource,
 ) : ViewModel() {
 
   private val monthlyWindow = calculationEngine.buildDateWindow(ReportPeriodType.MONTHLY)
 
-  private val cardOrder = MutableStateFlow(HomeCardId.entries.toList())
-  private val hiddenCards = MutableStateFlow<Set<HomeCardId>>(emptySet())
+  /** The UID whose layout the actions should write to. Set by the session flow below. */
+  private var activeUid: String? = null
 
   @OptIn(ExperimentalCoroutinesApi::class)
   val uiState: StateFlow<HomeDashboardUiState> =
@@ -48,22 +52,25 @@ constructor(
       .observeAuthSession()
       .flatMapLatest { session ->
         val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+        activeUid = uid
         if (uid == null) {
           flowOf(HomeDashboardUiState(isLoading = false, isEmpty = true))
         } else {
-          observeFinancialReportsUseCase(uid, flowOf(monthlyWindow))
-            .map { snapshot ->
-              HomeDashboardMapper.map(
-                snapshot = snapshot,
-                preferredCurrencyCode = null,
-                formatMoney = { money -> formatMoneyUseCase(money) },
-              )
-            }
+          combine(
+            observeFinancialReportsUseCase(uid, flowOf(monthlyWindow)),
+            layoutPreferences.observeLayout(uid),
+          ) { snapshot, savedLayout ->
+            val layout = DashboardLayoutPolicy.decode(savedLayout)
+            HomeDashboardMapper.map(
+              snapshot = snapshot,
+              preferredCurrencyCode = null,
+              formatMoney = { money -> formatMoneyUseCase(money) },
+            )
+              .copy(cards = layout.order, hiddenCards = layout.hidden)
+          }
         }
       }
       .catch { emit(HomeDashboardUiState(isLoading = false, hasError = true)) }
-      .combine(cardOrder) { state, order -> state.copy(cards = order) }
-      .combine(hiddenCards) { state, hidden -> state.copy(hiddenCards = hidden) }
       .stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -71,33 +78,31 @@ constructor(
       )
 
   fun toggleCardVisibility(card: HomeCardId) {
-    hiddenCards.value =
-      if (hiddenCards.value.contains(card)) {
-        hiddenCards.value - card
-      } else {
-        // Never let the user hide every card: an empty dashboard looks broken.
-        if (visibleCards().size <= 1 && !hiddenCards.value.contains(card)) hiddenCards.value
-        else hiddenCards.value + card
-      }
+    val uid = activeUid ?: return
+    persist(uid, DashboardLayoutPolicy.toggle(currentLayout(), card))
   }
 
   fun moveCard(card: HomeCardId, moveUp: Boolean) {
-    val current = cardOrder.value
-    val index = current.indexOf(card)
-    if (index < 0) return
-    val target = if (moveUp) index - 1 else index + 1
-    if (target !in current.indices) return
-    val reordered = current.toMutableList()
-    val moved = reordered.removeAt(index)
-    reordered.add(target, moved)
-    cardOrder.value = reordered
+    val uid = activeUid ?: return
+    persist(uid, DashboardLayoutPolicy.move(currentLayout(), card, moveUp))
   }
 
+  /** Restores the default order, shows every card, and writes that reset to disk. */
   fun resetCardLayout() {
-    cardOrder.value = HomeCardId.entries.toList()
-    hiddenCards.value = emptySet()
+    val uid = activeUid ?: return
+    persist(uid, DashboardLayoutPolicy.reset(currentLayout()))
   }
 
-  fun visibleCards(): List<HomeCardId> =
-    cardOrder.value.filterNot { hiddenCards.value.contains(it) }
+  private fun currentLayout(): DashboardLayout =
+    DashboardLayout(order = uiState.value.cards, hidden = uiState.value.hiddenCards)
+
+  private fun persist(uid: String, layout: DashboardLayout) {
+    viewModelScope.launch {
+      layoutPreferences.saveLayout(
+        userId = uid,
+        orderRaw = DashboardLayoutPolicy.encodeOrder(layout.order),
+        hiddenRaw = DashboardLayoutPolicy.encodeHidden(layout.hidden),
+      )
+    }
+  }
 }
