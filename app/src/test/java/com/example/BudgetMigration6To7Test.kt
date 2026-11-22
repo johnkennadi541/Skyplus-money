@@ -118,7 +118,7 @@ class BudgetMigration6To7Test {
          startDate, endDate, warningThresholdPercent, createdAt, updatedAt)
       VALUES (?, 'uid_1', ?, 'Food & Dining', ?, 'INR', ?, ?, ?, 75, 111, 222)
       """.trimIndent(),
-      arrayOf(id, "Budget $id", amountMinor, periodType, startDate, endDate),
+      arrayOf<Any?>(id, "Budget $id", amountMinor, periodType, startDate, endDate),
     )
   }
 
