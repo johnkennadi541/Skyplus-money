@@ -10,6 +10,7 @@ import com.example.domain.model.Budget
 import com.example.domain.model.BudgetAlertStatus
 import com.example.domain.model.BudgetPeriodType
 import com.example.domain.model.BudgetStatus
+import com.example.domain.model.BudgetSummary
 import com.example.domain.model.FinancialAccount
 import com.example.domain.model.Money
 import com.example.domain.model.ThemePreference
@@ -70,12 +71,15 @@ class BudgetsStaleDisplayTest {
       currentBalanceMinor = 0L,
     )
 
-  private fun render(status: BudgetStatus) {
+  private fun render(
+    status: BudgetStatus,
+    summaries: Map<String, BudgetSummary> = emptyMap(),
+  ) {
     composeTestRule.setContent {
       SkyplusOceanTheme(themePreference = ThemePreference.DARK) {
         BudgetsContent(
           budgets = listOf(status),
-          summaries = emptyMap(),
+          summaries = summaries,
           accounts = listOf(account),
         )
       }
@@ -102,5 +106,38 @@ class BudgetsStaleDisplayTest {
       .onNodeWithTag("budget_remaining_budget_stale_1")
       .assertTextContains("Remaining:", substring = true)
     composeTestRule.onNodeWithTag("budget_stale_note_budget_stale_1").assertDoesNotExist()
+  }
+  @Test
+  fun `when every budget is stale the screen shows no active summary`() {
+    render(status(stale = true))
+
+    composeTestRule.onNodeWithTag("budget_no_active_summary").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("budget_summary_card").assertDoesNotExist()
+    // The stale card itself is still shown, with its history intact.
+    composeTestRule.onNodeWithTag("budget_card_budget_stale_1").assertIsDisplayed()
+  }
+
+  @Test
+  fun `a live budget still shows the active summary card`() {
+    val live = status(stale = false)
+    render(
+      live,
+      summaries =
+        mapOf(
+          "INR" to
+            BudgetSummary(
+              currencyCode = "INR",
+              totalAllocatedMinor = 100_00L,
+              totalSpentMinor = 20_00L,
+              totalRemainingMinor = 80_00L,
+              averageUtilizationPercent = 20.0,
+              activeBudgetCount = 1,
+              overspentBudgetCount = 0,
+            )
+        ),
+    )
+
+    composeTestRule.onNodeWithTag("budget_summary_card").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("budget_no_active_summary").assertDoesNotExist()
   }
 }

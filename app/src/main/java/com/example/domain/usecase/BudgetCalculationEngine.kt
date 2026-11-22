@@ -105,7 +105,11 @@ class BudgetCalculationEngine @Inject constructor() {
    * Currencies are NEVER combined into a single total.
    */
   fun calculateSummaries(budgetStatuses: List<BudgetStatus>): Map<String, BudgetSummary> {
-    return budgetStatuses
+    // A closed period's remaining amount is history, so it must never be added to the totals a
+    // user reads as "available now". Stale budgets keep their cards and their archive; they are
+    // only excluded from the live summary.
+    val activeStatuses = budgetStatuses.filterNot { it.isStale }
+    return activeStatuses
       .groupBy { it.budget.currencyCode }
       .mapValues { (currency, statuses) ->
         val totalAllocated = statuses.sumOf { it.budget.amountMinor }

@@ -316,6 +316,23 @@ fun BudgetsContent(
             }
           }
         }
+      } else if (filteredBudgets.isNotEmpty()) {
+        // Every budget for this currency is a closed period. Say so instead of showing a total.
+        item {
+          Surface(
+            modifier = Modifier.fillMaxWidth().testTag("budget_no_active_summary"),
+            shape = MaterialTheme.shapes.small,
+            color = OceanTheme.colors.cardSubtle,
+            border = BorderStroke(1.dp, OceanTheme.colors.cardBorder.copy(alpha = 0.7f)),
+          ) {
+            Text(
+              text = stringResource(R.string.budgets_no_active_summary),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.padding(OceanSpacing.sm),
+            )
+          }
+        }
       }
 
       // Empty State
