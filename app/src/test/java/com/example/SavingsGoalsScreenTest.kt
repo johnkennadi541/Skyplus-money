@@ -179,9 +179,10 @@ class SavingsGoalsScreenTest {
   }
 
   @Test
-  fun `editing opens a prefilled form with the existing values`() {
+  fun `editing opens a prefilled form and saves the existing values`() {
+    // An unfunded goal keeps the currency field editable, so the prefill is visible there too.
     val existing = goal(name = "Holiday", targetMinor = 250_000L)
-    render(listOf(summary(savedMinor = 50_000L, goal = existing)))
+    render(listOf(summary(savedMinor = 0L, targetMinor = 250_000L, contributionCount = 0, goal = existing)))
 
     composeTestRule.onNodeWithTag("edit_goal_goal_1").performClick()
     composeTestRule.waitForIdle()
@@ -190,7 +191,16 @@ class SavingsGoalsScreenTest {
     composeTestRule.onNodeWithTag("goal_name_input").assertTextContains("Holiday", substring = true)
     // 250_000 minor units in INR is 2500.00
     composeTestRule.onNodeWithTag("goal_target_input").assertTextContains("2500.00", substring = true)
-    composeTestRule.onNodeWithTag("goal_currency_input").assertTextContains("INR", substring = true)
+    composeTestRule.onNodeWithTag("goal_currency_input").assertIsDisplayed()
+
+    // Saving untouched proves every field was really prefilled from the stored goal.
+    composeTestRule.onNodeWithTag("save_goal_button").performClick()
+    composeTestRule.waitForIdle()
+
+    assertEquals(1, recorded.editCalls)
+    assertEquals("Holiday", recorded.editedName)
+    assertEquals("INR", recorded.editedCurrency)
+    assertEquals("2500.00", recorded.editedTarget)
   }
 
   @Test
@@ -257,8 +267,10 @@ class SavingsGoalsScreenTest {
     composeTestRule.onNodeWithTag("add_goal_button").performClick()
     composeTestRule.waitForIdle()
 
-    composeTestRule.onNodeWithTag("goal_currency_input").assertTextContains("INR", substring = true)
+    composeTestRule.onNodeWithTag("goal_form_dialog").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("goal_currency_input").assertIsDisplayed()
     composeTestRule.onNodeWithTag("goal_currency_locked").assertDoesNotExist()
+    assertEquals(0, recorded.editCalls)
     assertTrue(recorded.createdName == null)
   }
   @Test
