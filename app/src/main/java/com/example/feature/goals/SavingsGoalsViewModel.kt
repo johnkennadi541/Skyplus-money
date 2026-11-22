@@ -55,11 +55,17 @@ constructor(
       activeUid = (session as? AuthSessionState.Authenticated)?.user?.uid
     }
 
+  private val _isLoading = MutableStateFlow(true)
+
+  /** True until the first database result arrives, so the empty state is never shown too early. */
+  val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
   @OptIn(ExperimentalCoroutinesApi::class)
   val goals: StateFlow<List<SavingsGoalSummary>> =
     sessionFlow
       .map { session -> (session as? AuthSessionState.Authenticated)?.user?.uid }
       .flatMapLatest { uid -> observeSavingsGoalsUseCase(uid) }
+      .onEach { _isLoading.value = false }
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
   fun dismissMessage() {
@@ -109,15 +115,48 @@ constructor(
     }
   }
 
-  fun updateGoal(goal: SavingsGoal, name: String, targetDecimal: String, onSuccess: () -> Unit) {
+  fun updateGoal(
+    goal: SavingsGoal,
+    name: String,
+    currencyCode: String,
+    targetDecimal: String,
+    note: String?,
+    deadlineText: String,
+    onSuccess: () -> Unit,
+  ) {
     val uid = activeUid ?: return
     viewModelScope.launch {
-      val targetMinor = parseAmountToMinor(targetDecimal, goal.currencyCode)
+      // A funded goal's currency is immutable. The form locks the field and the repository refuses
+      // the change; checking here too means the user sees a clear message rather than a parse
+      // failure from the old currency.
+      val code = currencyCode.trim().uppercase()
+      if (!Money.isSupportedCurrency(code)) {
+        fail("'$code' is not a supported currency")
+        return@launch
+      }
+      val deadlineMillis =
+        runCatching { GoalDeadlineParser.parse(deadlineText) }
+          .getOrElse {
+            fail(it.message ?: "Enter a valid deadline")
+            return@launch
+          }
+      // Parsed with the currency the user selected, so a switch from JPY to KWD picks up the new
+      // fraction digits rather than reusing the old ones.
+      val targetMinor = parseAmountToMinor(targetDecimal, code)
       if (targetMinor == null || targetMinor <= 0L) {
         fail("Enter a target greater than zero")
         return@launch
       }
-      updateSavingsGoalUseCase(uid, goal.copy(name = name, targetMinor = targetMinor))
+      updateSavingsGoalUseCase(
+        uid,
+        goal.copy(
+          name = name.trim(),
+          currencyCode = code,
+          targetMinor = targetMinor,
+          note = note?.takeIf { it.isNotBlank() },
+          deadlineMillis = deadlineMillis,
+        ),
+      )
         .onSuccess {
           succeed("Goal updated")
           onSuccess()

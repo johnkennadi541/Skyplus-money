@@ -183,6 +183,30 @@ class SavingsGoalDatabaseAndRepoTest {
   }
 
   @Test
+  fun `editing a goal leaves its contributions and saved total untouched`() = runTest {
+    repository.createGoal(userA, goal()).getOrThrow()
+    repository.addContribution(userA, contribution(30_000L, id = "c_1")).getOrThrow()
+    repository.addContribution(userA, contribution(20_000L, id = "c_2")).getOrThrow()
+
+    val savedBefore =
+      engine.savedMinor(repository.getGoal(userA, "goal_1")!!, repository.observeContributions(userA).first())
+
+    repository
+      .updateGoal(
+        userA,
+        goal(name = "Renamed", targetMinor = 200_000L),
+      )
+      .getOrThrow()
+
+    val after = repository.getGoal(userA, "goal_1")!!
+    assertEquals("Renamed", after.name)
+    assertEquals(200_000L, after.targetMinor)
+    assertEquals(2, repository.observeContributions(userA).first().size)
+    assertEquals(savedBefore, engine.savedMinor(after, repository.observeContributions(userA).first()))
+    assertEquals(50_000L, savedBefore)
+  }
+
+  @Test
   fun `the currency of an unfunded goal can still change`() = runTest {
     repository.createGoal(userA, goal(currency = "INR")).getOrThrow()
 

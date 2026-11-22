@@ -53,6 +53,20 @@ data class SavingsGoalEntity(
   }
 }
 
+/**
+ * Contributions deliberately carry **no database-level foreign key** to `savings_goals`.
+ *
+ * SQLite cannot add a foreign key to an existing table, so adding one would require a full
+ * create/copy/drop/rename rebuild of a table holding user data inside a migration. If a single
+ * orphan row existed the copy would abort and the encrypted database would fail to open, which the
+ * fail-closed SQLCipher path turns into an unusable app. Making the rebuild always succeed would
+ * mean deleting orphans, which is silent data loss.
+ *
+ * Integrity is instead guaranteed by [com.example.data.repository.SavingsGoalRepositoryImpl], which
+ * deletes a goal's contributions inside the same transaction as the goal itself, and that path is
+ * covered by tests. The foreign key would only add protection against direct DAO writes that bypass
+ * the repository, which do not exist today.
+ */
 @Entity(
   tableName = "savings_contributions",
   indices = [

@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -42,12 +43,14 @@ import com.example.core.designsystem.component.SkyplusConfirmDialog
 import com.example.core.designsystem.component.SkyplusEmptyState
 import com.example.core.designsystem.component.SkyplusInlineMessage
 import com.example.core.designsystem.component.SkyplusMessageTone
+import com.example.core.designsystem.component.SkyplusSkeletonCard
 import com.example.core.designsystem.component.SkyplusPrimaryButton
 import com.example.core.designsystem.component.SkyplusTertiaryButton
 import com.example.core.designsystem.component.SkyplusTextField
 import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
 import com.example.domain.model.Money
+import com.example.domain.model.SavingsGoal
 import com.example.domain.model.SavingsGoalSummary
 import com.example.domain.usecase.FormatMoneyUseCase
 import java.util.Locale
@@ -58,17 +61,20 @@ fun SavingsGoalsScreen(
   modifier: Modifier = Modifier,
 ) {
   val goals by viewModel.goals.collectAsStateWithLifecycle()
+  val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
   val message by viewModel.userMessage.collectAsStateWithLifecycle()
   val isError by viewModel.isErrorMessage.collectAsStateWithLifecycle()
 
   SavingsGoalsContent(
     goals = goals,
+    isLoading = isLoading,
     message = message,
     isErrorMessage = isError,
     onDismissMessage = viewModel::dismissMessage,
     onCreateGoal = viewModel::createGoal,
     onAddContribution = viewModel::addContribution,
     onDeleteGoal = viewModel::deleteGoal,
+    onEditGoal = viewModel::updateGoal,
     modifier = modifier,
   )
 }
@@ -76,15 +82,18 @@ fun SavingsGoalsScreen(
 @Composable
 fun SavingsGoalsContent(
   goals: List<SavingsGoalSummary>,
+  isLoading: Boolean = false,
   message: String?,
   isErrorMessage: Boolean,
   onDismissMessage: () -> Unit,
   onCreateGoal: (name: String, currencyCode: String, targetDecimal: String, note: String?, deadlineText: String, onSuccess: () -> Unit) -> Unit,
   onAddContribution: (summary: SavingsGoalSummary, amountDecimal: String, note: String?, onSuccess: () -> Unit) -> Unit,
   onDeleteGoal: (goalId: String, onSuccess: () -> Unit) -> Unit,
+  onEditGoal: (goal: SavingsGoal, name: String, currencyCode: String, targetDecimal: String, note: String?, deadlineText: String, onSuccess: () -> Unit) -> Unit = { _, _, _, _, _, _, _ -> },
   modifier: Modifier = Modifier,
 ) {
   var showCreateDialog by remember { mutableStateOf(false) }
+  var editing by remember { mutableStateOf<SavingsGoalSummary?>(null) }
   var contributingTo by remember { mutableStateOf<SavingsGoalSummary?>(null) }
   var deleting by remember { mutableStateOf<SavingsGoalSummary?>(null) }
 
@@ -129,7 +138,14 @@ fun SavingsGoalsContent(
         }
       }
 
-      if (goals.isEmpty()) {
+      if (isLoading && goals.isEmpty()) {
+        item {
+          SkyplusSkeletonCard(modifier = Modifier.fillMaxWidth().testTag("goals_loading"))
+        }
+        item {
+          SkyplusSkeletonCard(modifier = Modifier.fillMaxWidth().testTag("goals_loading_second"))
+        }
+      } else if (goals.isEmpty()) {
         item {
           SkyplusEmptyState(
             title = "No savings goals yet",
@@ -143,11 +159,23 @@ fun SavingsGoalsContent(
           GoalCard(
             summary = summary,
             onContribute = { contributingTo = summary },
+            onEdit = { editing = summary },
             onDelete = { deleting = summary },
           )
         }
       }
     }
+  }
+
+  editing?.let { summary ->
+    GoalFormDialog(
+      existing = summary.goal,
+      currencyLocked = summary.contributionCount > 0,
+      onDismiss = { editing = null },
+      onSave = { name, currency, target, note, deadline, done ->
+        onEditGoal(summary.goal, name, currency, target, note, deadline, done)
+      },
+    )
   }
 
   if (showCreateDialog) {
@@ -186,6 +214,7 @@ fun SavingsGoalsContent(
 private fun GoalCard(
   summary: SavingsGoalSummary,
   onContribute: () -> Unit,
+  onEdit: () -> Unit,
   onDelete: () -> Unit,
 ) {
   val extended = OceanTheme.colors
@@ -243,15 +272,27 @@ private fun GoalCard(
           OceanStatusBadge(text = "Unsupported currency", tone = BadgeTone.WARNING)
         }
       }
-      IconButton(
-        onClick = onDelete,
-        modifier = Modifier.testTag("delete_goal_${summary.goal.id}"),
-      ) {
-        Icon(
-          imageVector = Icons.Rounded.Delete,
-          contentDescription = "Delete goal",
-          tint = MaterialTheme.colorScheme.error,
-        )
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        IconButton(
+          onClick = onEdit,
+          modifier = Modifier.testTag("edit_goal_${summary.goal.id}"),
+        ) {
+          Icon(
+            imageVector = Icons.Rounded.Edit,
+            contentDescription = "Edit goal",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        IconButton(
+          onClick = onDelete,
+          modifier = Modifier.testTag("delete_goal_${summary.goal.id}"),
+        ) {
+          Icon(
+            imageVector = Icons.Rounded.Delete,
+            contentDescription = "Delete goal",
+            tint = MaterialTheme.colorScheme.error,
+          )
+        }
       }
     }
 
@@ -326,18 +367,34 @@ private fun GoalCard(
 private fun GoalFormDialog(
   onDismiss: () -> Unit,
   onSave: (name: String, currencyCode: String, targetDecimal: String, note: String?, deadlineText: String, onSuccess: () -> Unit) -> Unit,
+  existing: SavingsGoal? = null,
+  currencyLocked: Boolean = false,
 ) {
-  var name by remember { mutableStateOf("") }
-  var currency by remember { mutableStateOf("INR") }
-  var target by remember { mutableStateOf("") }
-  var note by remember { mutableStateOf("") }
-  var deadline by remember { mutableStateOf("") }
+  var name by remember { mutableStateOf(existing?.name.orEmpty()) }
+  var currency by remember { mutableStateOf(existing?.currencyCode ?: "INR") }
+  var target by remember {
+    mutableStateOf(
+      existing
+        ?.let { goal ->
+          // A stored code that is not a real ISO currency must never throw while composing. Show
+          // the raw minor units instead, which the user can correct by picking a real currency.
+          if (Money.isSupportedCurrency(goal.currencyCode)) {
+            Money.fromMinorUnits(goal.targetMinor, goal.currencyCode).toBigDecimal().toPlainString()
+          } else {
+            goal.targetMinor.toString()
+          }
+        }
+        .orEmpty()
+    )
+  }
+  var note by remember { mutableStateOf(existing?.note.orEmpty()) }
+  var deadline by remember { mutableStateOf(GoalDeadlineParser.format(existing?.deadlineMillis)) }
   var formError by remember { mutableStateOf<String?>(null) }
 
   AlertDialog(
     onDismissRequest = onDismiss,
     modifier = Modifier.testTag("goal_form_dialog"),
-    title = { Text("New savings goal") },
+    title = { Text(if (existing == null) "New savings goal" else "Edit goal") },
     text = {
       Column(verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs)) {
         SkyplusTextField(
@@ -347,13 +404,22 @@ private fun GoalFormDialog(
           placeholder = "Emergency fund",
           modifier = Modifier.testTag("goal_name_input"),
         )
-        SkyplusTextField(
-          value = currency,
-          onValueChange = { input -> currency = input.uppercase().filter { it.isLetter() }.take(3) },
-          label = "Currency",
-          placeholder = "INR",
-          modifier = Modifier.testTag("goal_currency_input"),
-        )
+        if (currencyLocked) {
+          Text(
+            text = "Currency: $currency — cannot change once the goal has contributions",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag("goal_currency_locked"),
+          )
+        } else {
+          SkyplusTextField(
+            value = currency,
+            onValueChange = { input -> currency = input.uppercase().filter { it.isLetter() }.take(3) },
+            label = "Currency",
+            placeholder = "INR",
+            modifier = Modifier.testTag("goal_currency_input"),
+          )
+        }
         SkyplusTextField(
           value = target,
           onValueChange = { target = it },
@@ -392,8 +458,14 @@ private fun GoalFormDialog(
             formError = "Enter a goal name"
             return@SkyplusPrimaryButton
           }
-          if (currency.length != 3) {
-            formError = "Currency must be three letters"
+          if (!Money.isSupportedCurrency(currency)) {
+            formError = "'$currency' is not a supported currency"
+            return@SkyplusPrimaryButton
+          }
+          if (currencyLocked && existing != null &&
+            !currency.equals(existing.currencyCode, ignoreCase = true)
+          ) {
+            formError = "The currency cannot change once the goal has contributions"
             return@SkyplusPrimaryButton
           }
           formError = null
@@ -402,7 +474,13 @@ private fun GoalFormDialog(
         modifier = Modifier.testTag("save_goal_button"),
       )
     },
-    dismissButton = { SkyplusTertiaryButton(text = "Cancel", onClick = onDismiss) },
+    dismissButton = {
+      SkyplusTertiaryButton(
+        text = "Cancel",
+        onClick = onDismiss,
+        modifier = Modifier.testTag("goal_form_cancel"),
+      )
+    },
   )
 }
 
