@@ -20,4 +20,8 @@ object OceanSpacing {
   val md = 16.dp
   val lg = 24.dp
   val xl = 32.dp
+  val xxl = 48.dp
+
+  /** Horizontal gutter used by every screen so content lines up across the app. */
+  val screenHorizontal = 20.dp
 }
