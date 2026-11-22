@@ -75,7 +75,10 @@ import com.example.domain.model.BudgetSummary
 import com.example.domain.model.FinancialAccount
 import com.example.domain.model.TransactionCategories
 import com.example.domain.usecase.FormatMoneyUseCase
+import java.math.BigDecimal
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
+import java.util.Currency
 import java.util.Date
 import java.util.Locale
 
@@ -90,10 +93,12 @@ fun BudgetsScreen(
   val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
   val isErrorMessage by viewModel.isErrorMessage.collectAsStateWithLifecycle()
   val selectedCurrency by viewModel.selectedCurrency.collectAsStateWithLifecycle()
+  val budgetPeriods by viewModel.budgetPeriods.collectAsStateWithLifecycle()
 
   BudgetsContent(
     budgets = budgets,
     summaries = summaries,
+    periods = budgetPeriods,
     accounts = accounts,
     userMessage = userMessage,
     isErrorMessage = isErrorMessage,
@@ -117,6 +122,7 @@ fun BudgetsScreen(
 fun BudgetsContent(
   budgets: List<BudgetStatus>,
   summaries: Map<String, BudgetSummary>,
+  periods: List<com.example.domain.model.BudgetPeriod> = emptyList(),
   accounts: List<FinancialAccount>,
   userMessage: String? = null,
   isErrorMessage: Boolean = false,
@@ -310,6 +316,23 @@ fun BudgetsContent(
             }
           }
         }
+      } else if (filteredBudgets.isNotEmpty()) {
+        // Every budget for this currency is a closed period. Say so instead of showing a total.
+        item {
+          Surface(
+            modifier = Modifier.fillMaxWidth().testTag("budget_no_active_summary"),
+            shape = MaterialTheme.shapes.small,
+            color = OceanTheme.colors.cardSubtle,
+            border = BorderStroke(1.dp, OceanTheme.colors.cardBorder.copy(alpha = 0.7f)),
+          ) {
+            Text(
+              text = stringResource(R.string.budgets_no_active_summary),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.padding(OceanSpacing.sm),
+            )
+          }
+        }
       }
 
       // Empty State
@@ -355,6 +378,21 @@ fun BudgetsContent(
             onEdit = { budgetToEdit = status.budget },
             onDelete = { budgetToDelete = status.budget },
           )
+        }
+      }
+
+      val currencyPeriods =
+        periods.filter { it.currencyCode.equals(activeCurrency, ignoreCase = true) }
+      if (currencyPeriods.isNotEmpty()) {
+        item {
+          OceanSectionHeader(
+            title = stringResource(R.string.budgets_history_title),
+            subtitle = stringResource(R.string.budgets_history_subtitle),
+            modifier = Modifier.testTag("budget_history_section"),
+          )
+        }
+        items(currencyPeriods, key = { it.id }) { period ->
+          BudgetPeriodRow(period = period)
         }
       }
     }
@@ -472,6 +510,7 @@ private fun BudgetCard(
       BudgetAlertStatus.APPROACHING_75 -> BadgeTone.WARNING to "75% Reached"
       BudgetAlertStatus.WARNING_90 -> BadgeTone.WARNING to "90% Warning"
       BudgetAlertStatus.EXCEEDED_100 -> BadgeTone.NEGATIVE to "Overspent"
+      BudgetAlertStatus.PERIOD_ENDED -> BadgeTone.INFO to "Period ended"
     }
 
   val progressColor =
@@ -479,6 +518,7 @@ private fun BudgetCard(
       BudgetAlertStatus.NORMAL -> OceanTheme.colors.positive
       BudgetAlertStatus.APPROACHING_75, BudgetAlertStatus.WARNING_90 -> OceanTheme.colors.warning
       BudgetAlertStatus.EXCEEDED_100 -> OceanTheme.colors.negative
+      BudgetAlertStatus.PERIOD_ENDED -> MaterialTheme.colorScheme.outline
     }
 
   val dateFormat = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
@@ -508,6 +548,14 @@ private fun BudgetCard(
           style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (status.isStale) {
+          Text(
+            text = stringResource(R.string.budgets_period_ended_note),
+            style = MaterialTheme.typography.labelSmall,
+            color = OceanTheme.colors.warning,
+            modifier = Modifier.testTag("budget_stale_note_${budget.id}"),
+          )
+        }
       }
       Row(verticalAlignment = Alignment.CenterVertically) {
         IconButton(
@@ -556,11 +604,27 @@ private fun BudgetCard(
         )
       }
       Column(horizontalAlignment = Alignment.End) {
+        // A closed period's remaining amount is history, not this month's available budget, so it
+        // is relabelled and muted instead of being shown as if it were live.
         Text(
-          text = "Remaining: ${FormatMoneyUseCase().format(status.remainingMoney)}",
+          text =
+            if (status.isStale) {
+              stringResource(
+                R.string.budgets_remaining_at_close,
+                FormatMoneyUseCase().format(status.remainingMoney),
+              )
+            } else {
+              "Remaining: ${FormatMoneyUseCase().format(status.remainingMoney)}"
+            },
           style = MaterialTheme.typography.bodySmall,
           fontWeight = FontWeight.Bold,
-          color = if (status.remainingMoney.minorUnits < 0L) OceanTheme.colors.negative else MaterialTheme.colorScheme.onSurface,
+          color =
+            when {
+              status.isStale -> MaterialTheme.colorScheme.onSurfaceVariant
+              status.remainingMoney.minorUnits < 0L -> OceanTheme.colors.negative
+              else -> MaterialTheme.colorScheme.onSurface
+            },
+          modifier = Modifier.testTag("budget_remaining_${budget.id}"),
         )
         Text(
           text = "Limit: ${FormatMoneyUseCase().format(status.allocatedMoney)}",
@@ -751,4 +815,48 @@ private fun BudgetFormDialog(
     },
     modifier = Modifier.testTag("budget_form_dialog"),
   )
+}
+
+@Composable
+private fun BudgetPeriodRow(period: com.example.domain.model.BudgetPeriod) {
+  val dateFormat = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
+  val range =
+    "${dateFormat.format(Date(period.periodStart))} – ${dateFormat.format(Date(period.periodEnd))}"
+  val currency = remember(period.currencyCode) { Currency.getInstance(period.currencyCode) }
+  val numberFormat =
+    remember(currency) {
+      NumberFormat.getCurrencyInstance(Locale.getDefault()).apply {
+        this.currency = currency
+        minimumFractionDigits = 2
+        maximumFractionDigits = 2
+      }
+    }
+  val spentText = numberFormat.format(BigDecimal.valueOf(period.spentMinor, 2))
+  val allocatedText = numberFormat.format(BigDecimal.valueOf(period.allocatedMinor, 2))
+
+  Surface(
+    modifier = Modifier.fillMaxWidth().testTag("budget_period_${period.id}"),
+    shape = MaterialTheme.shapes.small,
+    color = OceanTheme.colors.cardSubtle,
+    border = BorderStroke(1.dp, OceanTheme.colors.cardBorder.copy(alpha = 0.6f)),
+  ) {
+    Row(
+      modifier = Modifier.fillMaxWidth().padding(OceanSpacing.sm),
+      horizontalArrangement = Arrangement.SpaceBetween,
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = "${period.category} • $range",
+          style = MaterialTheme.typography.titleSmall,
+          color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+          text = stringResource(R.string.budgets_history_spent, spentText, allocatedText),
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+    }
+  }
 }

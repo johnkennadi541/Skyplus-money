@@ -5,6 +5,12 @@
     <string name="auth_pending_badge">Auth Gate: Phase 1 Pending</string>
 
     <!-- Primary Navigation -->
+    <string name="budgets_history_title">Past periods</string>
+    <string name="budgets_history_subtitle">Closed budget windows, newest first</string>
+    <string name="budgets_history_spent">Spent %1$s of %2$s</string>
+    <string name="budgets_no_active_summary">No active budget for this period. Closed periods are listed below.</string>
+    <string name="budgets_remaining_at_close">Remaining at close: %1$s</string>
+    <string name="budgets_period_ended_note">Period ended · renews automatically</string>
     <string name="nav_home">Home</string>
     <string name="nav_transactions">Transactions</string>
     <string name="nav_budgets">Budgets</string>

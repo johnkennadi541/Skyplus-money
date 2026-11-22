@@ -6,15 +6,18 @@ import com.example.core.common.DispatcherProvider
 import com.example.domain.model.AuthSessionState
 import com.example.domain.model.Budget
 import com.example.domain.model.BudgetPeriodType
+import com.example.domain.model.BudgetPeriod
 import com.example.domain.model.BudgetStatus
 import com.example.domain.model.BudgetSummary
 import com.example.domain.model.FinancialAccount
 import com.example.domain.model.Money
 import com.example.domain.repository.AuthRepository
+import com.example.domain.repository.BudgetRepository
 import com.example.domain.repository.FinancialAccountRepository
 import com.example.domain.usecase.CreateBudgetUseCase
 import com.example.domain.usecase.DeleteBudgetUseCase
 import com.example.domain.usecase.ObserveBudgetsWithStatusUseCase
+import com.example.domain.usecase.RenewBudgetsUseCase
 import com.example.domain.usecase.UpdateBudgetUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -51,6 +54,8 @@ class BudgetsViewModel @Inject constructor(
   private val updateBudgetUseCase: UpdateBudgetUseCase,
   private val deleteBudgetUseCase: DeleteBudgetUseCase,
   private val accountRepository: FinancialAccountRepository,
+  private val budgetRepository: BudgetRepository,
+  private val renewBudgetsUseCase: RenewBudgetsUseCase,
   private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
 
@@ -67,9 +72,16 @@ class BudgetsViewModel @Inject constructor(
     viewModelScope.launch {
       authRepository.observeAuthSession()
         .distinctUntilChangedBy { (it as? AuthSessionState.Authenticated)?.user?.uid }
-        .collect {
+        .collect { session ->
           _userMessage.value = null
           _isErrorMessage.value = false
+
+          // Roll due recurring budgets into the current month. Idempotent, and a failure here must
+          // never block the screen: the stale-budget state still shows correctly without it.
+          val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+          if (uid != null) {
+            runCatching { renewBudgetsUseCase(uid) }
+          }
         }
     }
   }
@@ -101,6 +113,19 @@ class BudgetsViewModel @Inject constructor(
 
   val budgets: StateFlow<List<BudgetStatus>> =
     rawBudgetData.map { it.first }
+      .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList(),
+      )
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  val budgetPeriods: StateFlow<List<BudgetPeriod>> =
+    authRepository.observeAuthSession()
+      .flatMapLatest { session ->
+        val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+        if (uid != null) budgetRepository.observeBudgetPeriods(uid) else flowOf(emptyList())
+      }
       .stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),

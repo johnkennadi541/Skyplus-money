@@ -444,7 +444,14 @@ class ReportsCalculationEngine @Inject constructor(
       budgets
         .sortedByDescending { it.endDate }
         .map { budget ->
-          val status = budgetEngine.calculateBudgetStatus(budget, transactions)
+          // Evaluate the historical band at the budget's own window end, so a report row keeps
+          // the status the budget had while it was running instead of being marked period-ended.
+          val status =
+            budgetEngine.calculateBudgetStatus(
+              budget = budget,
+              transactions = transactions,
+              nowMillis = budget.endDate,
+            )
           val overlaps =
             budget.endDate >= window.startDateMillis && budget.startDate <= window.endDateMillis
           val utilizationPct = percentageOf(status.spentMoney.minorUnits, budget.amountMinor)

@@ -1,5 +1,6 @@
 package com.example.domain.model
 
+import java.math.BigDecimal
 import java.util.UUID
 
 enum class BudgetPeriodType {
@@ -12,6 +13,9 @@ enum class BudgetAlertStatus {
   APPROACHING_75,
   WARNING_90,
   EXCEEDED_100,
+
+  /** The budget window has already ended, so its remaining figure no longer describes today. */
+  PERIOD_ENDED,
 }
 
 data class Budget(
@@ -25,6 +29,13 @@ data class Budget(
   val startDate: Long,
   val endDate: Long,
   val warningThresholdPercent: Int = 75,
+  /**
+   * When true and [periodType] is MONTHLY, an elapsed period is archived and the budget moves on to
+   * the current month with the same limit. Unused amount is never carried forward.
+   */
+  val isRecurring: Boolean = true,
+  /** When the window was last moved forward by renewal; 0 means it never has been. */
+  val lastRenewedAt: Long = 0L,
   val createdAt: Long = System.currentTimeMillis(),
   val updatedAt: Long = System.currentTimeMillis(),
 )
@@ -38,6 +49,14 @@ data class BudgetStatus(
   val overspendingMoney: Money,
   val alertStatus: BudgetAlertStatus,
   val transactionCount: Int,
+  /** True when the window has ended; the remaining figure is then historical, not current. */
+  val isStale: Boolean = false,
+  /**
+   * Display percentage at four decimal places. Alert bands are decided by exact
+   * cross-multiplication in [com.example.domain.usecase.BudgetCalculationEngine] and never read
+   * this value, so a rounded figure can never move a budget into the band above.
+   */
+  val percentageConsumedExact: BigDecimal = BigDecimal.ZERO,
 )
 
 data class BudgetSummary(

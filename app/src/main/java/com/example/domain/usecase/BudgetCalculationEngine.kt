@@ -8,6 +8,8 @@ import com.example.domain.model.FinancialTransaction
 import com.example.domain.model.Money
 import com.example.domain.model.TransactionStatus
 import com.example.domain.model.TransactionType
+import java.math.BigDecimal
+import java.math.RoundingMode
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
@@ -21,6 +23,7 @@ class BudgetCalculationEngine @Inject constructor() {
   fun calculateBudgetStatus(
     budget: Budget,
     transactions: List<FinancialTransaction>,
+    nowMillis: Long = System.currentTimeMillis(),
   ): BudgetStatus {
     var totalExpensesMinor = 0L
     var totalRefundsMinor = 0L
@@ -55,18 +58,32 @@ class BudgetCalculationEngine @Inject constructor() {
     val remainingMinor = budget.amountMinor - netSpentMinor
     val overspendingMinor = max(0L, netSpentMinor - budget.amountMinor)
 
-    val percentageConsumed =
+    // Display percentage only. It is rounded, so it must never decide an alert band.
+    val percentageExact =
       if (budget.amountMinor > 0L) {
-        (netSpentMinor.toDouble() / budget.amountMinor.toDouble()) * 100.0
+        BigDecimal.valueOf(netSpentMinor)
+          .multiply(HUNDRED)
+          .divide(BigDecimal.valueOf(budget.amountMinor), 4, RoundingMode.HALF_EVEN)
       } else {
-        0.0
+        BigDecimal.ZERO
       }
+    val percentageConsumed = percentageExact.toDouble()
+
+    val isStale = nowMillis > budget.endDate
+
+    // Band classification is done by cross-multiplying, with no division and no rounding:
+    //   spent x 100  compared with  allocated x 75 / 90 / 100.
+    // A value just below a threshold can therefore never round up into the band above it.
+    val spentScaled = BigDecimal.valueOf(netSpentMinor).multiply(HUNDRED)
+    val allocated = BigDecimal.valueOf(budget.amountMinor)
 
     val alertStatus =
       when {
-        percentageConsumed >= 100.0 -> BudgetAlertStatus.EXCEEDED_100
-        percentageConsumed >= 90.0 -> BudgetAlertStatus.WARNING_90
-        percentageConsumed >= 75.0 -> BudgetAlertStatus.APPROACHING_75
+        isStale -> BudgetAlertStatus.PERIOD_ENDED
+        budget.amountMinor <= 0L -> BudgetAlertStatus.NORMAL
+        spentScaled >= allocated.multiply(HUNDRED) -> BudgetAlertStatus.EXCEEDED_100
+        spentScaled >= allocated.multiply(NINETY) -> BudgetAlertStatus.WARNING_90
+        spentScaled >= allocated.multiply(SEVENTY_FIVE) -> BudgetAlertStatus.APPROACHING_75
         else -> BudgetAlertStatus.NORMAL
       }
 
@@ -79,7 +96,15 @@ class BudgetCalculationEngine @Inject constructor() {
       overspendingMoney = Money.fromMinorUnits(overspendingMinor, budget.currencyCode),
       alertStatus = alertStatus,
       transactionCount = matchingTxnCount,
+      isStale = isStale,
+      percentageConsumedExact = percentageExact,
     )
+  }
+
+  private companion object {
+    val HUNDRED: BigDecimal = BigDecimal.valueOf(100)
+    val NINETY: BigDecimal = BigDecimal.valueOf(90)
+    val SEVENTY_FIVE: BigDecimal = BigDecimal.valueOf(75)
   }
 
   /**
@@ -87,7 +112,11 @@ class BudgetCalculationEngine @Inject constructor() {
    * Currencies are NEVER combined into a single total.
    */
   fun calculateSummaries(budgetStatuses: List<BudgetStatus>): Map<String, BudgetSummary> {
-    return budgetStatuses
+    // A closed period's remaining amount is history, so it must never be added to the totals a
+    // user reads as "available now". Stale budgets keep their cards and their archive; they are
+    // only excluded from the live summary.
+    val activeStatuses = budgetStatuses.filterNot { it.isStale }
+    return activeStatuses
       .groupBy { it.budget.currencyCode }
       .mapValues { (currency, statuses) ->
         val totalAllocated = statuses.sumOf { it.budget.amountMinor }
@@ -95,7 +124,10 @@ class BudgetCalculationEngine @Inject constructor() {
         val totalRemaining = totalAllocated - totalSpent
         val avgUtilization =
           if (totalAllocated > 0L) {
-            (totalSpent.toDouble() / totalAllocated.toDouble()) * 100.0
+            BigDecimal.valueOf(totalSpent)
+              .multiply(HUNDRED)
+              .divide(BigDecimal.valueOf(totalAllocated), 4, RoundingMode.HALF_EVEN)
+              .toDouble()
           } else {
             0.0
           }

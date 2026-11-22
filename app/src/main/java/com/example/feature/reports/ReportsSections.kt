@@ -317,6 +317,7 @@ fun BudgetReportSection(
             BudgetAlertStatus.EXCEEDED_100 -> BadgeTone.NEGATIVE
             BudgetAlertStatus.WARNING_90, BudgetAlertStatus.APPROACHING_75 -> BadgeTone.WARNING
             BudgetAlertStatus.NORMAL -> BadgeTone.POSITIVE
+            BudgetAlertStatus.PERIOD_ENDED -> BadgeTone.INFO
           }
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
           Row(

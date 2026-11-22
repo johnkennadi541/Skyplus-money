@@ -1,5 +1,6 @@
 package com.example.data.local.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -25,6 +26,12 @@ data class BudgetEntity(
   val startDate: Long,
   val endDate: Long,
   val warningThresholdPercent: Int,
+  /**
+   * Column default 0 matches MIGRATION_6_7, which switches it to 1 only for eligible monthly
+   * budgets. Room validates the migrated schema against this annotation, so the two must agree.
+   */
+  @ColumnInfo(defaultValue = "0") val isRecurring: Boolean = true,
+  @ColumnInfo(defaultValue = "0") val lastRenewedAt: Long = 0L,
   val createdAt: Long,
   val updatedAt: Long,
 ) {
@@ -40,6 +47,8 @@ data class BudgetEntity(
       startDate = startDate,
       endDate = endDate,
       warningThresholdPercent = warningThresholdPercent,
+      isRecurring = isRecurring,
+      lastRenewedAt = lastRenewedAt,
       createdAt = createdAt,
       updatedAt = updatedAt,
     )
@@ -57,6 +66,8 @@ data class BudgetEntity(
         startDate = domain.startDate,
         endDate = domain.endDate,
         warningThresholdPercent = domain.warningThresholdPercent,
+        isRecurring = domain.isRecurring,
+        lastRenewedAt = domain.lastRenewedAt,
         createdAt = domain.createdAt,
         updatedAt = domain.updatedAt,
       )

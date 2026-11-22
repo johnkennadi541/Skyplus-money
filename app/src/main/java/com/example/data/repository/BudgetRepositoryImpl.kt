@@ -5,7 +5,9 @@ import com.example.core.common.DispatcherProvider
 import com.example.data.local.db.AppDatabase
 import com.example.data.local.db.dao.BudgetDao
 import com.example.data.local.db.entity.BudgetEntity
+import com.example.data.local.db.entity.BudgetPeriodEntity
 import com.example.domain.model.Budget
+import com.example.domain.model.BudgetPeriod
 import com.example.domain.model.Money
 import com.example.domain.repository.BudgetRepository
 import kotlinx.coroutines.flow.Flow
@@ -145,6 +147,65 @@ class BudgetRepositoryImpl @Inject constructor(
           require(existing.userId == userId) { "Budget ownership verification failed" }
           val rowsDeleted = budgetDao.deleteBudget(userId, budgetId)
           check(rowsDeleted == 1) { "Budget deletion rejected for authenticated user" }
+        }
+      }
+    }
+
+  override fun observeBudgetPeriods(userId: String): Flow<List<BudgetPeriod>> =
+    budgetDao.observeAllPeriods(userId)
+      .map { list -> list.map { it.toDomain() } }
+      .flowOn(dispatchers.io)
+
+  override suspend fun applyRenewal(
+    authenticatedUserId: String,
+    budgetId: String,
+    expectedStart: Long,
+    expectedEnd: Long,
+    closedPeriods: List<BudgetPeriod>,
+    nextStart: Long,
+    nextEnd: Long,
+    renewedAt: Long,
+  ): Result<Boolean> =
+    withContext(dispatchers.io) {
+      runCatching {
+        require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
+        require(budgetId.isNotBlank()) { "Budget ID is required" }
+        require(nextEnd > nextStart) { "Renewed window must be positive" }
+        require(closedPeriods.all { it.userId == authenticatedUserId }) {
+          "Closed periods cannot be assigned across users"
+        }
+        require(closedPeriods.all { it.budgetId == budgetId }) {
+          "Closed periods must belong to the renewed budget"
+        }
+
+        database.withTransaction {
+          val existing =
+            budgetDao.getBudgetById(authenticatedUserId, budgetId)
+              ?: throw SecurityException("Budget does not belong to authenticated user")
+          require(existing.userId == authenticatedUserId) { "Budget ownership verification failed" }
+
+          // Compare-and-set FIRST. Only the renewal that still sees the expected window wins;
+          // anyone else returns without archiving anything.
+          val rowsUpdated =
+            budgetDao.applyRenewalScoped(
+              id = budgetId,
+              userId = authenticatedUserId,
+              expectedStart = expectedStart,
+              expectedEnd = expectedEnd,
+              startDate = nextStart,
+              endDate = nextEnd,
+              lastRenewedAt = renewedAt,
+              updatedAt = renewedAt,
+            )
+
+          if (rowsUpdated != 1) {
+            return@withTransaction false
+          }
+
+          if (closedPeriods.isNotEmpty()) {
+            budgetDao.insertPeriods(closedPeriods.map { BudgetPeriodEntity.fromDomain(it) })
+          }
+          true
         }
       }
     }
