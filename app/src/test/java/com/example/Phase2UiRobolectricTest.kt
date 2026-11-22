@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.example.core.designsystem.theme.SkyplusOceanTheme
 import com.example.domain.model.AccountType
 import com.example.domain.model.AutoSavedTransactionNotice
@@ -151,9 +152,12 @@ class Phase2UiRobolectricTest {
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
     composeTestRule.onNodeWithTag("auto_saved_notice_banner").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("home_accounts_button").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("home_smart_detection_button").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("home_review_queue_button").performClick()
+    composeTestRule.onNodeWithTag("home_accounts_button").performScrollTo().assertIsDisplayed()
+    composeTestRule
+      .onNodeWithTag("home_smart_detection_button")
+      .performScrollTo()
+      .assertIsDisplayed()
+    composeTestRule.onNodeWithTag("home_review_queue_button").performScrollTo().performClick()
     assertTrue(reviewClicked)
   }
 
