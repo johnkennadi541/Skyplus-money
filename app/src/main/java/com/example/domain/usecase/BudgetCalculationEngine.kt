@@ -58,7 +58,7 @@ class BudgetCalculationEngine @Inject constructor() {
     val remainingMinor = budget.amountMinor - netSpentMinor
     val overspendingMinor = max(0L, netSpentMinor - budget.amountMinor)
 
-    // Exact percentage: the alert bands must never be decided by a rounded Double.
+    // Display percentage only. It is rounded, so it must never decide an alert band.
     val percentageExact =
       if (budget.amountMinor > 0L) {
         BigDecimal.valueOf(netSpentMinor)
@@ -71,12 +71,19 @@ class BudgetCalculationEngine @Inject constructor() {
 
     val isStale = nowMillis > budget.endDate
 
+    // Band classification is done by cross-multiplying, with no division and no rounding:
+    //   spent x 100  compared with  allocated x 75 / 90 / 100.
+    // A value just below a threshold can therefore never round up into the band above it.
+    val spentScaled = BigDecimal.valueOf(netSpentMinor).multiply(HUNDRED)
+    val allocated = BigDecimal.valueOf(budget.amountMinor)
+
     val alertStatus =
       when {
         isStale -> BudgetAlertStatus.PERIOD_ENDED
-        percentageExact >= HUNDRED -> BudgetAlertStatus.EXCEEDED_100
-        percentageExact >= NINETY -> BudgetAlertStatus.WARNING_90
-        percentageExact >= SEVENTY_FIVE -> BudgetAlertStatus.APPROACHING_75
+        budget.amountMinor <= 0L -> BudgetAlertStatus.NORMAL
+        spentScaled >= allocated.multiply(HUNDRED) -> BudgetAlertStatus.EXCEEDED_100
+        spentScaled >= allocated.multiply(NINETY) -> BudgetAlertStatus.WARNING_90
+        spentScaled >= allocated.multiply(SEVENTY_FIVE) -> BudgetAlertStatus.APPROACHING_75
         else -> BudgetAlertStatus.NORMAL
       }
 

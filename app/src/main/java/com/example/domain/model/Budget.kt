@@ -51,7 +51,11 @@ data class BudgetStatus(
   val transactionCount: Int,
   /** True when the window has ended; the remaining figure is then historical, not current. */
   val isStale: Boolean = false,
-  /** Exact percentage, used for the alert bands so no threshold is decided by a rounded Double. */
+  /**
+   * Display percentage at four decimal places. Alert bands are decided by exact
+   * cross-multiplication in [com.example.domain.usecase.BudgetCalculationEngine] and never read
+   * this value, so a rounded figure can never move a budget into the band above.
+   */
   val percentageConsumedExact: BigDecimal = BigDecimal.ZERO,
 )
 
