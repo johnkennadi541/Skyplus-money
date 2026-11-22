@@ -55,7 +55,14 @@ class BudgetSummaryStaleTest {
       remainingMoney = Money.fromMinorUnits(allocated - spent, currency),
       percentageConsumed = if (allocated > 0L) (spent * 100.0 / allocated) else 0.0,
       overspendingMoney = Money.fromMinorUnits(maxOf(0L, spent - allocated), currency),
-      alertStatus = if (stale) BudgetAlertStatus.PERIOD_ENDED else BudgetAlertStatus.NORMAL,
+      alertStatus =
+        when {
+          stale -> BudgetAlertStatus.PERIOD_ENDED
+          allocated > 0L && spent >= allocated -> BudgetAlertStatus.EXCEEDED_100
+          allocated > 0L && spent * 100 >= allocated * 90 -> BudgetAlertStatus.WARNING_90
+          allocated > 0L && spent * 100 >= allocated * 75 -> BudgetAlertStatus.APPROACHING_75
+          else -> BudgetAlertStatus.NORMAL
+        },
       transactionCount = 1,
       isStale = stale,
     )
