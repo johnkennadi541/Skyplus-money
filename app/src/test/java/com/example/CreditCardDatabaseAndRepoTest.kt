@@ -319,10 +319,13 @@ class CreditCardDatabaseAndRepoTest {
     val account = createAccount(userA, "acc_card_v3")
     val created = cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
 
+    val aprBefore = cardRepository.getCard(userA, created.id)?.aprPercent
+
     val result = cardRepository.updateCard(userA, created.copy(aprPercent = "abc"))
 
     assertTrue(result.isFailure)
-    assertEquals("42", cardRepository.getCard(userA, created.id)?.aprPercent ?: "42")
+    // A rejected update must leave the stored card untouched.
+    assertEquals(aprBefore, cardRepository.getCard(userA, created.id)?.aprPercent)
   }
 
   @Test
