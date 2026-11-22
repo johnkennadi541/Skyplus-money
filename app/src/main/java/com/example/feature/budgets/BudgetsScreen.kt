@@ -98,6 +98,7 @@ fun BudgetsScreen(
   BudgetsContent(
     budgets = budgets,
     summaries = summaries,
+    periods = budgetPeriods,
     accounts = accounts,
     userMessage = userMessage,
     isErrorMessage = isErrorMessage,
@@ -121,6 +122,7 @@ fun BudgetsScreen(
 fun BudgetsContent(
   budgets: List<BudgetStatus>,
   summaries: Map<String, BudgetSummary>,
+  periods: List<com.example.domain.model.BudgetPeriod> = emptyList(),
   accounts: List<FinancialAccount>,
   userMessage: String? = null,
   isErrorMessage: Boolean = false,
@@ -363,7 +365,7 @@ fun BudgetsContent(
       }
 
       val currencyPeriods =
-        budgetPeriods.filter { it.currencyCode.equals(activeCurrency, ignoreCase = true) }
+        periods.filter { it.currencyCode.equals(activeCurrency, ignoreCase = true) }
       if (currencyPeriods.isNotEmpty()) {
         item {
           OceanSectionHeader(
@@ -780,6 +782,8 @@ private fun BudgetFormDialog(
     },
     modifier = Modifier.testTag("budget_form_dialog"),
   )
+}
+
 @Composable
 private fun BudgetPeriodRow(period: com.example.domain.model.BudgetPeriod) {
   val dateFormat = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
@@ -822,5 +826,4 @@ private fun BudgetPeriodRow(period: com.example.domain.model.BudgetPeriod) {
       }
     }
   }
-}
 }
