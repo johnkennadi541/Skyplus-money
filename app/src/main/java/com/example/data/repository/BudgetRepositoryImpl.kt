@@ -159,11 +159,13 @@ class BudgetRepositoryImpl @Inject constructor(
   override suspend fun applyRenewal(
     authenticatedUserId: String,
     budgetId: String,
+    expectedStart: Long,
+    expectedEnd: Long,
     closedPeriods: List<BudgetPeriod>,
     nextStart: Long,
     nextEnd: Long,
     renewedAt: Long,
-  ): Result<Unit> =
+  ): Result<Boolean> =
     withContext(dispatchers.io) {
       runCatching {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
@@ -182,20 +184,28 @@ class BudgetRepositoryImpl @Inject constructor(
               ?: throw SecurityException("Budget does not belong to authenticated user")
           require(existing.userId == authenticatedUserId) { "Budget ownership verification failed" }
 
-          if (closedPeriods.isNotEmpty()) {
-            budgetDao.insertPeriods(closedPeriods.map { BudgetPeriodEntity.fromDomain(it) })
-          }
-
+          // Compare-and-set FIRST. Only the renewal that still sees the expected window wins;
+          // anyone else returns without archiving anything.
           val rowsUpdated =
             budgetDao.applyRenewalScoped(
               id = budgetId,
               userId = authenticatedUserId,
+              expectedStart = expectedStart,
+              expectedEnd = expectedEnd,
               startDate = nextStart,
               endDate = nextEnd,
               lastRenewedAt = renewedAt,
               updatedAt = renewedAt,
             )
-          check(rowsUpdated == 1) { "Budget renewal rejected for authenticated user" }
+
+          if (rowsUpdated != 1) {
+            return@withTransaction false
+          }
+
+          if (closedPeriods.isNotEmpty()) {
+            budgetDao.insertPeriods(closedPeriods.map { BudgetPeriodEntity.fromDomain(it) })
+          }
+          true
         }
       }
     }

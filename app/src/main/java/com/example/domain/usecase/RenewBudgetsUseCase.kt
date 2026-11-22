@@ -38,17 +38,21 @@ constructor(
       for (budget in budgets) {
         val plan = renewalEngine.plan(budget, transactions, nowMillis)
         if (plan is BudgetRenewalPlan.Due) {
-          budgetRepository
-            .applyRenewal(
-              authenticatedUserId = authenticatedUserId,
-              budgetId = plan.budgetId,
-              closedPeriods = plan.closedPeriods,
-              nextStart = plan.nextStart,
-              nextEnd = plan.nextEnd,
-              renewedAt = plan.renewedAt,
-            )
-            .getOrThrow()
-          renewed++
+          val applied =
+            budgetRepository
+              .applyRenewal(
+                authenticatedUserId = authenticatedUserId,
+                budgetId = plan.budgetId,
+                expectedStart = plan.expectedStart,
+                expectedEnd = plan.expectedEnd,
+                closedPeriods = plan.closedPeriods,
+                nextStart = plan.nextStart,
+                nextEnd = plan.nextEnd,
+                renewedAt = plan.renewedAt,
+              )
+              .getOrThrow()
+          // false means another call already renewed this budget: a safe no-op, not a failure.
+          if (applied) renewed++
         }
       }
       renewed

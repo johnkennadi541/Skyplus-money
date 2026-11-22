@@ -221,4 +221,92 @@ class BudgetRenewalEngineTest {
 
     assertEquals(0L, plan.closedPeriods.first().spentMinor)
   }
+  @Test
+  fun `the anchor day survives a short month instead of drifting`() {
+    val january31 = at(2026, 0, 31, hour = 9)
+    val anchor = engine.dayOfMonth(january31)
+
+    val february = engine.addMonthsWithAnchor(january31, 1, anchor)
+    val march = engine.addMonthsWithAnchor(february, 1, anchor)
+
+    val calendar = Calendar.getInstance()
+    calendar.timeInMillis = february
+    assertEquals(1, calendar.get(Calendar.MONTH))
+    assertEquals(28, calendar.get(Calendar.DAY_OF_MONTH))
+
+    calendar.timeInMillis = march
+    assertEquals(2, calendar.get(Calendar.MONTH))
+    assertEquals(31, calendar.get(Calendar.DAY_OF_MONTH))
+  }
+
+  @Test
+  fun `a plan built from a month-end budget keeps the 31st`() {
+    val budget =
+      budget(
+        start = at(2026, 0, 31, hour = 9),
+        end = engine.endOfWindow(at(2026, 0, 31, hour = 9)),
+      )
+
+    val plan = engine.plan(budget, emptyList(), nowMillis = at(2026, 3, 5)) as BudgetRenewalPlan.Due
+
+    assertEquals(2, plan.closedPeriods.size)
+
+    val calendar = Calendar.getInstance()
+    calendar.timeInMillis = plan.closedPeriods[0].periodStart
+    assertEquals(0, calendar.get(Calendar.MONTH))
+    assertEquals(31, calendar.get(Calendar.DAY_OF_MONTH))
+
+    calendar.timeInMillis = plan.closedPeriods[1].periodStart
+    assertEquals(1, calendar.get(Calendar.MONTH))
+    assertEquals(28, calendar.get(Calendar.DAY_OF_MONTH))
+
+    calendar.timeInMillis = plan.nextStart
+    assertEquals(2, calendar.get(Calendar.MONTH))
+    assertEquals(31, calendar.get(Calendar.DAY_OF_MONTH))
+  }
+
+  @Test
+  fun `the anchor day is 29 February in a leap year and back to 31 in March`() {
+    val january31 = at(2024, 0, 31, hour = 9)
+    val anchor = engine.dayOfMonth(january31)
+
+    val february = engine.addMonthsWithAnchor(january31, 1, anchor)
+    val march = engine.addMonthsWithAnchor(february, 1, anchor)
+
+    val calendar = Calendar.getInstance()
+    calendar.timeInMillis = february
+    assertEquals(1, calendar.get(Calendar.MONTH))
+    assertEquals(29, calendar.get(Calendar.DAY_OF_MONTH))
+
+    calendar.timeInMillis = march
+    assertEquals(2, calendar.get(Calendar.MONTH))
+    assertEquals(31, calendar.get(Calendar.DAY_OF_MONTH))
+  }
+
+  @Test
+  fun `an archived period keeps the alert band it had while running`() {
+    val january = budget(start = at(2026, 0, 1), end = lastMillisOfMonth(2026, 0), amountMinor = 100_00L)
+    val transactions = listOf(expense(80_00L, at(2026, 0, 10)))
+
+    val plan = engine.plan(january, transactions, nowMillis = at(2026, 1, 20)) as BudgetRenewalPlan.Due
+
+    val archived = plan.closedPeriods.single()
+    assertEquals(BudgetAlertStatus.APPROACHING_75, archived.alertStatus)
+    assertEquals(80_00L, archived.spentMinor)
+    assertEquals(20_00L, archived.remainingMinor)
+  }
+
+  @Test
+  fun `archive ids are stable for the same window`() {
+    val january = budget(start = at(2026, 0, 1), end = lastMillisOfMonth(2026, 0))
+
+    val first = engine.plan(january, emptyList(), at(2026, 1, 20)) as BudgetRenewalPlan.Due
+    val second = engine.plan(january, emptyList(), at(2026, 1, 20)) as BudgetRenewalPlan.Due
+
+    assertEquals(
+      first.closedPeriods.map { it.id },
+      second.closedPeriods.map { it.id },
+    )
+    assertEquals(january.id + ":" + january.startDate + ":" + january.endDate, first.closedPeriods.single().id)
+  }
 }

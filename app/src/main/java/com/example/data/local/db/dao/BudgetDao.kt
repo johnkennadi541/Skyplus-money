@@ -111,7 +111,8 @@ interface BudgetDao {
   @Query("SELECT * FROM budget_periods WHERE userId = :userId AND budgetId = :budgetId")
   suspend fun getPeriodsForBudget(userId: String, budgetId: String): List<BudgetPeriodEntity>
 
-  @Insert(onConflict = OnConflictStrategy.ABORT)
+  /** IGNORE: archive ids are deterministic, so a retried insert can never duplicate history. */
+  @Insert(onConflict = OnConflictStrategy.IGNORE)
   suspend fun insertPeriods(periods: List<BudgetPeriodEntity>)
 
   /**
@@ -125,12 +126,17 @@ interface BudgetDao {
         endDate = :endDate,
         lastRenewedAt = :lastRenewedAt,
         updatedAt = :updatedAt
-    WHERE id = :id AND userId = :userId
+    WHERE id = :id
+      AND userId = :userId
+      AND startDate = :expectedStart
+      AND endDate = :expectedEnd
     """
   )
   suspend fun applyRenewalScoped(
     id: String,
     userId: String,
+    expectedStart: Long,
+    expectedEnd: Long,
     startDate: Long,
     endDate: Long,
     lastRenewedAt: Long,

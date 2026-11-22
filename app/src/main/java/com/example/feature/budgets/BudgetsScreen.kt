@@ -587,11 +587,27 @@ private fun BudgetCard(
         )
       }
       Column(horizontalAlignment = Alignment.End) {
+        // A closed period's remaining amount is history, not this month's available budget, so it
+        // is relabelled and muted instead of being shown as if it were live.
         Text(
-          text = "Remaining: ${FormatMoneyUseCase().format(status.remainingMoney)}",
+          text =
+            if (status.isStale) {
+              stringResource(
+                R.string.budgets_remaining_at_close,
+                FormatMoneyUseCase().format(status.remainingMoney),
+              )
+            } else {
+              "Remaining: ${FormatMoneyUseCase().format(status.remainingMoney)}"
+            },
           style = MaterialTheme.typography.bodySmall,
           fontWeight = FontWeight.Bold,
-          color = if (status.remainingMoney.minorUnits < 0L) OceanTheme.colors.negative else MaterialTheme.colorScheme.onSurface,
+          color =
+            when {
+              status.isStale -> MaterialTheme.colorScheme.onSurfaceVariant
+              status.remainingMoney.minorUnits < 0L -> OceanTheme.colors.negative
+              else -> MaterialTheme.colorScheme.onSurface
+            },
+          modifier = Modifier.testTag("budget_remaining_${budget.id}"),
         )
         Text(
           text = "Limit: ${FormatMoneyUseCase().format(status.allocatedMoney)}",
