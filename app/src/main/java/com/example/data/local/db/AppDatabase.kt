@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.example.data.local.db.dao.AccountMappingRuleDao
 import com.example.data.local.db.dao.BudgetDao
+import com.example.data.local.db.dao.CreditCardDao
 import com.example.data.local.db.dao.FinancialAccountDao
 import com.example.data.local.db.dao.FinancialTransactionDao
 import com.example.data.local.db.dao.InvestmentDao
@@ -12,6 +13,7 @@ import com.example.data.local.db.dao.ShoppingDao
 import com.example.data.local.db.dao.TransactionDetectionEventDao
 import com.example.data.local.db.entity.AccountMappingRuleEntity
 import com.example.data.local.db.entity.BudgetEntity
+import com.example.data.local.db.entity.CreditCardEntity
 import com.example.data.local.db.entity.BudgetPeriodEntity
 import com.example.data.local.db.entity.FinancialAccountEntity
 import com.example.data.local.db.entity.FinancialTransactionEntity
@@ -33,6 +35,7 @@ import com.example.data.local.db.entity.TransactionDetectionEventEntity
     AccountMappingRuleEntity::class,
     BudgetEntity::class,
     BudgetPeriodEntity::class,
+    CreditCardEntity::class,
     LoanEntity::class,
     LoanPaymentEntity::class,
     InvestmentHoldingEntity::class,
@@ -42,7 +45,7 @@ import com.example.data.local.db.entity.TransactionDetectionEventEntity
     ShoppingItemEntity::class,
     ShoppingStorePriceEntity::class,
   ],
-  version = 7,
+  version = 8,
   exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -51,6 +54,7 @@ abstract class AppDatabase : RoomDatabase() {
   abstract fun transactionDetectionEventDao(): TransactionDetectionEventDao
   abstract fun accountMappingRuleDao(): AccountMappingRuleDao
   abstract fun budgetDao(): BudgetDao
+  abstract fun creditCardDao(): CreditCardDao
   abstract fun loanDao(): LoanDao
   abstract fun investmentDao(): InvestmentDao
   abstract fun shoppingDao(): ShoppingDao

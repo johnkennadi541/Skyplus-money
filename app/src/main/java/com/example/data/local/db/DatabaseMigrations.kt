@@ -368,4 +368,68 @@ object DatabaseMigrations {
         )
       }
     }
+  /**
+   * Stage 3 PR 2 — credit cards.
+   *
+   * Additive only: one new table with a unique index on accountId, plus a backfill that gives every
+   * existing CREDIT_CARD account a card record with safe defaults. No financial account, transaction
+   * or balance is created, updated or deleted here.
+   */
+  val MIGRATION_7_8: Migration =
+    object : Migration(7, 8) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS credit_cards (
+            id TEXT NOT NULL PRIMARY KEY,
+            userId TEXT NOT NULL,
+            accountId TEXT NOT NULL,
+            issuerName TEXT NOT NULL,
+            network TEXT NOT NULL,
+            last4 TEXT NOT NULL,
+            creditLimitMinor INTEGER NOT NULL,
+            currencyCode TEXT NOT NULL,
+            billingCycleDay INTEGER NOT NULL,
+            paymentDueDayOffset INTEGER NOT NULL,
+            aprPercent TEXT NOT NULL,
+            isActive INTEGER NOT NULL,
+            createdAt INTEGER NOT NULL,
+            updatedAt INTEGER NOT NULL
+          )
+          """.trimIndent()
+        )
+        db.execSQL(
+          "CREATE UNIQUE INDEX IF NOT EXISTS index_credit_cards_accountId ON credit_cards(accountId)"
+        )
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS index_credit_cards_userId ON credit_cards(userId)"
+        )
+
+        // Backfill: one card per existing credit-card account, safe defaults, no data touched.
+        db.execSQL(
+          """
+          INSERT OR IGNORE INTO credit_cards
+            (id, userId, accountId, issuerName, network, last4, creditLimitMinor, currencyCode,
+             billingCycleDay, paymentDueDayOffset, aprPercent, isActive, createdAt, updatedAt)
+          SELECT
+            lower(hex(randomblob(16))),
+            userId,
+            id,
+            coalesce(institutionName, name),
+            'OTHER',
+            coalesce(accountNumberLast4, ''),
+            0,
+            currencyCode,
+            1,
+            20,
+            '0',
+            isActive,
+            createdAt,
+            updatedAt
+          FROM financial_accounts
+          WHERE accountType = 'CREDIT_CARD'
+          """.trimIndent()
+        )
+      }
+    }
 }

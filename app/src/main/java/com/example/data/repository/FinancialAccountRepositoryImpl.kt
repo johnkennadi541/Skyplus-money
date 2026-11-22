@@ -73,6 +73,18 @@ class FinancialAccountRepositoryImpl @Inject constructor(
           require(existing.userId == authenticatedUserId) {
             "Account ownership verification failed"
           }
+          // A card-linked account anchors a credit card record: changing its type or currency
+          // would break the card's limit, statement cycle and liability maths.
+          val linkedCard = database.creditCardDao().getCardByAccountId(authenticatedUserId, account.id)
+          if (linkedCard != null) {
+            require(account.type.name == existing.accountType) {
+              "Cannot change the type of an account linked to a credit card"
+            }
+            require(account.currencyCode.equals(existing.currencyCode, ignoreCase = true)) {
+              "Cannot change the currency of an account linked to a credit card"
+            }
+          }
+
           val immutableEntity =
             FinancialAccountEntity.fromDomain(
               account.copy(
@@ -136,6 +148,11 @@ class FinancialAccountRepositoryImpl @Inject constructor(
             transactionDao.deleteByAccount(userId, accountId)
           }
           mappingRuleDao.deleteRulesForAccount(userId, accountId)
+          // Remove the card record in the same transaction so an orphan card can never survive
+          // its account. The card row carries no ledger data of its own.
+          database.creditCardDao().getCardByAccountId(userId, accountId)?.let { linkedCard ->
+            database.creditCardDao().deleteCard(userId, linkedCard.id)
+          }
           val deletedRows = accountDao.deleteAccount(userId, accountId)
           check(deletedRows == 1) { "Account deletion rejected for authenticated user" }
         }

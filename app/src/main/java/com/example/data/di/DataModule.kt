@@ -70,6 +70,12 @@ abstract class DataModule {
 
   @Binds
   @Singleton
+  abstract fun bindCreditCardRepository(
+    impl: com.example.data.repository.CreditCardRepositoryImpl
+  ): com.example.domain.repository.CreditCardRepository
+
+  @Binds
+  @Singleton
   abstract fun bindShoppingRepository(
     impl: com.example.data.repository.ShoppingRepositoryImpl
   ): com.example.domain.repository.ShoppingRepository

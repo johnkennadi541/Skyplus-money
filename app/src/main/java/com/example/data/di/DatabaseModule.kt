@@ -14,6 +14,7 @@ import com.example.data.local.db.AppDatabase
 import com.example.data.local.db.DatabaseMigrations
 import com.example.data.local.db.dao.AccountMappingRuleDao
 import com.example.data.local.db.dao.BudgetDao
+import com.example.data.local.db.dao.CreditCardDao
 import com.example.data.local.db.dao.FinancialAccountDao
 import com.example.data.local.db.dao.FinancialTransactionDao
 import com.example.data.local.db.dao.InvestmentDao
@@ -78,6 +79,7 @@ object DatabaseModule {
           DatabaseMigrations.MIGRATION_4_5,
           DatabaseMigrations.MIGRATION_5_6,
           DatabaseMigrations.MIGRATION_6_7,
+          DatabaseMigrations.MIGRATION_7_8,
         )
 
     if (factoryHolder.delegate != null || factoryHolder.lastError != null) {
@@ -109,6 +111,7 @@ object DatabaseModule {
           DatabaseMigrations.MIGRATION_4_5,
           DatabaseMigrations.MIGRATION_5_6,
           DatabaseMigrations.MIGRATION_6_7,
+          DatabaseMigrations.MIGRATION_7_8,
         )
 
     val encryptedFactory =
@@ -201,6 +204,10 @@ object DatabaseModule {
   @Provides
   fun provideBudgetDao(database: AppDatabase): BudgetDao =
     database.budgetDao()
+
+  @Provides
+  fun provideCreditCardDao(database: AppDatabase): CreditCardDao =
+    database.creditCardDao()
 
   @Provides
   fun provideLoanDao(database: AppDatabase): LoanDao =
