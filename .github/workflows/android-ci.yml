@@ -7,6 +7,7 @@ on:
     # Feature branches are tested when they open a PR into main, develop or
     # another feature branch (the UI redesign runs on feature/ui-redesign).
     branches: [ main, develop, 'feature/**' ]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -58,7 +59,7 @@ jobs:
   # the signing secrets are never reachable from a pull request.
   debug-apk:
     needs: build-and-test
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/stage3-pr3-savings-goals'
     runs-on: ubuntu-latest
     environment: debug-signing
     permissions:
