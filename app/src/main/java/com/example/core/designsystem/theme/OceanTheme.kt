@@ -13,7 +13,7 @@ import com.example.domain.model.ThemePreference
 private val DarkOceanColorScheme =
   darkColorScheme(
     primary = OceanPrimaryDarkMode,
-    onPrimary = DeepOceanNavy,
+    onPrimary = Color(0xFF062044),
     primaryContainer = DeepOceanBlue,
     onPrimaryContainer = OceanTextLight,
     secondary = OceanTealBright,
