@@ -279,6 +279,7 @@ private fun DatabaseSecurityErrorScreen(
 fun SkyplusAppShell(
   homeUiState: HomeFoundationUiState,
   openReportsRequest: Long = 0L,
+  openCardsRequest: Long = 0L,
   themePreference: ThemePreference,
   onToggleTheme: () -> Unit,
   onSelectTheme: (ThemePreference) -> Unit,
