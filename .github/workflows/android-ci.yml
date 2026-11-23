@@ -56,7 +56,7 @@ jobs:
           awk -F'"' '/<testsuite /{for(i=1;i<=NF;i++){if($i ~ /tests=$/){t+=$(i+1)} if($i ~ /failures=$/){f+=$(i+1)} if($i ~ /errors=$/){e+=$(i+1)} if($i ~ /skipped=$/){s+=$(i+1)}}} END{printf "tests=%d failures=%d errors=%d skipped=%d\n", t, f, e, s}' "$DIR"/TEST-*.xml
 
       # Report the Room migration integration test independently of the aggregate suite total.
-      - name: Verify Room 8-to-9 migration integration test
+      - name: Verify Room 8-to-10 migration integration test
         if: always()
         run: |
           set -euo pipefail
