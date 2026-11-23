@@ -14,6 +14,7 @@ import com.example.data.local.db.entity.ShoppingReceiptEntity
 import com.example.domain.model.FinancialTransaction
 import com.example.domain.model.Money
 import com.example.domain.model.ShoppingMealPlan
+import com.example.domain.model.ShoppingMealIngredient
 import com.example.domain.model.ShoppingPantryItem
 import com.example.domain.model.ShoppingReceipt
 import com.example.domain.model.TransactionStatus
@@ -22,6 +23,7 @@ import com.example.domain.repository.ShoppingExtendedRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.withContext
 import java.math.BigDecimal
 import javax.inject.Inject
@@ -40,7 +42,11 @@ class ShoppingExtendedRepositoryImpl @Inject constructor(
     shoppingDao.observePantry(userId).map { rows -> rows.map { it.toDomain() } }.flowOn(dispatchers.io)
 
   override fun observeMealPlans(userId: String): Flow<List<ShoppingMealPlan>> =
-    shoppingDao.observeMealPlans(userId).map { rows -> rows.map { it.toDomain() } }.flowOn(dispatchers.io)
+    shoppingDao.observeMealPlans(userId).mapLatest { rows ->
+      rows.map { row ->
+        row.toDomain(shoppingDao.getMealIngredients(userId, row.id).map { it.toDomain() })
+      }
+    }.flowOn(dispatchers.io)
 
   override fun observeReceipts(userId: String): Flow<List<ShoppingReceipt>> =
     shoppingDao.observeReceipts(userId).map { rows -> rows.map { it.toDomain() } }.flowOn(dispatchers.io)
@@ -214,9 +220,14 @@ private fun ShoppingPantryEntity.toDomain() = ShoppingPantryItem(
   unit = unit, lowStockThresholdDecimal = lowStockThresholdDecimal, expiryAt = expiryAt, updatedAt = updatedAt,
 )
 
-private fun ShoppingMealPlanEntity.toDomain() = ShoppingMealPlan(
+private fun ShoppingMealPlanEntity.toDomain(ingredients: List<ShoppingMealIngredient> = emptyList()) = ShoppingMealPlan(
   id = id, userId = userId, title = title, plannedDate = plannedDate, mealType = mealType,
-  notes = notes, createdAt = createdAt, updatedAt = updatedAt,
+  notes = notes, ingredients = ingredients, createdAt = createdAt, updatedAt = updatedAt,
+)
+
+private fun ShoppingMealIngredientEntity.toDomain() = ShoppingMealIngredient(
+  id = id, userId = userId, mealPlanId = mealPlanId, name = name,
+  quantityDecimal = quantityDecimal, unit = unit, shoppingItemId = shoppingItemId,
 )
 
 private fun ShoppingReceiptEntity.toDomain() = ShoppingReceipt(
