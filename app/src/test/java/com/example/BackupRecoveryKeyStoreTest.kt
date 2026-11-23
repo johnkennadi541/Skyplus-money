@@ -41,8 +41,8 @@ class BackupRecoveryKeyStoreTest {
     assertTrue(store.hasKey())
     assertArrayEquals(key, restored)
     assertFalse(preferences.all.values.any { it == String(key) })
-    restored?.fill('\\u0000')
-    key.fill('\\u0000')
+    restored?.fill(Char.MIN_VALUE)
+    key.fill(Char.MIN_VALUE)
   }
 
   @Test
@@ -69,7 +69,7 @@ class BackupRecoveryKeyStoreTest {
     preferences.edit().putString("wrapped_recovery_key", Base64.getEncoder().encodeToString(bytes)).commit()
 
     assertThrows(AEADBadTagException::class.java) { store.load() }
-    key.fill('\\u0000')
+    key.fill(Char.MIN_VALUE)
   }
 
   @Test
@@ -78,7 +78,7 @@ class BackupRecoveryKeyStoreTest {
 
     assertThrows(IllegalArgumentException::class.java) { store.store(invalid) }
     assertTrue(preferences.all.isEmpty())
-    invalid.fill('\\u0000')
+    invalid.fill(Char.MIN_VALUE)
   }
 
   private class TestWrappingBackend : KeyWrappingBackend {
