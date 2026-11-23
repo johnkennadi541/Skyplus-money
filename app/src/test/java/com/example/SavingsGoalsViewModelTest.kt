@@ -56,7 +56,7 @@ class SavingsGoalsViewModelTest {
       // StateFlow is WhileSubscribed, so collect it as the screen would.
       val collector =
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-          viewModel.goals.collect()
+          viewModel.goals.collect { }
         }
 
       advanceUntilIdle()
@@ -77,6 +77,7 @@ class SavingsGoalsViewModelTest {
       assertEquals(null, viewModel.userMessage.value)
 
       collector.cancel()
+      advanceUntilIdle()
     } finally {
       Dispatchers.resetMain()
     }
