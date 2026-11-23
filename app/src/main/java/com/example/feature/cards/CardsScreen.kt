@@ -103,6 +103,11 @@ fun CardsScreen(
 fun CardsContent(
   cards: List<CreditCardSummary>,
   linkableAccounts: List<FinancialAccount>,
+  accounts: List<FinancialAccount> = linkableAccounts,
+  selectedCardStatements: List<com.example.domain.model.CreditCardStatementSummary> = emptyList(),
+  selectedCardRewardEvents: List<com.example.domain.model.CreditCardRewardEvent> = emptyList(),
+  selectedCardTransactions: List<com.example.domain.model.FinancialTransaction> = emptyList(),
+  selectedCardAnalytics: com.example.domain.model.CreditCardSpendingAnalytics? = null,
   message: String?,
   isErrorMessage: Boolean,
   onDismissMessage: () -> Unit,
@@ -115,13 +120,27 @@ fun CardsContent(
     billingCycleDay: Int,
     paymentDueDayOffset: Int,
     aprPercent: String,
+    annualFeeDecimal: String,
+    annualFeeMonth: Int,
+    rewardProgramName: String?,
+    reminderEnabled: Boolean,
+    reminderDaysBefore: Int,
+    notes: String?,
     onSuccess: () -> Unit
   ) -> Unit,
+  onUpdateCard: (card: com.example.domain.model.CreditCard, limitDecimal: String, annualFeeDecimal: String, onSuccess: () -> Unit) -> Unit,
+  onToggleCardFrozen: (cardId: String, frozen: Boolean) -> Unit,
+  onSelectCardDetails: (cardId: String) -> Unit,
+  onClearCardDetails: () -> Unit,
+  onCreateStatement: (com.example.domain.model.CreditCardStatement, onSuccess: () -> Unit) -> Unit,
+  onAddRewardEvent: (com.example.domain.model.CreditCardRewardEvent, onSuccess: () -> Unit) -> Unit,
   onDeleteCard: (cardId: String, onSuccess: () -> Unit) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   var showCreateDialog by remember { mutableStateOf(false) }
   var cardToDelete by remember { mutableStateOf<CreditCardSummary?>(null) }
+  var cardToEdit by remember { mutableStateOf<CreditCardSummary?>(null) }
+  var cardToDetails by remember { mutableStateOf<CreditCardSummary?>(null) }
 
   Column(
     modifier =
