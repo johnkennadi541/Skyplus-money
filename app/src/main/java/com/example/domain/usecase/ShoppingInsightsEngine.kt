@@ -71,7 +71,7 @@ object ShoppingInsightsEngine {
       .sortedBy { it.itemName.lowercase(Locale.ROOT) }
   }
 
-  private fun sumMinorExact(values: List<Long>): Long = values.fold(0L, Math::addExact)
+  private fun sumMinorExact(values: List<Long>): Long = values.fold(0L) { total, value -> Math.addExact(total, value) }
 
   private fun monthUtc(timestamp: Long): String {
     val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"), Locale.ROOT).apply { timeInMillis = timestamp }
