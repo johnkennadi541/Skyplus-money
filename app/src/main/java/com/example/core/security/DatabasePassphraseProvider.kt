@@ -151,6 +151,8 @@ class DatabasePassphraseProvider(
         }
 
       if (decrypted.size != PASSPHRASE_LENGTH_BYTES) {
+        // Invalid plaintext must never remain resident after validation fails.
+        decrypted.fill(0)
         throw DatabaseSecurityException(
           reason = PassphraseFailureReason.KEY_CORRUPTED,
           isRecoverable = false,
