@@ -25,11 +25,11 @@ interface InvestmentRepository {
 
   fun getAllPriceHistory(userId: String): Flow<List<InvestmentPriceHistory>>
 
-  fun observeSyncSettings(): Flow<MarketSyncSettings>
+  fun observeSyncSettings(authenticatedUserId: String): Flow<MarketSyncSettings>
 
-  suspend fun setAutoUpdateConsent(enabled: Boolean)
+  suspend fun setAutoUpdateConsent(authenticatedUserId: String, enabled: Boolean)
 
-  suspend fun setSyncOnlyOnWifi(wifiOnly: Boolean)
+  suspend fun setSyncOnlyOnWifi(authenticatedUserId: String, wifiOnly: Boolean)
 
   suspend fun createHoldingWithInitialBuy(
     authenticatedUserId: String,
