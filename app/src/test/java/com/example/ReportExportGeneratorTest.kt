@@ -164,6 +164,7 @@ class ReportExportGeneratorTest {
     val csvText = String(exportGenerator.generateExport(snapshot, ReportExportFormat.CSV).bytes, StandardCharsets.UTF_8)
 
     assertTrue(csvText.contains("Awaiting first price"))
+    assertTrue(csvText.contains("Stale false"))
     assertFalse("Missing first NAV must not be rendered as an epoch date", csvText.contains("1970-01-01"))
   }
 
