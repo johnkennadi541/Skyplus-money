@@ -62,6 +62,7 @@ import com.example.core.designsystem.theme.OceanNumericStyle
 import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
 import com.example.domain.model.EmiCalculationResult
+import com.example.domain.model.Money
 import com.example.domain.model.EmiPrefillDraft
 import com.example.domain.model.TenureUnit
 import com.example.domain.usecase.EmiCalculationEngine
@@ -447,6 +448,7 @@ fun EmiCalculatorContent(
     if (showPrincipalCalculator) {
       SmartCalculatorAmountDialog(
         initialExpression = principalText,
+        decimalScale = Money.resolveFractionDigits(selectedCurrency),
         onApply = { calculatedAmount ->
           principalText = calculatedAmount
           showPrincipalCalculator = false
