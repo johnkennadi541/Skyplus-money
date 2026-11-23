@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.domain.usecase.FormatMoneyUseCase
+import com.example.domain.model.Money
 import com.example.domain.usecase.SipCalculationEngine
 import com.example.domain.usecase.SipCalculationResult
 
@@ -132,6 +133,7 @@ fun SipCalculatorScreen(
   if (showAmountCalculator) {
     SmartCalculatorAmountDialog(
       initialExpression = monthlyInvestment,
+      decimalScale = Money.resolveFractionDigits(currencyCode),
       onApply = { calculatedAmount ->
         monthlyInvestment = calculatedAmount
         showAmountCalculator = false
