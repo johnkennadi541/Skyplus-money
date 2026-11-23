@@ -82,6 +82,7 @@ import com.example.core.designsystem.theme.OceanNumericStyle
 import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
 import com.example.domain.model.FinancialAccount
+import com.example.domain.model.Money
 import com.example.domain.model.FinancialTransaction
 import com.example.domain.model.TransactionCategories
 import com.example.domain.model.TransactionStatus
@@ -805,6 +806,7 @@ fun AddEditTransactionBottomSheet(
       if (showAmountCalculator) {
         com.example.feature.calculator.SmartCalculatorAmountDialog(
           initialExpression = calculatorExpression,
+          decimalScale = sourceAcc?.let { Money.resolveFractionDigits(it.currencyCode) } ?: 2,
           onApply = { calculatedAmount ->
             amountText = calculatedAmount
             showAmountCalculator = false
