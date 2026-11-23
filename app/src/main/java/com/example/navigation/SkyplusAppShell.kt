@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
@@ -131,6 +132,7 @@ import com.example.feature.transactions.TransactionsViewModel
 @Composable
 fun SkyplusAuthGateRoot(
   authUiState: AuthUiState,
+  openReportsRequest: Long = 0L,
   homeUiState: HomeFoundationUiState,
   themePreference: ThemePreference,
   onContinueWithGoogle: (android.content.Context) -> Unit,
@@ -191,6 +193,7 @@ fun SkyplusAuthGateRoot(
           SkyplusAppShell(
             homeUiState = homeUiState,
             themePreference = themePreference,
+            openReportsRequest = openReportsRequest,
             onToggleTheme = onToggleTheme,
             onSelectTheme = onSelectTheme,
             authenticatedUser = session.user,
@@ -273,6 +276,7 @@ private fun DatabaseSecurityErrorScreen(
 @Composable
 fun SkyplusAppShell(
   homeUiState: HomeFoundationUiState,
+  openReportsRequest: Long = 0L,
   themePreference: ThemePreference,
   onToggleTheme: () -> Unit,
   onSelectTheme: (ThemePreference) -> Unit,
@@ -294,6 +298,14 @@ fun SkyplusAppShell(
 ) {
   val backStackEntry by navController.currentBackStackEntryAsState()
   val currentDestination = backStackEntry?.destination
+
+  LaunchedEffect(openReportsRequest) {
+    if (openReportsRequest > 0L) {
+      navController.navigate(SkyplusRoute.Reports) {
+        launchSingleTop = true
+      }
+    }
+  }
   val showTopLevelNav =
     TopLevelTab.entries.any { tab -> currentDestination?.hasRoute(tab.route::class) == true } ||
       currentDestination == null
