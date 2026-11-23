@@ -362,6 +362,13 @@ class InvestmentRepositoryImpl @Inject constructor(
           require(transactionDate >= existing.purchaseDate) {
             "Additional purchase date cannot be before the original purchase"
           }
+          val latestTransactionDate =
+            investmentDao.getLatestTransactionDate(authenticatedUserId, holdingId)
+              ?: existing.purchaseDate
+          require(transactionDate >= latestTransactionDate) {
+            "Purchase date cannot be earlier than the latest recorded investment transaction"
+          }
+
           require(transactionDate <= System.currentTimeMillis() + MAX_FUTURE_CLOCK_SKEW_MILLIS) {
             "Transaction date cannot be in the future"
           }
@@ -464,6 +471,13 @@ class InvestmentRepositoryImpl @Inject constructor(
           require(transactionDate >= existing.purchaseDate) {
             "Sale date cannot be before the original purchase"
           }
+          val latestTransactionDate =
+            investmentDao.getLatestTransactionDate(authenticatedUserId, holdingId)
+              ?: existing.purchaseDate
+          require(transactionDate >= latestTransactionDate) {
+            "Sale date cannot be earlier than the latest recorded investment transaction"
+          }
+
           require(transactionDate <= System.currentTimeMillis() + MAX_FUTURE_CLOCK_SKEW_MILLIS) {
             "Transaction date cannot be in the future"
           }
