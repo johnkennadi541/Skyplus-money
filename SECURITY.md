@@ -1,28 +1,45 @@
 # SKYPLUS MONEY — Security Documentation
 
-## 1. Authentication & Session Security (Phase 1B — Preserved)
-- **Authoritative Session Source:** `FirebaseAuth` (`Firebase.auth`) via `AuthStateListener` inside `FirebaseAuthDataSource`.
-- **Mandatory Gate:** `SkyplusAuthGateRoot` blocks all 6 financial navigation tabs and all Phase 2 financial screens unless `AuthSessionState` is `Authenticated`. `DefaultSecurityPolicy.allowsGuestMode` is `false`.
-- **No Prohibited Fallbacks:** `signInAnonymously()` and `signInWithEmailAndPassword()` are never used anywhere in `app/src/main/`.
-- **Account Linking Policy:** Email-only automatic account merging is prohibited (`FirebaseAuthUserCollisionException` maps to `AuthError.AccountLinkingRequiresOwnershipVerification`).
-- **Session Validation:** `RefreshAuthSessionUseCase` reloads the cached Firebase user on startup; invalid or disabled users are signed out cleanly.
+## 1. Authentication & Session Security
+- Firebase Auth is the authoritative session source through `FirebaseAuthDataSource` and `AuthStateListener`.
+- The app requires an authenticated session; guest access is disabled by `DefaultSecurityPolicy`.
+- Google Credential Manager ID tokens are exchanged with Firebase Auth and are not persisted or logged.
+- Automatic account linking based only on matching email addresses is prohibited.
+- Startup session refresh signs out invalid or disabled cached users.
+- The authenticated workspace is additionally protected by the in-memory biometric/device-credential app lock. `FLAG_SECURE` is enabled by `MainActivity`.
 
-## 2. Consent & Data Governance (Phase 1D — Preserved)
-- **Mandatory Consent Gate:** Authenticated users cannot enter `SkyplusAppShell` until current Terms (`1.0.0`) and Privacy (`1.0.0`) versions are explicitly accepted.
-- **UID Isolation:** Consent records, financial accounts, financial transactions, detection events, and account mapping rules are strictly keyed and queried by Firebase `userId` (`uid`).
+## 2. Consent & Data Governance
+- Current Terms and Privacy consent is required before entering the financial workspace.
+- Consent records are keyed by Firebase UID; background transaction detection fails closed when consent is missing, outdated, or unreadable.
+- Financial DAO reads, updates, and deletes are scoped by authenticated `userId`; update methods also reject entity ownership mismatches.
+- Inserts use `OnConflictStrategy.ABORT` rather than replacing records on primary-key collisions.
 
-## 3. Local Financial Database Encryption (Phase 2)
-- **Room + SQLCipher:** `AppDatabase` (version 2) is configured in `DatabaseModule` with `net.sqlcipher.database.SupportFactory` and `SQLiteDatabase.loadLibs(context)`.
-- **Android Keystore Passphrase:** `DatabasePassphraseProvider` generates a cryptographically random 256-bit (32-byte) database passphrase wrapped with an AES-256-GCM master key stored in `AndroidKeyStore`.
-- **Backup Restriction:** `android:allowBackup="false"` is enforced in `AndroidManifest.xml`.
-- **Non-Destructive Migrations:** `DatabaseMigrations.MIGRATION_1_2` preserves all existing financial records; destructive fallbacks (`fallbackToDestructiveMigration`) are prohibited.
+## 3. Local Financial Database Encryption
+- Room `AppDatabase` is currently schema version **11** and is configured through `DatabaseModule`.
+- SQLCipher is required on release builds and real Android devices. Plaintext fallback is permitted only for local debug Robolectric tests when native SQLCipher libraries are unavailable.
+- The database passphrase is a random 256-bit value wrapped by an AES-256-GCM master key in Android Keystore.
+- Existing database files without recoverable key metadata are not assigned a replacement key; initialization fails closed.
+- Android platform backup is disabled, with explicit backup/device-transfer exclusions retained in the XML rules.
+- Room migrations are explicit through version 11; destructive migration fallback is not configured.
 
-## 4. Smart Transaction Detection Privacy & Google Play Policy Controls (Phase 2)
-- **Zero OTP / PIN / CVV Persistence:** `SmartTransactionParser` rejects any alert matching `\b(OTP|One Time Password|secret code|verification code|security code|do not share|CVV|CVC|PIN|MPIN|TPIN|UPI PIN|ATM PIN|password|passcode)\b` before extraction.
-- **No Raw Message Storage:** `TransactionDetectionEventEntity` contains NO raw SMS or raw notification body fields; only structured metadata (`detectedAmountMinor`, `detectedCurrency`, `detectedType`, `detectedMerchant`, `detectedAccountLast4`, `referenceId`, `dedupFingerprint`) and masked titles (`sanitizeSenderTitle` replaces 6+ consecutive digits with `••••`).
-- **Zero Sensitive Logging:** Notification contents, account numbers, and transaction payloads are never written to Logcat.
-- **App Allowlist & Explicit Opt-In:** `SkyplusNotificationListenerService` (protected by `android.permission.BIND_NOTIFICATION_LISTENER_SERVICE`) runs only after explicit user Android Notification Access grant, respects user pause toggle (`isNotificationDetectionEnabled`), and processes only notifications whose package name is in the user's permitted financial app set.
-- **Google Play SMS Policy Compliance:** `READ_SMS`, `RECEIVE_SMS`, and `BIND_ACCESSIBILITY_SERVICE` are NOT declared anywhere in `AndroidManifest.xml` or source code.
+## 4. Smart Transaction Detection Privacy
+- The notification listener reads notification extras only after confirming that the notification belongs to the device's current default SMS app.
+- It requires Android Notification Access, current legal consent, an authenticated Firebase UID, and the user's detection opt-in.
+- Notification title/body lengths are bounded before parsing. The parser rejects sensitive OTP/PIN/CVV/passcode patterns.
+- Raw notification/SMS message bodies are not persisted; only structured transaction metadata and sanitized sender/title data are stored.
+- No SMS-reading/receiving permission or Accessibility Service is declared in the Android manifest.
+- The listener does **not** currently process a general allowlist of banking/UPI app notifications; its source boundary is the current default SMS app. This documentation reflects the implementation.
 
-## 5. Static Security Check
-Verified zero matches in `app/src/main/` for prohibited auth fallbacks, hardcoded OAuth client IDs, `READ_SMS`/`RECEIVE_SMS`/`BIND_ACCESSIBILITY_SERVICE` declarations, or financial payload logging.
+## 5. Backup / Restore Status — Not Complete
+- AES-256-GCM account-bound backup-envelope primitives, recovery-key wrapping primitives, a narrow Google Drive `drive.file` authorization client, and a bounded Drive REST API exist in source.
+- The documented end-to-end recovery flow is not complete: database snapshot packaging, portable database-key handling, restore orchestration, explicit user-facing backup/restore controls, scheduling, and end-to-end integration tests remain outstanding.
+- Do not describe cloud backup or restore as active or complete. No Drive permission has been requested and no backup file has been uploaded by this code review.
+
+## 6. Server Function Boundary
+- The welcome-email callable requires an authenticated Google provider session and a verified email claim; recipient address is taken from the auth token, not caller input.
+- The Resend API key is configured as a server secret and is not shipped in the Android app.
+- The repository does not contain Firestore/Storage security-rules files, so deployed Firebase rules cannot be verified from this repository snapshot.
+
+## 7. Audit Scope & Verification
+- This document describes source-level controls reviewed in the repository; it is not a third-party penetration test or a verification of live Firebase project configuration.
+- CI compilation and automated tests provide regression evidence but do not replace real-device SQLCipher/Keystore testing, dependency vulnerability scanning, or independent security testing.
