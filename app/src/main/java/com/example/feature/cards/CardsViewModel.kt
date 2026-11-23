@@ -200,7 +200,7 @@ constructor(
       val joiningFeeMinor = parseAmountToMinor(joiningFeeDecimal.ifBlank { "0" }, account.currencyCode)
       val annualFeeMinor = parseAmountToMinor(annualFeeDecimal.ifBlank { "0" }, account.currencyCode)
       if (limitMinor == null || joiningFeeMinor == null || annualFeeMinor == null) {
-        _userMessage.value = "Enter a valid credit limit"
+        _userMessage.value = "Enter valid credit limit, joining fee and annual fee amounts"
         _isErrorMessage.value = true
         return@launch
       }
@@ -249,7 +249,7 @@ constructor(
       val joiningFeeMinor = parseAmountToMinor(joiningFeeDecimal.ifBlank { "0" }, card.currencyCode)
       val annualFeeMinor = parseAmountToMinor(annualFeeDecimal.ifBlank { "0" }, card.currencyCode)
       if (limitMinor == null || joiningFeeMinor == null || annualFeeMinor == null) {
-        _userMessage.value = "Enter valid credit limit and annual fee amounts"
+        _userMessage.value = "Enter valid credit limit, joining fee and annual fee amounts"
         _isErrorMessage.value = true
         return@launch
       }
