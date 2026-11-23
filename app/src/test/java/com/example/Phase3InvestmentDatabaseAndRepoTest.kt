@@ -337,6 +337,7 @@ class Phase3InvestmentDatabaseAndRepoTest {
     assertFalse("Non-MF holding must never enable auto-sync", created.autoPriceUpdateEnabled)
     assertEquals(15050_00L, created.totalInvestedMinor)
     assertEquals(16000_00L, created.currentValuationMinor)
+    assertEquals(1, repo.getPriceHistoryForHolding("uid_inv_1", created.id).first().size)
 
     // Edit metadata
     repo.updateHoldingMetadata(
@@ -358,6 +359,8 @@ class Phase3InvestmentDatabaseAndRepoTest {
     val afterBuy = repo.getHoldingById("uid_inv_1", created.id)!!
     assertEquals("20", afterBuy.quantityDecimal)
     assertEquals(32100_00L, afterBuy.totalInvestedMinor)
+    // BUY transactions must not be misrepresented as new market-price observations.
+    assertEquals(1, repo.getPriceHistoryForHolding("uid_inv_1", created.id).first().size)
 
     // Partial sell: 5 units @ 1800, 0 charges => WAC cost = 32100 * 5/20 = 8025, realized = 9000 - 8025 = +975
     val sellTx =
@@ -375,6 +378,8 @@ class Phase3InvestmentDatabaseAndRepoTest {
     assertEquals("15", afterPartialSell.quantityDecimal)
     assertEquals(24075_00L, afterPartialSell.totalInvestedMinor)
     assertEquals(975_00L, afterPartialSell.realizedPnlMinor)
+    // SELL transactions belong in the ledger, not in quote history.
+    assertEquals(1, repo.getPriceHistoryForHolding("uid_inv_1", created.id).first().size)
 
     // Delete holding cascades transactions and history
     repo.deleteHolding("uid_inv_1", created.id).getOrThrow()
