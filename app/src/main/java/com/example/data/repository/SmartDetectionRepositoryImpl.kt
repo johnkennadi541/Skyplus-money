@@ -89,7 +89,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     parsed: ParsedFinancialMessage,
   ): Result<TransactionDetectionEvent> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         val settings = getDetectionSettings(userId).first()
         if (!settings.isNotificationDetectionEnabled) {
@@ -99,7 +99,8 @@ class SmartDetectionRepositoryImpl @Inject constructor(
         val safeTitle = sanitizeSenderTitle(senderOrTitle)
         val safeMerchant = sanitizeMerchant(parsed.merchantOrPayee)
 
-        database.withTransaction {
+        var pendingNotice: com.example.domain.model.AutoSavedTransactionNotice? = null
+        val processedEvent = database.withTransaction {
           // 1. Resolve target account upfront so deduplication/ambiguity checks respect distinct accounts
           val accounts = accountDao.getActiveAccountsSync(userId)
           val accountsById = accounts.associateBy { it.id }
@@ -317,7 +318,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
             if (savedInTx) {
               createdTxnId = newTxn.id
               eventStatus = DetectionEventStatus.AUTO_SAVED
-              _latestAutoSavedNotice.value =
+              pendingNotice =
                 AutoSavedTransactionNotice(
                   eventId = eventId,
                   transactionId = newTxn.id,
@@ -361,6 +362,10 @@ class SmartDetectionRepositoryImpl @Inject constructor(
           eventDao.insertEvent(eventEntity)
           eventEntity.toDomain()
         }
+        // Publish UI state only after Room commits; rolled-back transactions must not
+        // produce a success notice.
+        pendingNotice?.let { _latestAutoSavedNotice.value = it }
+        processedEvent
       }
     }
 
