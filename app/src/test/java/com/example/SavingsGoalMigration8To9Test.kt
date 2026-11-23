@@ -212,7 +212,7 @@ class SavingsGoalMigration8To9Test {
 
 /**
  * Exercises the migration through Room itself: a complete v8 entity schema is created by Room,
- * then the production v9 AppDatabase opens the same file and validates its complete schema.
+ * then the production v10 AppDatabase opens the same file and validates its complete schema.
  */
 @androidx.room.Entity(
   tableName = "credit_cards",
@@ -287,6 +287,15 @@ class SavingsGoalRoomMigrationIntegrationTest {
               'SBI', '9999', '#0A2540', 1, 111, 222)
       """.trimIndent()
     )
+    version8.openHelper.writableDatabase.execSQL(
+      """
+      INSERT INTO credit_cards
+        (id, userId, accountId, issuerName, network, last4, creditLimitMinor, currencyCode,
+         billingCycleDay, paymentDueDayOffset, aprPercent, isActive, createdAt, updatedAt)
+      VALUES ('room_card_1', 'uid_room_test', 'room_acc_1', 'HDFC', 'VISA', '4321',
+              500000, 'INR', 5, 20, '36', 1, 333, 444)
+      """.trimIndent()
+    )
     version8.close()
 
     val migrated =
@@ -314,6 +323,29 @@ class SavingsGoalRoomMigrationIntegrationTest {
         assertEquals(250_000L, cursor.getLong(1))
         assertEquals(111L, cursor.getLong(2))
         assertEquals(222L, cursor.getLong(3))
+      }
+      // The real 8 → 10 path must preserve an existing card row and apply v10 defaults.
+      database.query(
+        """
+        SELECT userId, accountId, issuerName, network, last4, creditLimitMinor, currencyCode,
+               createdAt, updatedAt, joiningFeeMinor, annualFeeMinor, isFrozen, reminderEnabled
+        FROM credit_cards WHERE id = 'room_card_1'
+        """.trimIndent()
+      ).use { cursor ->
+        assertTrue("Existing v8 credit card row was lost", cursor.moveToFirst())
+        assertEquals("uid_room_test", cursor.getString(0))
+        assertEquals("room_acc_1", cursor.getString(1))
+        assertEquals("HDFC", cursor.getString(2))
+        assertEquals("VISA", cursor.getString(3))
+        assertEquals("4321", cursor.getString(4))
+        assertEquals(500_000L, cursor.getLong(5))
+        assertEquals("INR", cursor.getString(6))
+        assertEquals(333L, cursor.getLong(7))
+        assertEquals(444L, cursor.getLong(8))
+        assertEquals(0L, cursor.getLong(9))
+        assertEquals(0L, cursor.getLong(10))
+        assertEquals(0, cursor.getInt(11))
+        assertEquals(1, cursor.getInt(12))
       }
 
       for (table in listOf("savings_goals", "savings_contributions")) {
