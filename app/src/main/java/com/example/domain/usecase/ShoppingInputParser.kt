@@ -31,7 +31,7 @@ object ShoppingInputParser {
     val segments = text
       .replace('•', '\n')
       .replace('\r', '\n')
-      .split(Regex("[\n;,]+|\s+(?:and|&)\s+|\s+மற்றும்\s+", RegexOption.IGNORE_CASE))
+      .split(Regex("[\n;,]+|\\s+(?:and|&)\\s+|\\s+மற்றும்\\s+", RegexOption.IGNORE_CASE))
       .map { it.trim().trimStart('-', '*', '•', ' ').trimEnd('.', ' ') }
       .filter { it.isNotBlank() }
 
