@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import com.example.domain.model.FinancialAccount
@@ -34,31 +35,50 @@ fun ShoppingReceiptCaptureAction(
 ) {
   val context = LocalContext.current
   var error by remember { mutableStateOf<String?>(null) }
+  fun processReceiptImage(image: InputImage) {
+    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    recognizer.process(image)
+      .addOnSuccessListener { result ->
+        val draft = ShoppingReceiptParser.parse(result.text)
+        if (draft.totalDecimal == null) error = draft.warnings.joinToString(" ")
+        onReceiptReady(draft)
+      }
+      .addOnFailureListener { error = "Could not read receipt. Try a clearer photo." }
+      .addOnCompleteListener { recognizer.close() }
+  }
+
   val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) {
       error = null
       try {
-        val image = InputImage.fromFilePath(context, uri)
-        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-        recognizer.process(image)
-          .addOnSuccessListener { result ->
-            val draft = ShoppingReceiptParser.parse(result.text)
-            if (draft.totalDecimal == null) error = draft.warnings.joinToString(" ")
-            onReceiptReady(draft)
-          }
-          .addOnFailureListener { error = "Could not read receipt. Try a clearer photo." }
-          .addOnCompleteListener { recognizer.close() }
+        processReceiptImage(InputImage.fromFilePath(context, uri))
       } catch (_: Exception) {
         error = "Could not open this receipt image."
       }
     }
   }
-  OutlinedButton(
-    onClick = { error = null; launcher.launch("image/*") },
-    modifier = modifier.testTag("shopping_receipt_scan_button"),
+  val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+    if (bitmap != null) processReceiptImage(InputImage.fromBitmap(bitmap, 0))
+  }
+
+  androidx.compose.foundation.layout.Row(
+    modifier = modifier,
+    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
   ) {
-    Icon(Icons.Rounded.ReceiptLong, contentDescription = null)
-    Text(" Scan Receipt")
+    OutlinedButton(
+      onClick = { error = null; launcher.launch("image/*") },
+      modifier = Modifier.weight(1f).testTag("shopping_receipt_scan_button"),
+    ) {
+      Icon(Icons.Rounded.ReceiptLong, contentDescription = null)
+      Text(" Gallery")
+    }
+    OutlinedButton(
+      onClick = { error = null; cameraLauncher.launch(null) },
+      modifier = Modifier.weight(1f).testTag("shopping_receipt_camera_button"),
+    ) {
+      Icon(Icons.Rounded.ReceiptLong, contentDescription = null)
+      Text(" Camera")
+    }
   }
   error?.let { Text(it) }
 }
