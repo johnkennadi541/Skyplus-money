@@ -669,6 +669,10 @@ fun AddEditTransactionBottomSheet(
   var amountText by remember {
     mutableStateOf(transactionToEdit?.money?.toBigDecimal()?.toPlainString().orEmpty())
   }
+  var showAmountCalculator by remember { mutableStateOf(false) }
+  var calculatorExpression by remember { mutableStateOf("") }
+  var calculatorResult by remember { mutableStateOf<java.math.BigDecimal?>(null) }
+  var calculatorError by remember { mutableStateOf<String?>(null) }
   var destAmountText by remember { mutableStateOf("") }
   var selectedCategory by remember {
     mutableStateOf(
@@ -785,8 +789,77 @@ fun AddEditTransactionBottomSheet(
         label = { Text("Amount (${sourceAcc?.currencyCode ?: ""}) *") },
         placeholder = { Text("0.00") },
         singleLine = true,
+        trailingIcon = {
+          IconButton(
+            onClick = {
+              calculatorExpression = amountText
+              calculatorResult = null
+              calculatorError = null
+              showAmountCalculator = true
+            },
+            modifier = Modifier.testTag("transaction_amount_calculator_button"),
+          ) {
+            Icon(Icons.Rounded.Calculate, contentDescription = "Open amount calculator")
+          }
+        },
         modifier = Modifier.fillMaxWidth().testTag("transaction_amount_input"),
       )
+
+      if (showAmountCalculator) {
+        val calculatorKeys = listOf("AC", "(", ")", "÷", "7", "8", "9", "×", "4", "5", "6", "−", "1", "2", "3", "+", "%", "0", ".", "=")
+        AlertDialog(
+          onDismissRequest = { showAmountCalculator = false },
+          title = { Text("Calculate amount") },
+          text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+              Text(calculatorExpression.ifBlank { "0" }, style = MaterialTheme.typography.titleLarge)
+              Text(
+                calculatorResult?.stripTrailingZeros()?.toPlainString() ?: "—",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.testTag("transaction_calculator_result"),
+              )
+              calculatorError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+              calculatorKeys.chunked(4).forEach { rowKeys ->
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                  rowKeys.forEach { key ->
+                    TextButton(
+                      onClick = {
+                        when (key) {
+                          "AC" -> { calculatorExpression = ""; calculatorResult = null; calculatorError = null }
+                          "=" -> try {
+                            calculatorResult = com.example.core.common.SmartCalculatorEngine.evaluate(calculatorExpression)
+                            calculatorError = null
+                          } catch (failure: IllegalArgumentException) {
+                            calculatorResult = null
+                            calculatorError = failure.message ?: "Invalid calculation"
+                          }
+                          "−" -> calculatorExpression += "-"
+                          else -> calculatorExpression += key
+                        }
+                      },
+                      modifier = Modifier.weight(1f).testTag("transaction_calculator_key_$key"),
+                    ) { Text(key) }
+                  }
+                  repeat(4 - rowKeys.size) { Spacer(Modifier.weight(1f)) }
+                }
+              }
+            }
+          },
+          confirmButton = {
+            TextButton(
+              enabled = calculatorResult != null && calculatorResult!! > java.math.BigDecimal.ZERO,
+              onClick = {
+                amountText = calculatorResult!!.stripTrailingZeros().toPlainString()
+                showAmountCalculator = false
+              },
+            ) { Text("Use amount") }
+          },
+          dismissButton = {
+            TextButton(onClick = { showAmountCalculator = false }) { Text("Cancel") }
+          },
+        )
+      }
 
       Text("Account", style = MaterialTheme.typography.labelMedium)
       Row(
