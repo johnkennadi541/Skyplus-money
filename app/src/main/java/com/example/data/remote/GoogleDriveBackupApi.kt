@@ -24,9 +24,19 @@ data class DriveBackupFile(
  * It never lists or downloads unrelated Drive documents.
  */
 @Singleton
-class GoogleDriveBackupApi @Inject constructor(
+class GoogleDriveBackupApi private constructor(
   private val callFactory: Call.Factory,
+  private val filesUrl: String,
+  private val uploadFilesUrl: String,
 ) {
+  @Inject
+  constructor(callFactory: Call.Factory) : this(callFactory, FILES_URL, UPLOAD_FILES_URL)
+
+  internal constructor(callFactory: Call.Factory, baseUrl: String) : this(
+    callFactory,
+    "${baseUrl.trimEnd('/')}/drive/v3/files",
+    "${baseUrl.trimEnd('/')}/upload/drive/v3/files",
+  )
   suspend fun uploadEncryptedBackup(accessToken: String, encryptedPayload: ByteArray): DriveBackupFile =
     withContext(Dispatchers.IO) {
       require(accessToken.isNotBlank()) { "Drive authorization is required" }
@@ -35,7 +45,7 @@ class GoogleDriveBackupApi @Inject constructor(
       }
 
       val existing = findBackupFileBlocking(accessToken)
-      val url = UPLOAD_FILES_URL.toHttpUrl().newBuilder()
+      val url = uploadFilesUrl.toHttpUrl().newBuilder()
         .apply {
           if (existing != null) addPathSegment(existing.id)
           addQueryParameter("uploadType", if (existing == null) "multipart" else "media")
@@ -77,7 +87,7 @@ class GoogleDriveBackupApi @Inject constructor(
     withContext(Dispatchers.IO) {
       require(accessToken.isNotBlank()) { "Drive authorization is required" }
       val backup = findBackupFileBlocking(accessToken) ?: return@withContext null
-      val url = FILES_URL.toHttpUrl().newBuilder()
+      val url = filesUrl.toHttpUrl().newBuilder()
         .addPathSegment(backup.id)
         .addQueryParameter("alt", "media")
         .build()
