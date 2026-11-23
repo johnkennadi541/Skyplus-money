@@ -41,6 +41,7 @@ class ShoppingExtendedRepositoryImpl @Inject constructor(
   override fun observePantry(userId: String): Flow<List<ShoppingPantryItem>> =
     shoppingDao.observePantry(userId).map { rows -> rows.map { it.toDomain() } }.flowOn(dispatchers.io)
 
+  @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
   override fun observeMealPlans(userId: String): Flow<List<ShoppingMealPlan>> =
     shoppingDao.observeMealPlans(userId).mapLatest { rows ->
       rows.map { row ->
