@@ -62,7 +62,32 @@ object SmartTransactionParser {
   private val CREDIT_WORD_PATTERN = Pattern.compile("\\bcr\\b", Pattern.CASE_INSENSITIVE)
 
   private val PENDING_KEYWORDS =
-    listOf("pending", "processing", "in progress", "awaiting confirmation")
+    listOf("pending", "processing", "in progress", "awaiting confirmation", "initiated", "requested", "request received", "under process")
+
+  private val COMPLETED_KEYWORDS =
+    listOf(
+      "debited",
+      "credited",
+      "spent",
+      "paid",
+      "sent to",
+      "withdrawn",
+      "atm withdrawal",
+      "purchase of",
+      "purchase at",
+      "received",
+      "deposited",
+      "salary",
+      "added to wallet",
+      "success",
+      "successful",
+      "successfully",
+      "completed",
+      "reversed",
+      "refund credited",
+      "cashback credited",
+      "transferred to",
+    )
 
   private val FAILED_KEYWORDS =
     listOf("failed", "declined", "unsuccessful", "timed out")
@@ -148,7 +173,15 @@ object SmartTransactionParser {
 
     // Status detection
     val isFailed = FAILED_KEYWORDS.any { lowerText.contains(it) }
-    val isPending = !isFailed && PENDING_KEYWORDS.any { lowerText.contains(it) }
+    val hasCompletionIndicator =
+      COMPLETED_KEYWORDS.any { lowerText.contains(it) } ||
+        DEBIT_WORD_PATTERN.matcher(text).find() ||
+        CREDIT_WORD_PATTERN.matcher(text).find()
+    // Never assume a notification represents a completed transaction merely because
+    // it contains an amount. Unconfirmed/request-style messages remain non-postable.
+    val isPending =
+      !isFailed &&
+        (PENDING_KEYWORDS.any { lowerText.contains(it) } || !hasCompletionIndicator)
     val status =
       when {
         isFailed -> {
