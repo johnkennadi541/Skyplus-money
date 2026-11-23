@@ -29,21 +29,28 @@ class EncryptedBackupEnvelope(
 
     val salt = ByteArray(SALT_BYTES).also(secureRandom::nextBytes)
     val iv = ByteArray(IV_BYTES).also(secureRandom::nextBytes)
-    val keyBytes = deriveKey(recoverySecret, salt)
+    var keyBytes: ByteArray? = null
+    var ciphertext: ByteArray? = null
     return try {
+      val derivedKey = deriveKey(recoverySecret, salt)
+      keyBytes = derivedKey
       val cipher = Cipher.getInstance(TRANSFORMATION)
-      cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(keyBytes, KEY_ALGORITHM), GCMParameterSpec(TAG_BITS, iv))
+      cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(derivedKey, KEY_ALGORITHM), GCMParameterSpec(TAG_BITS, iv))
       cipher.updateAAD(additionalData(uid))
-      val ciphertext = cipher.doFinal(plaintext)
-      ByteBuffer.allocate(HEADER_BYTES + salt.size + iv.size + ciphertext.size)
+      val encryptedBytes = cipher.doFinal(plaintext)
+      ciphertext = encryptedBytes
+      ByteBuffer.allocate(HEADER_BYTES + salt.size + iv.size + encryptedBytes.size)
         .put(MAGIC)
         .put(VERSION)
         .put(salt)
         .put(iv)
-        .put(ciphertext)
+        .put(encryptedBytes)
         .array()
     } finally {
-      keyBytes.fill(0)
+      keyBytes?.fill(0)
+      ciphertext?.fill(0)
+      salt.fill(0)
+      iv.fill(0)
     }
   }
 
@@ -62,16 +69,22 @@ class EncryptedBackupEnvelope(
     val salt = ByteArray(SALT_BYTES).also { buffer.get(it) }
     val iv = ByteArray(IV_BYTES).also { buffer.get(it) }
     val ciphertext = ByteArray(buffer.remaining()).also { buffer.get(it) }
-    val keyBytes = deriveKey(recoverySecret, salt)
+    var keyBytes: ByteArray? = null
     return try {
+      val derivedKey = deriveKey(recoverySecret, salt)
+      keyBytes = derivedKey
       val cipher = Cipher.getInstance(TRANSFORMATION)
-      cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(keyBytes, KEY_ALGORITHM), GCMParameterSpec(TAG_BITS, iv))
+      cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(derivedKey, KEY_ALGORITHM), GCMParameterSpec(TAG_BITS, iv))
       cipher.updateAAD(additionalData(uid))
       cipher.doFinal(ciphertext)
     } catch (error: AEADBadTagException) {
       throw GeneralSecurityException("Backup authentication failed; check recovery secret and account", error)
     } finally {
-      keyBytes.fill(0)
+      keyBytes?.fill(0)
+      magic.fill(0)
+      salt.fill(0)
+      iv.fill(0)
+      ciphertext.fill(0)
     }
   }
 
