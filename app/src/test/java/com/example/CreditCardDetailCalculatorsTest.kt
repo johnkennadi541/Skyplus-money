@@ -25,27 +25,37 @@ class CreditCardDetailCalculatorsTest {
   @Test
   fun `statement status is derived from completed card payment transfers`() {
     val now = 1_700_000_000_000L
-    val statements = listOf(
-      statement("partial", now - DAY, now + 5 * DAY, 10_000L, 2_000L),
-      statement("paid", now - 2 * DAY, now + 5 * DAY, 5_000L, 500L),
-      statement("overdue", now - 10 * DAY, now - DAY, 7_000L, 700L),
-    )
-    val transactions = listOf(
-      transfer("payment-partial", 4_000L, now, TransactionCategories.TRANSFER_IN_CATEGORY),
-      transfer("payment-paid", 5_000L, now, TransactionCategories.TRANSFER_IN_CATEGORY),
-      transfer("wrong-direction", 99_000L, now, TransactionCategories.TRANSFER_OUT_CATEGORY),
-      expense("purchase", 2_000L, now),
-    )
 
-    val summaries = CreditCardStatementCalculator.summarize(statements, card, transactions, now)
-      .associateBy { it.statement.id }
+    val partial = CreditCardStatementCalculator.summarize(
+      listOf(statement("partial", now - DAY, now + 5 * DAY, 10_000L, 2_000L)),
+      card,
+      listOf(
+        transfer("payment-partial", 4_000L, now, TransactionCategories.TRANSFER_IN_CATEGORY),
+        transfer("wrong-direction", 99_000L, now, TransactionCategories.TRANSFER_OUT_CATEGORY),
+        expense("purchase", 2_000L, now),
+      ),
+      now,
+    ).single()
+    assertEquals(CreditCardStatementStatus.PARTIALLY_PAID, partial.status)
+    assertEquals(4_000L, partial.paidAmountMinor)
+    assertEquals(6_000L, partial.remainingDueMinor)
 
-    assertEquals(CreditCardStatementStatus.PARTIALLY_PAID, summaries.getValue("partial").status)
-    assertEquals(4_000L, summaries.getValue("partial").paidAmountMinor)
-    assertEquals(6_000L, summaries.getValue("partial").remainingDueMinor)
-    assertEquals(CreditCardStatementStatus.PAID, summaries.getValue("paid").status)
-    assertEquals(0L, summaries.getValue("paid").remainingDueMinor)
-    assertEquals(CreditCardStatementStatus.OVERDUE, summaries.getValue("overdue").status)
+    val paid = CreditCardStatementCalculator.summarize(
+      listOf(statement("paid", now - DAY, now + 5 * DAY, 5_000L, 500L)),
+      card,
+      listOf(transfer("payment-paid", 5_000L, now, TransactionCategories.TRANSFER_IN_CATEGORY)),
+      now,
+    ).single()
+    assertEquals(CreditCardStatementStatus.PAID, paid.status)
+    assertEquals(0L, paid.remainingDueMinor)
+
+    val overdue = CreditCardStatementCalculator.summarize(
+      listOf(statement("overdue", now - 10 * DAY, now - DAY, 7_000L, 700L)),
+      card,
+      emptyList(),
+      now,
+    ).single()
+    assertEquals(CreditCardStatementStatus.OVERDUE, overdue.status)
   }
 
   @Test
