@@ -85,6 +85,12 @@ abstract class DataModule {
   abstract fun bindShoppingRepository(
     impl: com.example.data.repository.ShoppingRepositoryImpl
   ): com.example.domain.repository.ShoppingRepository
+
+  @Binds
+  @Singleton
+  abstract fun bindShoppingExtendedRepository(
+    impl: com.example.data.repository.ShoppingExtendedRepositoryImpl
+  ): com.example.domain.repository.ShoppingExtendedRepository
 }
 
 @dagger.Module
