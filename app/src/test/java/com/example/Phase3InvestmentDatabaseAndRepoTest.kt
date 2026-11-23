@@ -484,9 +484,6 @@ class Phase3InvestmentDatabaseAndRepoTest {
       newUnitPriceDecimal = "110.00",
       priceDate = currentQuoteDate,
     ).getOrThrow()
-    // Manual override pauses automation; re-enabling is a fresh explicit consent.
-    repo.setHoldingAutoPriceUpdate("uid_quote_guard", created.id, true).getOrThrow()
-
     val rejectedOlderQuote =
       repo.applyAutomaticMarketPrice(
         authenticatedUserId = "uid_quote_guard",
