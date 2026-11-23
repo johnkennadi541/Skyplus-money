@@ -27,37 +27,42 @@ class MarketPriceSyncPreferencesDataSource @Inject constructor(
   @ApplicationContext private val context: Context,
 ) {
 
-  private val autoConsentKey = booleanPreferencesKey("auto_update_consent_enabled")
-  private val wifiOnlyKey = booleanPreferencesKey("sync_only_on_wifi")
-  private val lastSyncMillisKey = longPreferencesKey("last_sync_attempt_millis")
-  private val lastSyncStatusKey = stringPreferencesKey("last_sync_status_message")
+  private fun autoConsentKey(userId: String) = booleanPreferencesKey("auto_update_consent_enabled_$userId")
+  private fun wifiOnlyKey(userId: String) = booleanPreferencesKey("sync_only_on_wifi_$userId")
+  private fun lastSyncMillisKey(userId: String) = longPreferencesKey("last_sync_attempt_millis_$userId")
+  private fun lastSyncStatusKey(userId: String) = stringPreferencesKey("last_sync_status_message_$userId")
 
-  val syncSettings: Flow<MarketSyncSettings> =
-    context.marketSyncDataStore.data.map { prefs ->
+  fun syncSettings(userId: String): Flow<MarketSyncSettings> {
+    require(userId.isNotBlank()) { "Authenticated user ID is required" }
+    return context.marketSyncDataStore.data.map { prefs ->
       MarketSyncSettings(
-        autoUpdateConsentEnabled = prefs[autoConsentKey] ?: false,
-        syncOnlyOnWifi = prefs[wifiOnlyKey] ?: true,
-        lastSyncAttemptMillis = prefs[lastSyncMillisKey],
-        lastSyncStatusMessage = prefs[lastSyncStatusKey],
+        autoUpdateConsentEnabled = prefs[autoConsentKey(userId)] ?: false,
+        syncOnlyOnWifi = prefs[wifiOnlyKey(userId)] ?: true,
+        lastSyncAttemptMillis = prefs[lastSyncMillisKey(userId)],
+        lastSyncStatusMessage = prefs[lastSyncStatusKey(userId)],
       )
     }
+  }
 
-  suspend fun setAutoUpdateConsent(enabled: Boolean) {
+  suspend fun setAutoUpdateConsent(userId: String, enabled: Boolean) {
+    require(userId.isNotBlank()) { "Authenticated user ID is required" }
     context.marketSyncDataStore.edit { prefs ->
-      prefs[autoConsentKey] = enabled
+      prefs[autoConsentKey(userId)] = enabled
     }
   }
 
-  suspend fun setSyncOnlyOnWifi(wifiOnly: Boolean) {
+  suspend fun setSyncOnlyOnWifi(userId: String, wifiOnly: Boolean) {
+    require(userId.isNotBlank()) { "Authenticated user ID is required" }
     context.marketSyncDataStore.edit { prefs ->
-      prefs[wifiOnlyKey] = wifiOnly
+      prefs[wifiOnlyKey(userId)] = wifiOnly
     }
   }
 
-  suspend fun recordSyncResult(timestampMillis: Long, statusMessage: String) {
+  suspend fun recordSyncResult(userId: String, timestampMillis: Long, statusMessage: String) {
+    require(userId.isNotBlank()) { "Authenticated user ID is required" }
     context.marketSyncDataStore.edit { prefs ->
-      prefs[lastSyncMillisKey] = timestampMillis
-      prefs[lastSyncStatusKey] = statusMessage
+      prefs[lastSyncMillisKey(userId)] = timestampMillis
+      prefs[lastSyncStatusKey(userId)] = statusMessage
     }
   }
 }
