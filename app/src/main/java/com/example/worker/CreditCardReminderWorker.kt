@@ -54,14 +54,10 @@ class CreditCardReminderWorker @AssistedInject constructor(
       val card = cards[statement.cardId] ?: return@forEach
       if (!card.isActive || !card.reminderEnabled) return@forEach
 
-      val dueDay = Calendar.getInstance().apply {
-        timeInMillis = statement.dueDate
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-      }
-      val daysRemaining = ((dueDay.timeInMillis - today.timeInMillis) / MILLIS_PER_DAY).toInt()
+      val zone = java.time.ZoneId.systemDefault()
+      val todayLocal = java.time.Instant.ofEpochMilli(today.timeInMillis).atZone(zone).toLocalDate()
+      val dueLocal = java.time.Instant.ofEpochMilli(statement.dueDate).atZone(zone).toLocalDate()
+      val daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(todayLocal, dueLocal).toInt()
       if (daysRemaining in 0..card.reminderDaysBefore) {
         postReminder(
           userId = userId,
@@ -146,6 +142,5 @@ class CreditCardReminderWorker @AssistedInject constructor(
     const val KEY_USER_ID = "credit_card_reminder_user_id"
     const val CHANNEL_ID = "skyplus_credit_card_due_reminders"
     private const val MAX_LOOKAHEAD_DAYS = 30
-    private const val MILLIS_PER_DAY = 86_400_000L
   }
 }
