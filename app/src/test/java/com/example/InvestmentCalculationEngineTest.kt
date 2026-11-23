@@ -198,6 +198,7 @@ class InvestmentCalculationEngineTest {
       )
 
     assertTrue(engine.evaluateHoldingPerformance(staleStock, now).isPriceStale)
+    assertFalse(engine.evaluateHoldingPerformance(staleStock.copy(lastPriceUpdateDate = 0L), now).isPriceStale)
     assertFalse(engine.evaluateHoldingPerformance(fixedDeposit, now).isPriceStale)
   }
 
