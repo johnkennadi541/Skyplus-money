@@ -56,6 +56,7 @@ data class CreditCard(
   val paymentDueDayOffset: Int = 20,
   /** Annual percentage rate as an exact decimal string; never a Double. */
   val aprPercent: String = "0",
+  val joiningFeeMinor: Long = 0L,
   val annualFeeMinor: Long = 0L,
   /** Month in which the annual fee is expected (1..12). */
   val annualFeeMonth: Int = 1,
@@ -88,6 +89,7 @@ data class CreditCardStatement(
   val statementBalanceMinor: Long,
   val minimumDueMinor: Long,
   val feesMinor: Long = 0L,
+  val lateFeeMinor: Long = 0L,
   val interestMinor: Long = 0L,
   val notes: String? = null,
   val createdAt: Long = System.currentTimeMillis(),
