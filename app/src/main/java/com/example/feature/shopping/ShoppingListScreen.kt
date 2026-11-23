@@ -163,7 +163,7 @@ fun ShoppingListScreen(
         )
       }
     },
-    onPostReceiptExpense = { draft, accountId, currencyCode, totalMinor, merchant ->
+    onPostReceiptExpense = { draft, accountId, currencyCode, totalMinor, merchant, purchaseDate ->
       val receipt = ShoppingReceipt(
         userId = "pending",
         fingerprint = draft.fingerprint,
