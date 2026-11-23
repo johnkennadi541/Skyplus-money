@@ -142,7 +142,12 @@ object SmartTransactionParser {
 
     val rawAmountStr = amountMatcher.group(1) ?: amountMatcher.group(2) ?: return null
     val cleanedAmount = rawAmountStr.replace(",", "").trim()
-    val bigDecimalAmount = runCatching { BigDecimal(cleanedAmount) }.getOrNull() ?: return null
+    val bigDecimalAmount =
+      try {
+        BigDecimal(cleanedAmount)
+      } catch (_: NumberFormatException) {
+        return null
+      }
 
     val matchedSubstring = amountMatcher.group(0)?.uppercase().orEmpty()
     val codeMatcher = Pattern.compile("\\b[A-Z]{3}\\b").matcher(matchedSubstring)
@@ -160,9 +165,11 @@ object SmartTransactionParser {
     // Do not silently round a notification amount to the currency's minor-unit scale.
     if (bigDecimalAmount.stripTrailingZeros().scale().coerceAtLeast(0) > fractionDigits) return null
     val amountMinor =
-      runCatching {
+      try {
         bigDecimalAmount.movePointRight(fractionDigits).longValueExact()
-      }.getOrNull() ?: return null
+      } catch (_: ArithmeticException) {
+        return null
+      }
 
     if (amountMinor <= 0L) return null
 
