@@ -409,8 +409,11 @@ class Phase3InvestmentDatabaseAndRepoTest {
     val afterBuy = repo.getHoldingById("uid_inv_1", created.id)!!
     assertEquals("20", afterBuy.quantityDecimal)
     assertEquals(32100_00L, afterBuy.totalInvestedMinor)
-    // BUY transactions must not be misrepresented as new market-price observations.
-    assertEquals(1, repo.getPriceHistoryForHolding("uid_inv_1", created.id).first().size)
+    // A BUY creates a portfolio valuation snapshot from the last known quote,
+    // but does not claim that a new market quote was received.
+    val historyAfterBuy = repo.getPriceHistoryForHolding("uid_inv_1", created.id).first()
+    assertEquals(2, historyAfterBuy.size)
+    assertEquals("Portfolio snapshot after BUY", historyAfterBuy.first().providerLabel)
 
     // Partial sell: 5 units @ 1800, 0 charges => WAC cost = 32100 * 5/20 = 8025, realized = 9000 - 8025 = +975
     val sellTx =
@@ -428,8 +431,10 @@ class Phase3InvestmentDatabaseAndRepoTest {
     assertEquals("15", afterPartialSell.quantityDecimal)
     assertEquals(24075_00L, afterPartialSell.totalInvestedMinor)
     assertEquals(975_00L, afterPartialSell.realizedPnlMinor)
-    // SELL transactions belong in the ledger, not in quote history.
-    assertEquals(1, repo.getPriceHistoryForHolding("uid_inv_1", created.id).first().size)
+    // A SELL records the changed portfolio valuation without changing quote provenance.
+    val historyAfterSell = repo.getPriceHistoryForHolding("uid_inv_1", created.id).first()
+    assertEquals(3, historyAfterSell.size)
+    assertEquals("Portfolio snapshot after SELL", historyAfterSell.first().providerLabel)
 
     // Delete holding cascades transactions and history
     repo.deleteHolding("uid_inv_1", created.id).getOrThrow()
