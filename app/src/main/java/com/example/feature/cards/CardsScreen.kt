@@ -493,6 +493,8 @@ private fun CardFormDialog(
   var reminderDays by remember { mutableStateOf((existingCard?.reminderDaysBefore ?: 3).toString()) }
   var notes by remember { mutableStateOf(existingCard?.notes.orEmpty()) }
   var formError by remember { mutableStateOf<String?>(null) }
+  val selectedCurrencyCode = existingCard?.currencyCode
+    ?: linkableAccounts.firstOrNull { it.id == selectedAccountId }?.currencyCode.orEmpty()
   val context = LocalContext.current
   val notificationPermissionLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -552,7 +554,7 @@ private fun CardFormDialog(
           label = "Last 4 digits",
           placeholder = "1234",
         )
-        SkyplusTextField(value = limitText, onValueChange = { limitText = it }, label = "Credit limit", placeholder = "100000")
+        SkyplusTextField(value = limitText, onValueChange = { limitText = it }, label = "Credit limit (${selectedCurrencyCode})", placeholder = "100000")
         SkyplusTextField(value = aprText, onValueChange = { aprText = it }, label = "APR %", placeholder = "36.0")
         SkyplusTextField(
           value = billingCycleDay,
@@ -566,8 +568,8 @@ private fun CardFormDialog(
           label = "Payment due days after closing (0–45)",
           placeholder = "20",
         )
-        SkyplusTextField(value = joiningFeeText, onValueChange = { joiningFeeText = it }, label = "Joining fee", placeholder = "0")
-        SkyplusTextField(value = annualFeeText, onValueChange = { annualFeeText = it }, label = "Annual fee", placeholder = "0")
+        SkyplusTextField(value = joiningFeeText, onValueChange = { joiningFeeText = it }, label = "Joining fee (${selectedCurrencyCode})", placeholder = "0")
+        SkyplusTextField(value = annualFeeText, onValueChange = { annualFeeText = it }, label = "Annual fee (${selectedCurrencyCode})", placeholder = "0")
         SkyplusTextField(
           value = annualFeeMonth,
           onValueChange = { annualFeeMonth = it.filter(Char::isDigit).take(2) },
@@ -1008,11 +1010,11 @@ private fun CardStatementFormDialog(
       ) {
         SkyplusTextField(value = statementDate, onValueChange = { statementDate = it }, label = "Statement date (YYYY-MM-DD)")
         SkyplusTextField(value = dueDate, onValueChange = { dueDate = it }, label = "Payment due date (YYYY-MM-DD)")
-        SkyplusTextField(value = balance, onValueChange = { balance = it }, label = "Statement balance")
-        SkyplusTextField(value = minimumDue, onValueChange = { minimumDue = it }, label = "Minimum due")
-        SkyplusTextField(value = fees, onValueChange = { fees = it }, label = "Other fees / charges")
-        SkyplusTextField(value = lateFee, onValueChange = { lateFee = it }, label = "Late fee")
-        SkyplusTextField(value = interest, onValueChange = { interest = it }, label = "Interest charged")
+        SkyplusTextField(value = balance, onValueChange = { balance = it }, label = "Statement balance (${card.currencyCode})")
+        SkyplusTextField(value = minimumDue, onValueChange = { minimumDue = it }, label = "Minimum due (${card.currencyCode})")
+        SkyplusTextField(value = fees, onValueChange = { fees = it }, label = "Other fees / charges (${card.currencyCode})")
+        SkyplusTextField(value = lateFee, onValueChange = { lateFee = it }, label = "Late fee (${card.currencyCode})")
+        SkyplusTextField(value = interest, onValueChange = { interest = it }, label = "Interest charged (${card.currencyCode})")
         SkyplusTextField(value = notes, onValueChange = { notes = it.take(500) }, label = "Notes")
         error?.let { Text(it, color = OceanTheme.colors.negative, style = MaterialTheme.typography.labelSmall) }
       }
@@ -1082,7 +1084,7 @@ private fun CardRewardFormDialog(
           }
         }
         SkyplusTextField(value = points, onValueChange = { points = it.filter { ch -> ch == '-' || ch.isDigit() } }, label = "Points change")
-        SkyplusTextField(value = cashValue, onValueChange = { cashValue = it }, label = "Cash value")
+        SkyplusTextField(value = cashValue, onValueChange = { cashValue = it }, label = "Cash value (${card.currencyCode})")
         SkyplusTextField(value = description, onValueChange = { description = it.take(160) }, label = "Description")
         error?.let { Text(it, color = OceanTheme.colors.negative, style = MaterialTheme.typography.labelSmall) }
       }
