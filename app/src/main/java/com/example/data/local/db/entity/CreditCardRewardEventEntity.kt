@@ -18,6 +18,7 @@ import com.example.domain.model.CreditCardRewardEventType
     ),
   ],
   indices = [
+    Index(value = ["cardId"]),
     Index(value = ["userId", "cardId", "eventDate"]),
     Index(value = ["userId", "cardId"]),
   ],
