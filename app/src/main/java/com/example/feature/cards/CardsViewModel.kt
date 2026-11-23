@@ -223,17 +223,19 @@ constructor(
   fun updateCard(
     card: CreditCard,
     limitDecimal: String,
+    annualFeeDecimal: String,
     onSuccess: () -> Unit,
   ) {
     val uid = currentUid() ?: return
     viewModelScope.launch {
       val limitMinor = parseAmountToMinor(limitDecimal, card.currencyCode)
-      if (limitMinor == null) {
-        _userMessage.value = "Enter a valid credit limit"
+      val annualFeeMinor = parseAmountToMinor(annualFeeDecimal.ifBlank { "0" }, card.currencyCode)
+      if (limitMinor == null || annualFeeMinor == null) {
+        _userMessage.value = "Enter valid credit limit and annual fee amounts"
         _isErrorMessage.value = true
         return@launch
       }
-      updateCreditCardUseCase(uid, card.copy(creditLimitMinor = limitMinor))
+      updateCreditCardUseCase(uid, card.copy(creditLimitMinor = limitMinor, annualFeeMinor = annualFeeMinor))
         .onSuccess {
           _userMessage.value = "Card updated"
           _isErrorMessage.value = false
