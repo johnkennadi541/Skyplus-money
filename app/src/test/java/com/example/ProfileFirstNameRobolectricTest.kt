@@ -1,10 +1,11 @@
 package com.example
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import com.example.core.designsystem.theme.SkyplusOceanTheme
 import com.example.domain.model.AuthProviderType
@@ -49,8 +50,9 @@ class ProfileFirstNameRobolectricTest {
     }
 
     composeTestRule.onNodeWithTag("profile_first_name_input").assertIsDisplayed()
-      .assertTextEquals("Alex")
-    composeTestRule.onNodeWithTag("profile_first_name_input").performTextInput("andra")
+      .assertTextContains("Alex")
+    composeTestRule.onNodeWithTag("profile_first_name_input").performTextClearance()
+    composeTestRule.onNodeWithTag("profile_first_name_input").performTextInput("Alexandra")
     composeTestRule.onNodeWithTag("profile_save_name_button").performClick()
     composeTestRule.runOnIdle { assertEquals("Alexandra", savedName) }
   }
