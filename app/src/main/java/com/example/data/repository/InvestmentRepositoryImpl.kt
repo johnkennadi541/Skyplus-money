@@ -88,18 +88,18 @@ class InvestmentRepositoryImpl @Inject constructor(
       .map { list -> list.map { it.toDomain() } }
       .flowOn(dispatchers.io)
 
-  override fun observeSyncSettings(): Flow<MarketSyncSettings> =
-    syncPreferencesDataSource.syncSettings
+  override fun observeSyncSettings(authenticatedUserId: String): Flow<MarketSyncSettings> =
+    syncPreferencesDataSource.syncSettings(authenticatedUserId)
 
-  override suspend fun setAutoUpdateConsent(enabled: Boolean) {
+  override suspend fun setAutoUpdateConsent(authenticatedUserId: String, enabled: Boolean) {
     withContext(dispatchers.io) {
-      syncPreferencesDataSource.setAutoUpdateConsent(enabled)
+      syncPreferencesDataSource.setAutoUpdateConsent(authenticatedUserId, enabled)
     }
   }
 
-  override suspend fun setSyncOnlyOnWifi(wifiOnly: Boolean) {
+  override suspend fun setSyncOnlyOnWifi(authenticatedUserId: String, wifiOnly: Boolean) {
     withContext(dispatchers.io) {
-      syncPreferencesDataSource.setSyncOnlyOnWifi(wifiOnly)
+      syncPreferencesDataSource.setSyncOnlyOnWifi(authenticatedUserId, wifiOnly)
     }
   }
 
@@ -685,11 +685,11 @@ class InvestmentRepositoryImpl @Inject constructor(
       runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         val now = System.currentTimeMillis()
-        val settings = syncPreferencesDataSource.syncSettings.first()
+        val settings = syncPreferencesDataSource.syncSettings(authenticatedUserId).first()
 
         if (!settings.autoUpdateConsentEnabled) {
           val msg = "Automatic updates are off. Manual price entry remains active."
-          syncPreferencesDataSource.recordSyncResult(now, msg)
+          syncPreferencesDataSource.recordSyncResult(authenticatedUserId, now, msg)
           return@runCatchingPreservingCancellation MarketSyncSummary(
             updatedCount = 0,
             skippedManualCount = 0,
@@ -709,8 +709,14 @@ class InvestmentRepositoryImpl @Inject constructor(
         var requestsSent = 0
 
         for (holding in holdings) {
-          val qty = runCatchingPreservingCancellation { BigDecimal(holding.quantityDecimal.trim()) }.getOrDefault(BigDecimal.ZERO)
-          if (qty <= BigDecimal.ZERO) continue
+          val qty =
+            try {
+              BigDecimal(holding.quantityDecimal.trim())
+            } catch (error: NumberFormatException) {
+              throw IllegalStateException("Stored investment quantity is invalid", error)
+            }
+          require(qty >= BigDecimal.ZERO) { "Stored investment quantity cannot be negative" }
+          if (qty.compareTo(BigDecimal.ZERO) == 0) continue
 
           if (!holding.autoPriceUpdateEnabled && !allowOverwriteManual) {
             skippedManualCount++
@@ -783,7 +789,7 @@ class InvestmentRepositoryImpl @Inject constructor(
             if (rateLimitedCount > 0) append(" • $rateLimitedCount rate-limited")
             if (errorCount > 0) append(" • $errorCount unreachable (manual fallback active)")
           }
-        syncPreferencesDataSource.recordSyncResult(now, statusMsg)
+        syncPreferencesDataSource.recordSyncResult(authenticatedUserId, now, statusMsg)
 
         MarketSyncSummary(
           updatedCount = updatedCount,
