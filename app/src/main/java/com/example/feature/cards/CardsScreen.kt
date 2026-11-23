@@ -773,7 +773,7 @@ private fun CardDetailsDialog(
                   color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                  "Fees ${formatter.format(Money.fromMinorUnits(item.statement.feesMinor, item.currencyCode))} • Interest ${formatter.format(Money.fromMinorUnits(item.statement.interestMinor, item.currencyCode))}",
+                  "Fees ${formatter.format(Money.fromMinorUnits(item.statement.feesMinor, item.currencyCode))} • Late fee ${formatter.format(Money.fromMinorUnits(item.statement.lateFeeMinor, item.currencyCode))} • Interest ${formatter.format(Money.fromMinorUnits(item.statement.interestMinor, item.currencyCode))}",
                   style = MaterialTheme.typography.labelSmall,
                   color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -977,6 +977,7 @@ private fun CardStatementFormDialog(
   var balance by remember { mutableStateOf("") }
   var minimumDue by remember { mutableStateOf("") }
   var fees by remember { mutableStateOf("0") }
+  var lateFee by remember { mutableStateOf("0") }
   var interest by remember { mutableStateOf("0") }
   var notes by remember { mutableStateOf("") }
   var error by remember { mutableStateOf<String?>(null) }
@@ -993,7 +994,8 @@ private fun CardStatementFormDialog(
         SkyplusTextField(value = dueDate, onValueChange = { dueDate = it }, label = "Payment due date (YYYY-MM-DD)")
         SkyplusTextField(value = balance, onValueChange = { balance = it }, label = "Statement balance")
         SkyplusTextField(value = minimumDue, onValueChange = { minimumDue = it }, label = "Minimum due")
-        SkyplusTextField(value = fees, onValueChange = { fees = it }, label = "Fees / charges")
+        SkyplusTextField(value = fees, onValueChange = { fees = it }, label = "Other fees / charges")
+        SkyplusTextField(value = lateFee, onValueChange = { lateFee = it }, label = "Late fee")
         SkyplusTextField(value = interest, onValueChange = { interest = it }, label = "Interest charged")
         SkyplusTextField(value = notes, onValueChange = { notes = it.take(500) }, label = "Notes")
         error?.let { Text(it, color = OceanTheme.colors.negative, style = MaterialTheme.typography.labelSmall) }
@@ -1008,10 +1010,11 @@ private fun CardStatementFormDialog(
           val balanceMinor = parseAmountToMinor(balance, card.currencyCode)
           val minimumMinor = parseAmountToMinor(minimumDue, card.currencyCode)
           val feesMinor = parseAmountToMinor(fees.ifBlank { "0" }, card.currencyCode)
+          val lateFeeMinor = parseAmountToMinor(lateFee.ifBlank { "0" }, card.currencyCode)
           val interestMinor = parseAmountToMinor(interest.ifBlank { "0" }, card.currencyCode)
           if (statementDay == null || dueDay == null || dueDay.isBefore(statementDay)) {
             error = "Enter valid statement and due dates"
-          } else if (balanceMinor == null || minimumMinor == null || feesMinor == null || interestMinor == null) {
+          } else if (balanceMinor == null || minimumMinor == null || feesMinor == null || lateFeeMinor == null || interestMinor == null) {
             error = "Enter valid amounts in ${card.currencyCode}"
           } else {
             error = null
@@ -1025,6 +1028,7 @@ private fun CardStatementFormDialog(
               statementBalanceMinor = balanceMinor,
               minimumDueMinor = minimumMinor,
               feesMinor = feesMinor,
+              lateFeeMinor = lateFeeMinor,
               interestMinor = interestMinor,
               notes = notes.ifBlank { null },
             )
