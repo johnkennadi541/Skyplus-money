@@ -47,6 +47,7 @@ class AndroidKeyStoreBackend : KeyWrappingBackend {
   }
 
   override fun encrypt(raw: ByteArray): Pair<String, String> {
+    require(raw.size == PASSPHRASE_BYTES) { "Unexpected database passphrase length" }
     val secretKey = getOrCreateMasterKey()
     val cipher = Cipher.getInstance(AES_GCM_NO_PADDING)
     cipher.init(Cipher.ENCRYPT_MODE, secretKey)
@@ -64,6 +65,11 @@ class AndroidKeyStoreBackend : KeyWrappingBackend {
   }
 
   override fun decrypt(encryptedBase64: String, ivBase64: String): ByteArray {
+    // Reject malformed or oversized vault metadata before Base64 allocates buffers.
+    require(encryptedBase64.length == ENCRYPTED_PASSPHRASE_BASE64_LENGTH) {
+      "Stored wrapped database passphrase has an invalid length"
+    }
+    require(ivBase64.length == IV_BASE64_LENGTH) { "Stored database passphrase IV has an invalid length" }
     val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
     if (!keyStore.containsAlias(KEY_ALIAS)) {
       throw UnrecoverableKeyException("Master key '$KEY_ALIAS' not found in AndroidKeyStore")
@@ -74,6 +80,9 @@ class AndroidKeyStoreBackend : KeyWrappingBackend {
     val iv = Base64.decode(ivBase64, Base64.NO_WRAP)
     val ciphertext = Base64.decode(encryptedBase64, Base64.NO_WRAP)
     try {
+      require(iv.size == GCM_IV_BYTES && ciphertext.size == ENCRYPTED_PASSPHRASE_BYTES) {
+        "Stored wrapped database passphrase metadata is malformed"
+      }
       val cipher = Cipher.getInstance(AES_GCM_NO_PADDING)
       val spec = GCMParameterSpec(128, iv)
       cipher.init(Cipher.DECRYPT_MODE, entry.secretKey, spec)
@@ -90,6 +99,11 @@ class AndroidKeyStoreBackend : KeyWrappingBackend {
     private const val ANDROID_KEYSTORE = "AndroidKeyStore"
     private const val KEY_ALIAS = "skyplus_sqlcipher_master_key"
     private const val AES_GCM_NO_PADDING = "AES/GCM/NoPadding"
+    private const val PASSPHRASE_BYTES = 32
+    private const val ENCRYPTED_PASSPHRASE_BYTES = PASSPHRASE_BYTES + 16
+    private const val ENCRYPTED_PASSPHRASE_BASE64_LENGTH = 64
+    private const val IV_BASE64_LENGTH = 16
+    private const val GCM_IV_BYTES = 12
   }
 }
 
