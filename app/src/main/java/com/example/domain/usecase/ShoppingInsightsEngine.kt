@@ -30,12 +30,12 @@ object ShoppingInsightsEngine {
     val totals = currencies.map { code ->
       ShoppingCurrencySpend(
         currencyCode = code,
-        actualSpentMinor = purchased.filter { currency(it) == code }.sumOf { it.actualTotalMinor ?: 0L },
-        estimatedMinor = purchased.filter { currency(it) == code }.sumOf { it.estimatedTotalMinor },
+        actualSpentMinor = sumMinorExact(purchased.filter { currency(it) == code }.map { it.actualTotalMinor ?: 0L }),
+        estimatedMinor = sumMinorExact(purchased.filter { currency(it) == code }.map { it.estimatedTotalMinor }),
       )
     }
     val categories = purchased.groupBy { currency(it) to it.category }
-      .map { (key, rows) -> ShoppingCategorySpend(key.first, key.second, rows.sumOf { it.actualTotalMinor ?: 0L }) }
+      .map { (key, rows) -> ShoppingCategorySpend(key.first, key.second, sumMinorExact(rows.map { it.actualTotalMinor ?: 0L })) }
       .sortedWith(compareBy({ it.currencyCode }, { it.category }))
     val monthly = purchased.groupBy { currency(it) to monthUtc(it.purchasedAt ?: it.updatedAt) }
       .map { (key, rows) -> ShoppingMonthlySpend(key.first, key.second, rows.sumOf { it.actualTotalMinor ?: 0L }) }
@@ -50,7 +50,7 @@ object ShoppingInsightsEngine {
     repeatWindowDays: Int = 45,
   ): List<ShoppingSmartSuggestion> {
     val stock = pantry.associateBy { key(it.name, it.unit) }
-    return items.filter { it.isPurchased && it.purchasedAt != null && now - it.purchasedAt <= repeatWindowDays * DAY_MS }
+    return items.filter { it.isPurchased && it.purchasedAt != null && it.purchasedAt <= now && now - it.purchasedAt <= repeatWindowDays.coerceAtLeast(0) * DAY_MS }
       .groupBy { key(it.name, it.unit) }
       .mapNotNull { (itemKey, history) ->
         val sample = history.maxByOrNull { it.purchasedAt ?: 0L } ?: return@mapNotNull null
@@ -70,6 +70,8 @@ object ShoppingInsightsEngine {
       .distinctBy { key(it.itemName, it.unit) }
       .sortedBy { it.itemName.lowercase(Locale.ROOT) }
   }
+
+  private fun sumMinorExact(values: List<Long>): Long = values.fold(0L, Math::addExact)
 
   private fun monthUtc(timestamp: Long): String {
     val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"), Locale.ROOT).apply { timeInMillis = timestamp }
