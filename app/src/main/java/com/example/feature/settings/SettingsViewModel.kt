@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.ProfilePreferencesDataSource
 import com.example.domain.model.ThemePreference
+import com.example.domain.repository.WelcomeEmailSender
 import com.example.domain.usecase.ObserveThemePreferenceUseCase
 import com.example.domain.usecase.SetThemePreferenceUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.asStateFlow
 
 @HiltViewModel
@@ -23,6 +25,7 @@ constructor(
   observeThemePreferenceUseCase: ObserveThemePreferenceUseCase,
   private val setThemePreferenceUseCase: SetThemePreferenceUseCase,
   private val profilePreferences: ProfilePreferencesDataSource,
+  private val welcomeEmailSender: WelcomeEmailSender,
 ) : ViewModel() {
 
   val themePreference: StateFlow<ThemePreference> =
@@ -44,6 +47,8 @@ constructor(
     profileObservationJob?.cancel()
     profileObservationJob = viewModelScope.launch {
       profilePreferences.ensureFirstName(uid, googleDisplayName)
+      val initialName = profilePreferences.observeFirstName(uid).first().orEmpty()
+      if (initialName.isNotBlank()) runCatching { welcomeEmailSender.sendWelcomeEmail(initialName) }
       profilePreferences.observeFirstName(uid).collect { savedName ->
         _profileFirstName.value = savedName.orEmpty()
       }
