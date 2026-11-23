@@ -139,6 +139,57 @@ class Phase3InvestmentDatabaseAndRepoTest {
   }
 
   @Test
+  fun `manual overwrite flag cannot bypass global market update opt in`() = runTest {
+    syncPreferences.setAutoUpdateConsent(false)
+    var fetchCount = 0
+    val dataSource =
+      object : MarketPriceDataSource {
+        override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult {
+          fetchCount++
+          return MarketQuoteFetchResult.Success(
+            unitPriceDecimal = "125.00",
+            asOfMillis = System.currentTimeMillis(),
+            source = PriceSourceType.MFAPI_AMFI_EOD,
+            providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
+            instrumentName = "Test Fund",
+          )
+        }
+      }
+    val repo = buildRepo(dataSource)
+    val holding =
+      repo.createHoldingWithInitialBuy(
+        authenticatedUserId = "uid_opt_in_guard",
+        name = "Test Mutual Fund",
+        category = InvestmentCategory.MUTUAL_FUNDS,
+        symbolOrTicker = "12345",
+        isin = null,
+        brokerOrPlatform = null,
+        currencyCode = "INR",
+        purchaseDate = 1_750_000_000_000L,
+        quantityDecimal = "2",
+        purchasePriceDecimal = "100.00",
+        chargesMinor = 0L,
+        currentMarketPriceDecimal = "110.00",
+        autoPriceUpdateEnabled = true,
+        notes = null,
+      ).getOrThrow()
+
+    val result =
+      repo.syncEligibleMarketPrices(
+        authenticatedUserId = "uid_opt_in_guard",
+        allowOverwriteManual = true,
+        forceBypassCooldown = true,
+      ).getOrThrow()
+
+    assertEquals("Global opt-in must block all provider requests", 0, fetchCount)
+    assertEquals(0, result.updatedCount)
+    assertEquals(
+      "110",
+      repo.getHoldingById("uid_opt_in_guard", holding.id)?.currentMarketPriceDecimal,
+    )
+  }
+
+  @Test
   fun `create edit additional buy partial sell complete sell and delete persist accurately`() = runTest {
     val repo = buildRepo(AmfiMfApiMarketPriceDataSource(fakeCallFactory { throw IOException("offline") }, testDispatchers))
 
