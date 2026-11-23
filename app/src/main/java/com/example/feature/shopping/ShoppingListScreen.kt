@@ -77,6 +77,8 @@ import com.example.domain.model.ShoppingListSummary
 import com.example.domain.usecase.FormatMoneyUseCase
 import com.example.domain.usecase.ShoppingCalculationEngine
 import com.example.domain.usecase.ShoppingWorkspaceSnapshot
+import com.example.domain.usecase.ShoppingInputParser
+import com.example.domain.usecase.ShoppingItemDraft
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -170,6 +172,7 @@ fun ShoppingListContent(
   var itemToPurchase by remember { mutableStateOf<ShoppingListItem?>(null) }
   var itemToDelete by remember { mutableStateOf<ShoppingListItem?>(null) }
   var compareItemId by remember { mutableStateOf<String?>(null) }
+  var importedDrafts by remember { mutableStateOf<List<ShoppingItemDraft>>(emptyList()) }
 
   val lists = workspace.lists
   val activeList = remember(lists, selectedListId) {
@@ -248,6 +251,13 @@ fun ShoppingListContent(
           }
         }
       }
+    }
+
+    if (activeList != null) {
+      ShoppingCaptureActions(
+        onDraftsReady = { drafts -> importedDrafts = drafts },
+        modifier = Modifier.fillMaxWidth(),
+      )
     }
 
     // Feedback Banner
@@ -519,6 +529,29 @@ fun ShoppingListContent(
             itemToEdit = null
           }
         }
+      },
+    )
+  }
+
+  if (importedDrafts.isNotEmpty() && activeList != null) {
+    val targetListId = activeList.id
+    ShoppingImportReviewDialog(
+      drafts = importedDrafts,
+      onDismiss = { importedDrafts = emptyList() },
+      onConfirm = {
+        importedDrafts.forEach { draft ->
+          onAddItem(
+            targetListId,
+            draft.name,
+            ShoppingInputParser.suggestCategory(draft.name),
+            draft.quantityDecimal,
+            draft.unit,
+            draft.estimatedUnitPriceDecimal ?: "0",
+            null,
+            "Imported from voice/photo; verify item details and price",
+          ) {}
+        }
+        importedDrafts = emptyList()
       },
     )
   }
