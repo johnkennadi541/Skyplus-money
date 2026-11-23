@@ -201,8 +201,14 @@ class ShoppingExtendedRepositoryImpl @Inject constructor(
           accountDao.adjustBalance(authenticatedUserId, accountId, -receipt.totalMinor, now)
           newTransaction
         }
-        require(transaction.userId == authenticatedUserId && transaction.type == TransactionType.EXPENSE) {
-          "Receipt reference is already linked to an incompatible transaction"
+        require(
+          transaction.userId == authenticatedUserId &&
+            transaction.type == TransactionType.EXPENSE &&
+            transaction.accountId == accountId &&
+            transaction.amountMinor == receipt.totalMinor &&
+            transaction.currencyCode.equals(receipt.currencyCode, ignoreCase = true)
+        ) {
+          "This receipt is already linked to a different expense; it was not posted again"
         }
         val rows = shoppingDao.markReceiptPosted(
           userId = authenticatedUserId, receiptId = receiptId, accountId = accountId,
