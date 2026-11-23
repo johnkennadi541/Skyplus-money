@@ -139,6 +139,7 @@ constructor(
               billingCycleDay = card.billingCycleDay,
               paymentDueDayOffset = card.paymentDueDayOffset,
               aprPercent = card.aprPercent,
+              joiningFeeMinor = card.joiningFeeMinor,
               annualFeeMinor = card.annualFeeMinor,
               annualFeeMonth = card.annualFeeMonth,
               rewardProgramName = card.rewardProgramName,
