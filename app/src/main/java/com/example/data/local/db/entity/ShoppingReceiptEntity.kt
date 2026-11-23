@@ -26,4 +26,23 @@ data class ShoppingReceiptEntity(
   val status: String,
   val createdAt: Long,
   val updatedAt: Long,
-)
+) {
+  companion object {
+    fun fromDomain(receipt: com.example.domain.model.ShoppingReceipt): ShoppingReceiptEntity =
+      ShoppingReceiptEntity(
+        id = receipt.id,
+        userId = receipt.userId,
+        listId = receipt.listId,
+        accountId = receipt.accountId,
+        fingerprint = receipt.fingerprint,
+        merchant = receipt.merchant,
+        purchaseDate = receipt.purchaseDate,
+        currencyCode = receipt.currencyCode,
+        totalMinor = receipt.totalMinor,
+        financialTransactionId = receipt.financialTransactionId,
+        status = receipt.status,
+        createdAt = receipt.createdAt,
+        updatedAt = receipt.updatedAt,
+      )
+  }
+}
