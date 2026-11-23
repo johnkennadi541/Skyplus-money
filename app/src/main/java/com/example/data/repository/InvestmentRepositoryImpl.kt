@@ -136,11 +136,12 @@ class InvestmentRepositoryImpl @Inject constructor(
 
         val buyQty = calculationEngine.parsePositiveDecimal(quantityDecimal, "Units / quantity")
         val buyPrice = calculationEngine.parsePositiveDecimal(purchasePriceDecimal, "Purchase price")
+        val hasExplicitCurrentMarketPrice = !currentMarketPriceDecimal.isNullOrBlank()
         val marketPrice =
-          if (currentMarketPriceDecimal.isNullOrBlank()) {
+          if (!hasExplicitCurrentMarketPrice) {
             buyPrice
           } else {
-            calculationEngine.parsePositiveDecimal(currentMarketPriceDecimal, "Current market price")
+            calculationEngine.parsePositiveDecimal(currentMarketPriceDecimal!!, "Current market price")
           }
         val marketPriceText = marketPrice.stripTrailingZeros().toPlainString()
 
@@ -185,9 +186,14 @@ class InvestmentRepositoryImpl @Inject constructor(
             totalChargesMinor = mutation.newTotalChargesMinor,
             currentMarketPriceDecimal = marketPriceText,
             currentValuationMinor = mutation.newValuationMinor,
-            lastPriceUpdateDate = if (allowAutoForHolding) 0L else now,
+            // If the user did not enter a current price, the purchase price is only a
+            // temporary valuation fallback. Do not present it as a fresh market quote.
+            lastPriceUpdateDate = if (hasExplicitCurrentMarketPrice) now else 0L,
             lastPriceSource = PriceSourceType.MANUAL,
-            lastPriceProviderLabel = "Manual",
+            lastPriceProviderLabel =
+              if (hasExplicitCurrentMarketPrice) "Manual"
+              else if (allowAutoForHolding) "Awaiting first NAV"
+              else "Awaiting current price",
             autoPriceUpdateEnabled = allowAutoForHolding,
             notes = notes?.trim()?.takeIf { it.isNotEmpty() },
             createdAt = now,
@@ -212,26 +218,34 @@ class InvestmentRepositoryImpl @Inject constructor(
             createdAt = now,
           )
 
+        // Only persist a market-price history point when the user actually supplied
+        // a current price. The purchase price fallback is not a market observation.
         val initialPricePoint =
-          InvestmentPriceHistory(
-            id = UUID.randomUUID().toString(),
-            holdingId = holdingId,
-            userId = authenticatedUserId,
-            priceDate = now,
-            unitPriceDecimal = marketPriceText,
-            valuationMinor = mutation.newValuationMinor,
-            totalInvestedMinor = mutation.newOpenCostBasisMinor,
-            realizedPnlMinor = 0L,
-            currencyCode = normalizedCurrency,
-            source = PriceSourceType.MANUAL,
-            providerLabel = "Manual (Initial)",
-            createdAt = now,
-          )
+          if (hasExplicitCurrentMarketPrice) {
+            InvestmentPriceHistory(
+              id = UUID.randomUUID().toString(),
+              holdingId = holdingId,
+              userId = authenticatedUserId,
+              priceDate = now,
+              unitPriceDecimal = marketPriceText,
+              valuationMinor = mutation.newValuationMinor,
+              totalInvestedMinor = mutation.newOpenCostBasisMinor,
+              realizedPnlMinor = 0L,
+              currencyCode = normalizedCurrency,
+              source = PriceSourceType.MANUAL,
+              providerLabel = "Manual (Initial)",
+              createdAt = now,
+            )
+          } else {
+            null
+          }
 
         database.withTransaction {
           investmentDao.insertHolding(InvestmentHoldingEntity.fromDomain(holding))
           investmentDao.insertTransaction(InvestmentTransactionEntity.fromDomain(initialTx))
-          investmentDao.insertPriceHistory(InvestmentPriceHistoryEntity.fromDomain(initialPricePoint))
+          initialPricePoint?.let {
+            investmentDao.insertPriceHistory(InvestmentPriceHistoryEntity.fromDomain(it))
+          }
         }
         holding
       }
