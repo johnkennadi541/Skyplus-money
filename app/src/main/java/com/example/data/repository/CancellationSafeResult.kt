@@ -15,6 +15,6 @@ internal inline fun <T> runCatchingPreservingCancellation(block: () -> T): Resul
     Result.success(block())
   } catch (cancellation: CancellationException) {
     throw cancellation
-  } catch (throwable: Throwable) {
+  } catch (throwable: Exception) {
     Result.failure(throwable)
   }
