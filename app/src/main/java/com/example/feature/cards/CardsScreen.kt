@@ -57,6 +57,15 @@ import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
 import com.example.domain.model.CreditCard
 import com.example.domain.model.CreditCardNetwork
+import com.example.domain.model.CreditCardStatement
+import com.example.domain.model.CreditCardStatementSummary
+import com.example.domain.model.CreditCardRewardEvent
+import com.example.domain.model.CreditCardRewardEventType
+import com.example.domain.model.CreditCardSpendingAnalytics
+import com.example.domain.model.FinancialTransaction
+import com.example.domain.model.TransactionCategories
+import com.example.domain.model.TransactionType
+import com.example.core.common.parseAmountToMinor
 import com.example.domain.model.CreditCardSummary
 import com.example.domain.model.FinancialAccount
 import com.example.domain.model.Money
@@ -632,6 +641,356 @@ private fun CardFormDialog(
     },
   )
 }
+
+@Composable
+private fun CardDetailsDialog(
+  summary: CreditCardSummary,
+  statements: List<CreditCardStatementSummary>,
+  rewardEvents: List<CreditCardRewardEvent>,
+  transactions: List<FinancialTransaction>,
+  analytics: CreditCardSpendingAnalytics?,
+  onDismiss: () -> Unit,
+  onToggleFrozen: (Boolean) -> Unit,
+  onCreateStatement: (CreditCardStatement, () -> Unit) -> Unit,
+  onAddRewardEvent: (CreditCardRewardEvent, () -> Unit) -> Unit,
+) {
+  var showStatementDialog by remember { mutableStateOf(false) }
+  var showRewardDialog by remember { mutableStateOf(false) }
+  val formatter = remember { FormatMoneyUseCase() }
+  val pointsBalance = rewardEvents.fold(0L) { total, event -> Math.addExact(total, event.pointsDelta) }
+  val paymentHistory = transactions
+    .filter { it.type == TransactionType.TRANSFER && it.category == TransactionCategories.TRANSFER_IN_CATEGORY }
+    .sortedByDescending { it.transactionDate }
+    .take(8)
+
+  androidx.compose.material3.AlertDialog(
+    onDismissRequest = onDismiss,
+    modifier = Modifier.testTag("card_details_dialog"),
+    title = {
+      Column {
+        Text(summary.card.issuerName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(
+          "${summary.card.network.name} ••${summary.card.last4}",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+    },
+    text = {
+      Column(
+        modifier = Modifier.heightIn(max = 600.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(OceanSpacing.sm),
+      ) {
+        OceanCard {
+          Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(modifier = Modifier.weight(1f)) {
+              Text("Freeze status", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+              Text(
+                "This is a local tracker flag only. It does not lock or block the physical card with your issuer.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+            Switch(checked = summary.card.isFrozen, onCheckedChange = onToggleFrozen)
+          }
+        }
+
+        OceanCard {
+          Text("Statement history & payment status", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+          Text(
+            "Payments are calculated from completed transfers into this card account. No paid status is manually assumed.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+          Spacer(Modifier.height(OceanSpacing.xs))
+          SkyplusPrimaryButton(
+            text = "Add statement",
+            onClick = { showStatementDialog = true },
+            modifier = Modifier.testTag("add_card_statement_button"),
+          )
+          if (statements.isEmpty()) {
+            Text("No statements recorded yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          } else {
+            statements.forEach { item ->
+              val statusTone = when (item.status) {
+                com.example.domain.model.CreditCardStatementStatus.PAID -> BadgeTone.POSITIVE
+                com.example.domain.model.CreditCardStatementStatus.OVERDUE -> BadgeTone.NEGATIVE
+                com.example.domain.model.CreditCardStatementStatus.PARTIALLY_PAID -> BadgeTone.WARNING
+                com.example.domain.model.CreditCardStatementStatus.UNPAID -> BadgeTone.INFO
+              }
+              Column(modifier = Modifier.fillMaxWidth().padding(vertical = OceanSpacing.xs)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                  Text("Statement ${formatCardDate(item.statement.statementDate)}", fontWeight = FontWeight.SemiBold)
+                  OceanStatusBadge(text = item.status.name.replace('_', ' '), tone = statusTone)
+                }
+                Text(
+                  "Due ${formatCardDate(item.statement.dueDate)} • Balance ${formatter.format(item.statementBalance)}",
+                  style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                  "Minimum ${formatter.format(item.minimumDue)} • Paid ${formatter.format(Money.fromMinorUnits(item.paidAmountMinor, item.currencyCode))} • Remaining ${formatter.format(item.remainingDue)}",
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                  "Fees ${formatter.format(Money.fromMinorUnits(item.statement.feesMinor, item.currencyCode))} • Interest ${formatter.format(Money.fromMinorUnits(item.statement.interestMinor, item.currencyCode))}",
+                  style = MaterialTheme.typography.labelSmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+              }
+            }
+          }
+        }
+
+        OceanCard {
+          Text("Rewards", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+          Text("$pointsBalance points", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+          Text(
+            summary.card.rewardProgramName?.takeIf { it.isNotBlank() } ?: "No rewards programme name set",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+          SkyplusPrimaryButton(
+            text = "Record reward activity",
+            onClick = { showRewardDialog = true },
+            modifier = Modifier.testTag("add_card_reward_button"),
+          )
+          rewardEvents.take(5).forEach { event ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+              Column(modifier = Modifier.weight(1f)) {
+                Text(event.description, style = MaterialTheme.typography.bodySmall)
+                Text("${event.eventType.name} • ${formatCardDate(event.eventDate)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+              }
+              Text(
+                if (event.pointsDelta > 0L) "+${event.pointsDelta}" else event.pointsDelta.toString(),
+                fontWeight = FontWeight.SemiBold,
+              )
+            }
+          }
+        }
+
+        OceanCard {
+          Text("This month's spending", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+          Text(
+            analytics?.let { formatter.format(Money.fromMinorUnits(it.totalSpentMinor, it.currencyCode)) } ?: formatter.format(Money.fromMinorUnits(0L, summary.card.currencyCode)),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+          )
+          Text(
+            "${analytics?.transactionCount ?: 0} completed purchases",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+          analytics?.categoryTotalsMinor?.toList()?.sortedByDescending { it.second }?.take(5)?.forEach { (category, amount) ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+              Text(category, style = MaterialTheme.typography.bodySmall)
+              Text(formatter.format(Money.fromMinorUnits(amount, summary.card.currencyCode)), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+            }
+          }
+        }
+
+        OceanCard {
+          Text("Payment history", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+          if (paymentHistory.isEmpty()) {
+            Text("No completed payments into this card account found.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          } else {
+            paymentHistory.forEach { payment ->
+              Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(modifier = Modifier.weight(1f)) {
+                  Text(payment.merchantOrPayee ?: payment.notes ?: "Card payment", style = MaterialTheme.typography.bodySmall)
+                  Text(formatCardDate(payment.transactionDate), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(formatter.format(Money.fromMinorUnits(payment.amountMinor, payment.currencyCode)), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+              }
+            }
+          }
+        }
+
+        OceanCard {
+          Text("Card charges & settings", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+          Text("APR: ${summary.card.aprPercent}% • Annual fee month: ${summary.card.annualFeeMonth}", style = MaterialTheme.typography.bodySmall)
+          Text("Annual fee: ${formatter.format(summary.card.annualFee)}", style = MaterialTheme.typography.bodySmall)
+          Text(
+            if (summary.card.reminderEnabled) "Payment reminder: ${summary.card.reminderDaysBefore} days before due date"
+            else "Payment reminders disabled",
+            style = MaterialTheme.typography.bodySmall,
+          )
+          summary.card.notes?.takeIf { it.isNotBlank() }?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          }
+        }
+      }
+    },
+    confirmButton = {
+      com.example.core.designsystem.component.SkyplusTertiaryButton(text = "Close", onClick = onDismiss)
+    },
+  )
+
+  if (showStatementDialog) {
+    CardStatementFormDialog(
+      card = summary.card,
+      onDismiss = { showStatementDialog = false },
+      onSave = { statement, onDone ->
+        onCreateStatement(statement) {
+          showStatementDialog = false
+          onDone()
+        }
+      },
+    )
+  }
+
+  if (showRewardDialog) {
+    CardRewardFormDialog(
+      card = summary.card,
+      onDismiss = { showRewardDialog = false },
+      onSave = { event, onDone ->
+        onAddRewardEvent(event) {
+          showRewardDialog = false
+          onDone()
+        }
+      },
+    )
+  }
+}
+
+@Composable
+private fun CardStatementFormDialog(
+  card: CreditCard,
+  onDismiss: () -> Unit,
+  onSave: (CreditCardStatement, () -> Unit) -> Unit,
+) {
+  val today = java.time.LocalDate.now()
+  var statementDate by remember { mutableStateOf(today.toString()) }
+  var dueDate by remember { mutableStateOf(today.plusDays(20).toString()) }
+  var balance by remember { mutableStateOf("") }
+  var minimumDue by remember { mutableStateOf("") }
+  var fees by remember { mutableStateOf("0") }
+  var interest by remember { mutableStateOf("0") }
+  var notes by remember { mutableStateOf("") }
+  var error by remember { mutableStateOf<String?>(null) }
+
+  androidx.compose.material3.AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("Add statement") },
+    text = {
+      Column(
+        modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
+      ) {
+        SkyplusTextField(value = statementDate, onValueChange = { statementDate = it }, label = "Statement date (YYYY-MM-DD)")
+        SkyplusTextField(value = dueDate, onValueChange = { dueDate = it }, label = "Payment due date (YYYY-MM-DD)")
+        SkyplusTextField(value = balance, onValueChange = { balance = it }, label = "Statement balance")
+        SkyplusTextField(value = minimumDue, onValueChange = { minimumDue = it }, label = "Minimum due")
+        SkyplusTextField(value = fees, onValueChange = { fees = it }, label = "Fees / charges")
+        SkyplusTextField(value = interest, onValueChange = { interest = it }, label = "Interest charged")
+        SkyplusTextField(value = notes, onValueChange = { notes = it.take(500) }, label = "Notes")
+        error?.let { Text(it, color = OceanTheme.colors.negative, style = MaterialTheme.typography.labelSmall) }
+      }
+    },
+    confirmButton = {
+      SkyplusPrimaryButton(
+        text = "Save statement",
+        onClick = {
+          val statementDay = runCatching { java.time.LocalDate.parse(statementDate) }.getOrNull()
+          val dueDay = runCatching { java.time.LocalDate.parse(dueDate) }.getOrNull()
+          val balanceMinor = parseAmountToMinor(balance, card.currencyCode)
+          val minimumMinor = parseAmountToMinor(minimumDue, card.currencyCode)
+          val feesMinor = parseAmountToMinor(fees.ifBlank { "0" }, card.currencyCode)
+          val interestMinor = parseAmountToMinor(interest.ifBlank { "0" }, card.currencyCode)
+          if (statementDay == null || dueDay == null || dueDay.isBefore(statementDay)) {
+            error = "Enter valid statement and due dates"
+          } else if (balanceMinor == null || minimumMinor == null || feesMinor == null || interestMinor == null) {
+            error = "Enter valid amounts in ${card.currencyCode}"
+          } else {
+            error = null
+            val zone = java.time.ZoneId.systemDefault()
+            val statement = CreditCardStatement(
+              userId = card.userId,
+              cardId = card.id,
+              currencyCode = card.currencyCode,
+              statementDate = statementDay.atStartOfDay(zone).toInstant().toEpochMilli(),
+              dueDate = dueDay.atStartOfDay(zone).toInstant().toEpochMilli(),
+              statementBalanceMinor = balanceMinor,
+              minimumDueMinor = minimumMinor,
+              feesMinor = feesMinor,
+              interestMinor = interestMinor,
+              notes = notes.ifBlank { null },
+            )
+            onSave(statement) {}
+          }
+        },
+      )
+    },
+    dismissButton = { com.example.core.designsystem.component.SkyplusTertiaryButton(text = "Cancel", onClick = onDismiss) },
+  )
+}
+
+@Composable
+private fun CardRewardFormDialog(
+  card: CreditCard,
+  onDismiss: () -> Unit,
+  onSave: (CreditCardRewardEvent, () -> Unit) -> Unit,
+) {
+  var eventType by remember { mutableStateOf(CreditCardRewardEventType.EARN) }
+  var points by remember { mutableStateOf("") }
+  var cashValue by remember { mutableStateOf("0") }
+  var description by remember { mutableStateOf("") }
+  var error by remember { mutableStateOf<String?>(null) }
+
+  androidx.compose.material3.AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("Record rewards") },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs)) {
+          CreditCardRewardEventType.entries.forEach { type ->
+            TextButton(onClick = { eventType = type }) {
+              Text(if (eventType == type) "• ${type.name}" else type.name)
+            }
+          }
+        }
+        SkyplusTextField(value = points, onValueChange = { points = it.filter { ch -> ch == '-' || ch.isDigit() } }, label = "Points change")
+        SkyplusTextField(value = cashValue, onValueChange = { cashValue = it }, label = "Cash value")
+        SkyplusTextField(value = description, onValueChange = { description = it.take(160) }, label = "Description")
+        error?.let { Text(it, color = OceanTheme.colors.negative, style = MaterialTheme.typography.labelSmall) }
+      }
+    },
+    confirmButton = {
+      SkyplusPrimaryButton(
+        text = "Save reward",
+        onClick = {
+          val rawPoints = points.toLongOrNull()
+          val cashMinor = parseAmountToMinor(cashValue.ifBlank { "0" }, card.currencyCode)
+          val delta = when (eventType) {
+            CreditCardRewardEventType.EARN -> rawPoints?.let { kotlin.math.abs(it) }
+            CreditCardRewardEventType.REDEEM -> rawPoints?.let { -kotlin.math.abs(it) }
+            CreditCardRewardEventType.ADJUSTMENT -> rawPoints
+          }
+          if (delta == null || delta == 0L || cashMinor == null || description.isBlank()) {
+            error = "Enter a valid points change, cash value and description"
+          } else {
+            error = null
+            val event = CreditCardRewardEvent(
+              userId = card.userId,
+              cardId = card.id,
+              eventDate = System.currentTimeMillis(),
+              eventType = eventType,
+              pointsDelta = delta,
+              cashValueMinor = cashMinor,
+              currencyCode = card.currencyCode,
+              description = description.trim(),
+            )
+            onSave(event) {}
+          }
+        },
+      )
+    },
+    dismissButton = { com.example.core.designsystem.component.SkyplusTertiaryButton(text = "Cancel", onClick = onDismiss) },
+  )
+}
+
+private fun formatCardDate(timestamp: Long): String =
+  java.text.SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(java.util.Date(timestamp))
 
 private fun minorToDecimal(amountMinor: Long, currencyCode: String): String {
   val digits = runCatching { java.util.Currency.getInstance(currencyCode).defaultFractionDigits }
