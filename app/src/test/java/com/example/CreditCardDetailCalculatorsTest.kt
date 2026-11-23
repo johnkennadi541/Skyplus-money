@@ -30,15 +30,16 @@ class CreditCardDetailCalculatorsTest {
       listOf(statement("partial", now - DAY, now + 5 * DAY, 10_000L, 2_000L)),
       card,
       listOf(
-        transfer("payment-partial", 4_000L, now, TransactionCategories.TRANSFER_IN_CATEGORY),
+        transfer("payment-partial", 1_000L, now, TransactionCategories.TRANSFER_IN_CATEGORY),
         transfer("wrong-direction", 99_000L, now, TransactionCategories.TRANSFER_OUT_CATEGORY),
         expense("purchase", 2_000L, now),
       ),
       now,
     ).single()
     assertEquals(CreditCardStatementStatus.PARTIALLY_PAID, partial.status)
-    assertEquals(4_000L, partial.paidAmountMinor)
-    assertEquals(6_000L, partial.remainingDueMinor)
+    assertEquals(1_000L, partial.paidAmountMinor)
+    assertEquals(9_000L, partial.remainingDueMinor)
+    assertEquals(1_000L, partial.remainingMinimumDueMinor)
 
     val paid = CreditCardStatementCalculator.summarize(
       listOf(statement("paid", now - DAY, now + 5 * DAY, 5_000L, 500L)),
