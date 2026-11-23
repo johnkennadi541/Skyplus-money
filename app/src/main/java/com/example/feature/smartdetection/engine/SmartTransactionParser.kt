@@ -22,7 +22,7 @@ object SmartTransactionParser {
   // Currencies: INR, USD, EUR, GBP, KWD, AED, SAR, QAR, BHD, OMR
   private val AMOUNT_PATTERN =
     Pattern.compile(
-      "(?:(?:Rs\\.?|INR|USD|EUR|GBP|\\$|€|£|KWD|AED|SAR|QAR|BHD|OMR)\\s*([0-9,]+(?:\\.[0-9]{1,3})?))|(?:([0-9,]+(?:\\.[0-9]{1,3})?)\\s*(?:INR|USD|EUR|GBP|KWD|AED|SAR|QAR|BHD|OMR))",
+      "(?:(?:₹|Rs\\.?|INR|USD|EUR|GBP|€|£|KWD|AED|SAR|QAR|BHD|OMR)\\s*([0-9,]+(?:\\.[0-9]{1,3})?))|(?:([0-9,]+(?:\\.[0-9]{1,3})?)\\s*(?:INR|USD|EUR|GBP|KWD|AED|SAR|QAR|BHD|OMR))",
       Pattern.CASE_INSENSITIVE,
     )
 
@@ -120,10 +120,11 @@ object SmartTransactionParser {
         matchedSubstring.contains("QAR") -> "QAR"
         matchedSubstring.contains("BHD") -> "BHD"
         matchedSubstring.contains("OMR") -> "OMR"
-        matchedSubstring.contains("$") || matchedSubstring.contains("USD") -> "USD"
+        matchedSubstring.contains("USD") -> "USD"
         matchedSubstring.contains("€") || matchedSubstring.contains("EUR") -> "EUR"
         matchedSubstring.contains("£") || matchedSubstring.contains("GBP") -> "GBP"
-        else -> "INR"
+        matchedSubstring.contains("₹") || matchedSubstring.contains("RS") || matchedSubstring.contains("INR") -> "INR"
+        else -> return null
       }
 
     val fractionDigits = Money.resolveFractionDigits(currencyCode)
