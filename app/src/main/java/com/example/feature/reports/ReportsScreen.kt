@@ -480,6 +480,16 @@ private fun DailyAutoEntryReportCard(
   onToggleEnabled: (Boolean) -> Unit,
 ) {
   val context = LocalContext.current
+  val timeLabel = remember(settings.hourOfDay, settings.minute) {
+    val calendar = java.util.Calendar.getInstance().apply {
+      set(java.util.Calendar.HOUR_OF_DAY, settings.hourOfDay)
+      set(java.util.Calendar.MINUTE, settings.minute)
+    }
+    android.text.format.DateFormat.format(
+      if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a",
+      calendar,
+    ).toString()
+  }
 
   OceanCard(modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp).testTag("daily_auto_entry_report_card")) {
     Row(
@@ -526,13 +536,13 @@ private fun DailyAutoEntryReportCard(
             },
             settings.hourOfDay,
             settings.minute,
-            false,
+            android.text.format.DateFormat.is24HourFormat(context),
           ).show()
         },
         modifier = Modifier.testTag("daily_auto_entry_report_time_button"),
       ) {
         Text(
-          String.format(java.util.Locale.getDefault(), "%02d:%02d", settings.hourOfDay, settings.minute),
+          timeLabel,
           fontWeight = FontWeight.Bold,
         )
       }
