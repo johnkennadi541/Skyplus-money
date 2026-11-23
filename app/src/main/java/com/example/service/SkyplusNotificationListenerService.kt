@@ -2,6 +2,7 @@ package com.example.service
 
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.provider.Telephony
 import com.example.core.common.DispatcherProvider
 import com.example.domain.model.AuthSessionState
 import com.example.domain.repository.AuthRepository
@@ -38,8 +39,14 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
     if (sbn == null) return
 
     val packageName = sbn.packageName ?: return
-    val extras = sbn.notification.extras ?: return
 
+    // Privacy boundary: inspect notification content ONLY when it belongs to the
+    // device's current default SMS app. All other packages (including every email
+    // app and bank app notification) are ignored before notification extras are read.
+    val defaultSmsPackage = Telephony.Sms.getDefaultSmsPackage(this) ?: return
+    if (packageName != defaultSmsPackage) return
+
+    val extras = sbn.notification.extras ?: return
     val title = extras.getCharSequence("android.title")?.toString().orEmpty()
     val text = extras.getCharSequence("android.text")?.toString().orEmpty()
     val bigText = extras.getCharSequence("android.bigText")?.toString().orEmpty()
@@ -63,6 +70,11 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
     timestamp: Long = System.currentTimeMillis(),
   ) {
     if (combinedContent.isBlank()) return
+
+    // Defense in depth for direct/internal invocations: never process a package
+    // other than the current default SMS app.
+    val defaultSmsPackage = Telephony.Sms.getDefaultSmsPackage(this) ?: return
+    if (packageName != defaultSmsPackage) return
 
     val session = authRepository.observeAuthSession().first()
     val userId = (session as? AuthSessionState.Authenticated)?.user?.uid ?: return
