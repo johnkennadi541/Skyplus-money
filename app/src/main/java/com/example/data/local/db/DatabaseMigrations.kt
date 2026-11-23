@@ -432,4 +432,58 @@ object DatabaseMigrations {
         )
       }
     }
+  /**
+   * Stage 3 PR 3 — savings goals.
+   *
+   * Additive only: two new tables and their indices. No existing account, transaction, budget,
+   * credit-card, loan, investment or shopping row is touched.
+   */
+  val MIGRATION_8_9: Migration =
+    object : Migration(8, 9) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS savings_goals (
+            id TEXT NOT NULL PRIMARY KEY,
+            userId TEXT NOT NULL,
+            name TEXT NOT NULL,
+            currencyCode TEXT NOT NULL,
+            targetMinor INTEGER NOT NULL,
+            deadlineMillis INTEGER,
+            note TEXT,
+            createdAt INTEGER NOT NULL,
+            updatedAt INTEGER NOT NULL
+          )
+          """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_savings_goals_userId ON savings_goals(userId)")
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS index_savings_goals_userId_currencyCode ON savings_goals(userId, currencyCode)"
+        )
+
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS savings_contributions (
+            id TEXT NOT NULL PRIMARY KEY,
+            userId TEXT NOT NULL,
+            goalId TEXT NOT NULL,
+            amountMinor INTEGER NOT NULL,
+            currencyCode TEXT NOT NULL,
+            contributedAt INTEGER NOT NULL,
+            note TEXT,
+            createdAt INTEGER NOT NULL
+          )
+          """.trimIndent()
+        )
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS index_savings_contributions_userId ON savings_contributions(userId)"
+        )
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS index_savings_contributions_userId_goalId ON savings_contributions(userId, goalId)"
+        )
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS index_savings_contributions_userId_goalId_contributedAt ON savings_contributions(userId, goalId, contributedAt)"
+        )
+      }
+    }
 }

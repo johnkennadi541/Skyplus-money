@@ -19,6 +19,7 @@ import com.example.data.local.db.dao.FinancialAccountDao
 import com.example.data.local.db.dao.FinancialTransactionDao
 import com.example.data.local.db.dao.InvestmentDao
 import com.example.data.local.db.dao.LoanDao
+import com.example.data.local.db.dao.SavingsGoalDao
 import com.example.data.local.db.dao.ShoppingDao
 import com.example.data.local.db.dao.TransactionDetectionEventDao
 import dagger.Module
@@ -80,6 +81,7 @@ object DatabaseModule {
           DatabaseMigrations.MIGRATION_5_6,
           DatabaseMigrations.MIGRATION_6_7,
           DatabaseMigrations.MIGRATION_7_8,
+          DatabaseMigrations.MIGRATION_8_9,
         )
 
     if (factoryHolder.delegate != null || factoryHolder.lastError != null) {
@@ -112,6 +114,7 @@ object DatabaseModule {
           DatabaseMigrations.MIGRATION_5_6,
           DatabaseMigrations.MIGRATION_6_7,
           DatabaseMigrations.MIGRATION_7_8,
+          DatabaseMigrations.MIGRATION_8_9,
         )
 
     val encryptedFactory =
@@ -208,6 +211,10 @@ object DatabaseModule {
   @Provides
   fun provideCreditCardDao(database: AppDatabase): CreditCardDao =
     database.creditCardDao()
+
+  @Provides
+  fun provideSavingsGoalDao(database: AppDatabase): SavingsGoalDao =
+    database.savingsGoalDao()
 
   @Provides
   fun provideLoanDao(database: AppDatabase): LoanDao =

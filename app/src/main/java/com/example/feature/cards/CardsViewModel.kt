@@ -2,6 +2,7 @@ package com.example.feature.cards
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.core.common.parseAmountToMinor
 import com.example.domain.model.AuthSessionState
 import com.example.domain.model.CreditCard
 import com.example.domain.model.CreditCardNetwork

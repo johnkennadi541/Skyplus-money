@@ -76,6 +76,12 @@ abstract class DataModule {
 
   @Binds
   @Singleton
+  abstract fun bindSavingsGoalRepository(
+    impl: com.example.data.repository.SavingsGoalRepositoryImpl
+  ): com.example.domain.repository.SavingsGoalRepository
+
+  @Binds
+  @Singleton
   abstract fun bindShoppingRepository(
     impl: com.example.data.repository.ShoppingRepositoryImpl
   ): com.example.domain.repository.ShoppingRepository

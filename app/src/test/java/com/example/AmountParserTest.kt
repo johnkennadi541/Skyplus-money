@@ -1,6 +1,6 @@
 package com.example
 
-import com.example.feature.cards.parseAmountToMinor
+import com.example.core.common.parseAmountToMinor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -8,7 +8,7 @@ import org.junit.Test
 /**
  * Amount parsing must follow the currency's ISO-4217 fraction digits, never a hardcoded 2.
  */
-class CardAmountParserTest {
+class AmountParserTest {
 
   @Test
   fun `indian rupees use two decimals`() {
@@ -51,6 +51,15 @@ class CardAmountParserTest {
     assertNull(parseAmountToMinor("abc", "INR"))
     assertNull(parseAmountToMinor("1,000", "INR"))
     assertNull(parseAmountToMinor("100%", "INR"))
+  }
+
+  @Test
+  fun `an unsupported currency returns null instead of throwing`() {
+    assertNull(parseAmountToMinor("100", "ABC"))
+    // XXX is the ISO pseudo-code for "no currency"; the app never stores money in it.
+    assertNull(parseAmountToMinor("100", "XXX"))
+    assertNull(parseAmountToMinor("100", "IN"))
+    assertNull(parseAmountToMinor("100", "I1R"))
   }
 
   @Test

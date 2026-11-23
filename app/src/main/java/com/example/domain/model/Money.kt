@@ -71,6 +71,32 @@ data class Money private constructor(
   }
 
   companion object {
+
+    /**
+     * True when [iso4217Code] is a real, usable ISO 4217 currency for this app.
+     *
+     * `XXX` is the ISO pseudo-code for "no currency" and resolves to a negative fraction digit, so
+     * it is deliberately rejected here: SKYPLUS MONEY never stores money in "no currency".
+     */
+    fun isSupportedCurrency(iso4217Code: String): Boolean =
+      fractionDigitsOrNull(iso4217Code) != null
+
+    /**
+     * Fraction digits for [iso4217Code], or null when the code is not a supported currency.
+     *
+     * Unlike [resolveFractionDigits] this never throws, so callers that must show a validation
+     * message instead of crashing can use it directly.
+     */
+    fun fractionDigitsOrNull(iso4217Code: String): Int? {
+      val normalized = iso4217Code.trim().uppercase()
+      if (normalized.length != 3 || !normalized.all { it.isLetter() }) return null
+      val currency =
+        runCatching { Currency.getInstance(normalized) }.getOrNull() ?: return null
+      val digits = currency.defaultFractionDigits
+      if (digits < 0) return null
+      return digits
+    }
+
     fun resolveFractionDigits(iso4217Code: String): Int {
       val normalized = iso4217Code.trim().uppercase()
       require(normalized.length == 3) { "Invalid ISO 4217 currency code: '$iso4217Code'" }

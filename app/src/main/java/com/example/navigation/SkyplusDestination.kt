@@ -46,6 +46,8 @@ sealed interface SkyplusRoute {
 
   @Serializable data object Cards : SkyplusRoute
 
+  @Serializable data object SavingsGoals : SkyplusRoute
+
   @Serializable data object Settings : SkyplusRoute
 
   @Serializable data object Profile : SkyplusRoute

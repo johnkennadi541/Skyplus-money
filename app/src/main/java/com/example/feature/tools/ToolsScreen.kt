@@ -21,6 +21,7 @@ import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.PieChart
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material.icons.rounded.List
 import androidx.compose.material.icons.rounded.Search
@@ -58,6 +59,7 @@ fun ToolsScreen(
   onOpenInvestments: () -> Unit,
   onOpenSettings: () -> Unit,
   onOpenCards: () -> Unit = {},
+  onOpenSavingsGoals: () -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
   Column(
@@ -96,6 +98,13 @@ fun ToolsScreen(
         subtitle = "Limits, outstanding balances and utilisation",
         testTag = "tools_cards_item",
         onClick = onOpenCards,
+      )
+      ToolRow(
+        icon = Icons.Rounded.Savings,
+        title = "Savings goals",
+        subtitle = "Targets, contributions and progress",
+        testTag = "tools_savings_goals_item",
+        onClick = onOpenSavingsGoals,
       )
       ToolRow(
         icon = Icons.Rounded.ShoppingCart,
