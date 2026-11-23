@@ -170,67 +170,81 @@ class DatabasePassphraseProvider(
       )
     }
 
-    // Fresh install: generate 256-bit passphrase, wrap via Keystore, persist synchronously, and verify.
+    // Fresh install: generate a 256-bit passphrase, wrap it, persist synchronously,
+    // and verify the round trip. Clear every temporary copy that is not transferred
+    // to the SQLCipher factory.
     val rawPassphrase = ByteArray(PASSPHRASE_LENGTH_BYTES)
     SecureRandom().nextBytes(rawPassphrase)
+    var ownershipTransferred = false
+    try {
+      val (encryptedBase64, ivBase64) =
+        try {
+          keyBackend.encrypt(rawPassphrase)
+        } catch (e: Exception) {
+          throw DatabaseSecurityException(
+            reason = PassphraseFailureReason.KEYSTORE_ENCRYPT_FAILED,
+            isRecoverable = true,
+            message = "Failed to wrap new database passphrase with Android Keystore.",
+            cause = e,
+          )
+        }
 
-    val (encryptedBase64, ivBase64) =
-      try {
-        keyBackend.encrypt(rawPassphrase)
-      } catch (e: Exception) {
+      val committed =
+        prefs.edit()
+          .putString(KEY_ENCRYPTED_PASSPHRASE, encryptedBase64)
+          .putString(KEY_IV, ivBase64)
+          .commit()
+
+      if (!committed) {
         throw DatabaseSecurityException(
-          reason = PassphraseFailureReason.KEYSTORE_ENCRYPT_FAILED,
+          reason = PassphraseFailureReason.PERSISTENCE_FAILED,
           isRecoverable = true,
-          message = "Failed to wrap new database passphrase with Android Keystore.",
-          cause = e,
+          message = "Failed to persist wrapped database passphrase synchronously.",
         )
       }
 
-    val committed =
-      prefs.edit()
-        .putString(KEY_ENCRYPTED_PASSPHRASE, encryptedBase64)
-        .putString(KEY_IV, ivBase64)
-        .commit()
-
-    if (!committed) {
-      throw DatabaseSecurityException(
-        reason = PassphraseFailureReason.PERSISTENCE_FAILED,
-        isRecoverable = true,
-        message = "Failed to persist wrapped database passphrase synchronously.",
-      )
-    }
-
-    val persistedEnc = prefs.getString(KEY_ENCRYPTED_PASSPHRASE, null)
-    val persistedIv = prefs.getString(KEY_IV, null)
-    if (persistedEnc != encryptedBase64 || persistedIv != ivBase64) {
-      throw DatabaseSecurityException(
-        reason = PassphraseFailureReason.PERSISTENCE_VERIFICATION_FAILED,
-        isRecoverable = true,
-        message = "Persisted wrapped database passphrase could not be verified after commit.",
-      )
-    }
-
-    val verifiedPassphrase =
-      try {
-        keyBackend.decrypt(persistedEnc, persistedIv)
-      } catch (e: Exception) {
+      val persistedEnc = prefs.getString(KEY_ENCRYPTED_PASSPHRASE, null)
+      val persistedIv = prefs.getString(KEY_IV, null)
+      if (persistedEnc != encryptedBase64 || persistedIv != ivBase64) {
         throw DatabaseSecurityException(
           reason = PassphraseFailureReason.PERSISTENCE_VERIFICATION_FAILED,
           isRecoverable = true,
-          message = "Round-trip verification of persisted database passphrase failed.",
-          cause = e,
+          message = "Persisted wrapped database passphrase could not be verified after commit.",
         )
       }
 
-    if (!MessageDigest.isEqual(verifiedPassphrase, rawPassphrase)) {
-      throw DatabaseSecurityException(
-        reason = PassphraseFailureReason.PERSISTENCE_VERIFICATION_FAILED,
-        isRecoverable = false,
-        message = "Verified database passphrase does not match generated key.",
-      )
-    }
+      val verifiedPassphrase =
+        try {
+          keyBackend.decrypt(persistedEnc, persistedIv)
+        } catch (e: Exception) {
+          throw DatabaseSecurityException(
+            reason = PassphraseFailureReason.PERSISTENCE_VERIFICATION_FAILED,
+            isRecoverable = true,
+            message = "Round-trip verification of persisted database passphrase failed.",
+            cause = e,
+          )
+        }
 
-    return rawPassphrase
+      val matches = try {
+        MessageDigest.isEqual(verifiedPassphrase, rawPassphrase)
+      } finally {
+        verifiedPassphrase.fill(0)
+      }
+      if (!matches) {
+        throw DatabaseSecurityException(
+          reason = PassphraseFailureReason.PERSISTENCE_VERIFICATION_FAILED,
+          isRecoverable = false,
+          message = "Verified database passphrase does not match generated key.",
+        )
+      }
+
+      // Ownership passes to SupportFactory, configured to clear this byte array
+      // immediately after SQLCipher opens the database.
+      ownershipTransferred = true
+      return rawPassphrase
+    } finally {
+      if (!ownershipTransferred) rawPassphrase.fill(0)
+    }
   }
 
   companion object {
