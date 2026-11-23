@@ -133,6 +133,7 @@ class CreditCardReminderWorker @AssistedInject constructor(
         .setContentIntent(pendingIntent)
         .setAutoCancel(true)
         .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+        .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
         .build()
       NotificationManagerCompat.from(applicationContext).notify(statementId.hashCode(), notification)
     }
