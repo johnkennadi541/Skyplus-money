@@ -608,7 +608,7 @@ private fun CardFormDialog(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
           Column(modifier = Modifier.weight(1f)) {
             Text("Payment reminders", style = MaterialTheme.typography.labelLarge)
-            Text("Notify before the statement due date", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Daily check at 9:00 AM before the statement due date", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
           }
           Switch(
             checked = reminderEnabled,
@@ -818,10 +818,19 @@ private fun CardDetailsDialog(
                 Text(event.description, style = MaterialTheme.typography.bodySmall)
                 Text("${event.eventType.name} • ${formatCardDate(event.eventDate)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
               }
-              Text(
-                if (event.pointsDelta > 0L) "+${event.pointsDelta}" else event.pointsDelta.toString(),
-                fontWeight = FontWeight.SemiBold,
-              )
+              Column(horizontalAlignment = Alignment.End) {
+                Text(
+                  if (event.pointsDelta > 0L) "+${event.pointsDelta}" else event.pointsDelta.toString(),
+                  fontWeight = FontWeight.SemiBold,
+                )
+                if (event.cashValueMinor > 0L) {
+                  Text(
+                    formatter.format(Money.fromMinorUnits(event.cashValueMinor, event.currencyCode)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                  )
+                }
+              }
             }
           }
         }
