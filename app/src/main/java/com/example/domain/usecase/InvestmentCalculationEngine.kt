@@ -271,8 +271,14 @@ class InvestmentCalculationEngine @Inject constructor() {
     holding: InvestmentHolding,
     nowMillis: Long = System.currentTimeMillis(),
   ): InvestmentHoldingPerformance {
-    val qty = runCatching { BigDecimal(holding.quantityDecimal.trim()) }.getOrDefault(BigDecimal.ZERO)
-    val isExited = qty.compareTo(BigDecimal.ZERO) <= 0
+    val qty =
+      try {
+        BigDecimal(holding.quantityDecimal.trim())
+      } catch (error: NumberFormatException) {
+        throw IllegalStateException("Stored investment quantity is invalid", error)
+      }
+    require(qty >= BigDecimal.ZERO) { "Stored investment quantity cannot be negative" }
+    val isExited = qty.compareTo(BigDecimal.ZERO) == 0
     val currency = holding.currencyCode.uppercase()
     val scale = Money.resolveFractionDigits(currency)
 
