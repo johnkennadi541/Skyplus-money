@@ -23,7 +23,7 @@ private val Context.reportPreferencesDataStore: DataStore<Preferences> by
   preferencesDataStore(name = "skyplus_report_preferences")
 
 /**
- * Local DataStore for non-sensitive, user-controlled email report summary preferences.
+ * Local DataStore for non-sensitive, user-controlled report delivery preferences.
  * Scoped strictly per authenticated Firebase UID.
  */
 @Singleton
