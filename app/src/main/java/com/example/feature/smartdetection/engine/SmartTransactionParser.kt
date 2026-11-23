@@ -22,7 +22,7 @@ object SmartTransactionParser {
   // Currencies: INR, USD, EUR, GBP, KWD, AED, SAR, QAR, BHD, OMR
   private val AMOUNT_PATTERN =
     Pattern.compile(
-      "(?:(?:₹|Rs\\.?|INR|USD|EUR|GBP|€|£|KWD|AED|SAR|QAR|BHD|OMR)\\s*([0-9,]+(?:\\.[0-9]{1,3})?))|(?:([0-9,]+(?:\\.[0-9]{1,3})?)\\s*(?:INR|USD|EUR|GBP|KWD|AED|SAR|QAR|BHD|OMR))",
+      "(?:(?:₹|Rs\\.?|INR\\b|USD\\b|EUR\\b|GBP\\b|€|£|KWD\\b|AED\\b|SAR\\b|QAR\\b|BHD\\b|OMR\\b)\\s*([0-9,]+(?:\\.[0-9]{1,3})?))|(?:([0-9,]+(?:\\.[0-9]{1,3})?)\\s*(?:INR\\b|USD\\b|EUR\\b|GBP\\b|KWD\\b|AED\\b|SAR\\b|QAR\\b|BHD\\b|OMR\\b))",
       Pattern.CASE_INSENSITIVE,
     )
 
