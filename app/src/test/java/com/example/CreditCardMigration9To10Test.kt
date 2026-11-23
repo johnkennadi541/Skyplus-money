@@ -96,18 +96,19 @@ class CreditCardMigration9To10Test {
     assertTrue(indexExists("index_credit_card_reward_events_cardId"))
 
     db.query("""
-      SELECT annualFeeMinor, annualFeeMonth, rewardProgramName, isFrozen,
+      SELECT joiningFeeMinor, annualFeeMinor, annualFeeMonth, rewardProgramName, isFrozen,
              reminderEnabled, reminderDaysBefore, notes
       FROM credit_cards WHERE id='card_1'
     """.trimIndent()).use { cursor ->
       assertTrue(cursor.moveToFirst())
       assertEquals(0L, cursor.getLong(0))
-      assertEquals(1, cursor.getInt(1))
-      assertTrue(cursor.isNull(2))
-      assertEquals(0, cursor.getInt(3))
-      assertEquals(1, cursor.getInt(4))
-      assertEquals(3, cursor.getInt(5))
-      assertTrue(cursor.isNull(6))
+      assertEquals(0L, cursor.getLong(1))
+      assertEquals(1, cursor.getInt(2))
+      assertTrue(cursor.isNull(3))
+      assertEquals(0, cursor.getInt(4))
+      assertEquals(1, cursor.getInt(5))
+      assertEquals(3, cursor.getInt(6))
+      assertTrue(cursor.isNull(7))
     }
   }
 
