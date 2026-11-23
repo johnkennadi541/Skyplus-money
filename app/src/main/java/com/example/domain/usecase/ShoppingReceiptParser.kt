@@ -44,7 +44,7 @@ object ShoppingReceiptParser {
     val amount = distinctAmounts.singleOrNull()
     val code = candidates.mapNotNull { it.third?.takeIf { codeValue -> Money.isSupportedCurrency(codeValue) } }.distinct().singleOrNull()
     val isoDates = normalized.mapNotNull { line ->
-      Regex("""\\b(20\\d{2}-\\d{2}-\\d{2})\\b""").find(line)?.groupValues?.get(1)
+      Regex("""\b(20\d{2}-\d{2}-\d{2})\b""").find(line)?.groupValues?.get(1)
     }.distinct()
     val purchaseDate = isoDates.singleOrNull()?.let { dateText ->
       runCatching {
