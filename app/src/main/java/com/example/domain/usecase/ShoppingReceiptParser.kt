@@ -39,7 +39,7 @@ object ShoppingReceiptParser {
     val candidates = if (preferred.isNotEmpty()) preferred else totals
     val distinctAmounts = candidates.map { it.second.stripTrailingZeros() }.distinct()
     val amount = distinctAmounts.singleOrNull()
-    val code = candidates.mapNotNull { it.third?.takeIf(Money::isSupportedCurrency) }.distinct().singleOrNull()
+    val code = candidates.mapNotNull { it.third?.takeIf { codeValue -> Money.isSupportedCurrency(codeValue) } }.distinct().singleOrNull()
     val merchant = normalized.firstOrNull()?.takeIf { line ->
       line.length in 2..60 && !line.contains(Regex("""(?i)(receipt|invoice|tax|date|time)"""))
     }
