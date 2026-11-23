@@ -104,6 +104,49 @@ class Phase3InvestmentDatabaseAndRepoTest {
     }
 
   @Test
+  fun `first opted in mutual fund NAV can be older than purchase day`() = runTest {
+    val uid = "uid_first_nav"
+    syncPreferences.setAutoUpdateConsent(uid, true)
+    val repo = buildRepo(
+      object : MarketPriceDataSource {
+        override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult =
+          MarketQuoteFetchResult.UnsupportedCategoryOrIdentifier("not used")
+      }
+    )
+    val now = System.currentTimeMillis()
+    val holding =
+      repo.createHoldingWithInitialBuy(
+        authenticatedUserId = uid,
+        name = "Test Mutual Fund",
+        category = InvestmentCategory.MUTUAL_FUNDS,
+        symbolOrTicker = "119598",
+        isin = null,
+        brokerOrPlatform = null,
+        currencyCode = "INR",
+        purchaseDate = now,
+        quantityDecimal = "1",
+        purchasePriceDecimal = "100",
+        chargesMinor = 0L,
+        currentMarketPriceDecimal = "100",
+        autoPriceUpdateEnabled = true,
+        notes = null,
+      ).getOrThrow()
+
+    val applied = repo.applyAutomaticMarketPrice(
+      authenticatedUserId = uid,
+      holdingId = holding.id,
+      newUnitPriceDecimal = "101",
+      priceDate = now - 86_400_000L,
+      source = PriceSourceType.MFAPI_AMFI_EOD,
+      providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
+      allowOverwriteManual = false,
+    ).getOrThrow()
+
+    assertTrue(applied)
+    assertEquals("101", repo.getHoldingById(uid, holding.id)?.currentMarketPriceDecimal)
+  }
+
+  @Test
   fun `new investment holdings reject non INR currencies`() = runTest {
     val repo = buildRepo(
       object : MarketPriceDataSource {
@@ -441,6 +484,8 @@ class Phase3InvestmentDatabaseAndRepoTest {
       newUnitPriceDecimal = "110.00",
       priceDate = currentQuoteDate,
     ).getOrThrow()
+    // Manual override pauses automation; re-enabling is a fresh explicit consent.
+    repo.setHoldingAutoPriceUpdate("uid_quote_guard", created.id, true).getOrThrow()
 
     val rejectedOlderQuote =
       repo.applyAutomaticMarketPrice(
