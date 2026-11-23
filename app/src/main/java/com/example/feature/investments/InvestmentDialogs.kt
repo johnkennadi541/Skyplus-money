@@ -468,8 +468,13 @@ fun RecordTradeDialog(
   var dateText by remember { mutableStateOf(formatDateIso(System.currentTimeMillis())) }
   var quantityText by remember { mutableStateOf("") }
   // Do not prefill a purchase-price fallback as though it were a current quote.
+  val quoteAgeMillis = System.currentTimeMillis() - holding.lastPriceUpdateDate
+  val hasFreshQuote =
+    holding.lastPriceUpdateDate > 0L &&
+      quoteAgeMillis >= 0L &&
+      quoteAgeMillis <= InvestmentCalculationEngine.STALE_PRICE_THRESHOLD_MILLIS
   var unitPriceText by remember(holding) {
-    mutableStateOf(if (holding.lastPriceUpdateDate > 0L) holding.currentMarketPriceDecimal else "")
+    mutableStateOf(if (hasFreshQuote) holding.currentMarketPriceDecimal else "")
   }
   var chargesText by remember { mutableStateOf("0") }
   var notes by remember { mutableStateOf("") }
@@ -706,7 +711,10 @@ fun UpdateMarketPriceDialog(
   onDismiss: () -> Unit,
   onSubmit: (newPriceDecimal: String, priceDate: Long) -> Unit,
 ) {
-  var priceText by remember(holding) { mutableStateOf(holding.currentMarketPriceDecimal) }
+  // A cost-price fallback is not a market quote; leave the field blank until one exists.
+  var priceText by remember(holding) {
+    mutableStateOf(if (holding.lastPriceUpdateDate > 0L) holding.currentMarketPriceDecimal else "")
+  }
   var dateText by remember { mutableStateOf(formatDateIso(System.currentTimeMillis())) }
   var errorText by remember { mutableStateOf<String?>(null) }
   var showPriceCalculator by remember { mutableStateOf(false) }
