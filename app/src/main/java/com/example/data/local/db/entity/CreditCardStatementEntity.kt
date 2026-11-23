@@ -17,6 +17,7 @@ import com.example.domain.model.CreditCardStatement
     ),
   ],
   indices = [
+    Index(value = ["cardId"]),
     Index(value = ["userId", "cardId", "statementDate"], unique = true),
     Index(value = ["userId", "dueDate"]),
   ],
