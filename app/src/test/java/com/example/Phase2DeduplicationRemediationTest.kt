@@ -24,6 +24,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -214,6 +215,18 @@ class Phase2DeduplicationRemediationTest {
 
     assertEquals(DetectionEventStatus.IN_REVIEW, event.status)
     assertEquals(500_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
+
+    val oneSidedApproval = detectionRepo.approveReviewEvent(
+      userId = uid,
+      eventId = event.id,
+      selectedAccountId = "acc_1",
+      category = "Transfer",
+      merchant = "Own Account",
+      correctedType = TransactionType.TRANSFER,
+    )
+    assertTrue(oneSidedApproval.isFailure)
+    assertEquals(500_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
+    assertEquals(DetectionEventStatus.IN_REVIEW, detectionRepo.getEventById(uid, event.id)!!.status)
   }
 
   @Test
