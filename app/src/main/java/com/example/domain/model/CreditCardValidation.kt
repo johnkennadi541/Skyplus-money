@@ -28,6 +28,11 @@ object CreditCardValidation {
     require(card.issuerName.isNotBlank()) { "Issuer name cannot be blank" }
     require(card.currencyCode.isNotBlank()) { "Card currency is required" }
     require(card.creditLimitMinor >= 0L) { "Credit limit cannot be negative" }
+    require(card.annualFeeMinor >= 0L) { "Annual fee cannot be negative" }
+    require(card.annualFeeMonth in 1..12) { "Annual fee month must be between 1 and 12" }
+    require(card.reminderDaysBefore in 1..30) { "Reminder lead time must be between 1 and 30 days" }
+    require(card.rewardProgramName == null || card.rewardProgramName.length <= 80) { "Reward program name is too long" }
+    require(card.notes == null || card.notes.length <= 500) { "Card notes are too long" }
     require(card.billingCycleDay in 1..28) { "Billing cycle day must be between 1 and 28" }
     require(card.paymentDueDayOffset in 0..45) { "Payment due offset must be between 0 and 45" }
     require(card.last4.isEmpty() || isFourDigits(card.last4)) {
