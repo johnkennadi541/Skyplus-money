@@ -6,7 +6,6 @@ import com.example.domain.model.ParsedFinancialMessage
 import com.example.domain.model.TransactionStatus
 import com.example.domain.model.TransactionType
 import java.math.BigDecimal
-import java.math.RoundingMode
 import java.util.regex.Pattern
 
 object SmartTransactionParser {
@@ -19,10 +18,19 @@ object SmartTransactionParser {
 
   private val LONG_DIGITS_PATTERN = Regex("[0-9]{6,}")
 
-  // Currencies: INR, USD, EUR, GBP, KWD, AED, SAR, QAR, BHD, OMR
+  // Build the code matcher from the Android ISO 4217 registry so notification
+  // parsing follows the same full currency support as the rest of the finance app.
+  private val SUPPORTED_CURRENCY_CODES_PATTERN =
+    java.util.Currency.getAvailableCurrencies()
+      .map { it.currencyCode }
+      .filter { Money.isSupportedCurrency(it) }
+      .distinct()
+      .sortedByDescending { it.length }
+      .joinToString("|")
+
   private val AMOUNT_PATTERN =
     Pattern.compile(
-      "(?:(?:₹|Rs\\.?|INR\\b|USD\\b|EUR\\b|GBP\\b|€|£|KWD\\b|AED\\b|SAR\\b|QAR\\b|BHD\\b|OMR\\b)\\s*([0-9,]+(?:\\.[0-9]{1,3})?))|(?:([0-9,]+(?:\\.[0-9]{1,3})?)\\s*(?:INR\\b|USD\\b|EUR\\b|GBP\\b|KWD\\b|AED\\b|SAR\\b|QAR\\b|BHD\\b|OMR\\b))",
+      "(?:(?:₹|Rs\\.?|(?:$SUPPORTED_CURRENCY_CODES_PATTERN)\\b)\\s*([0-9,]+(?:\\.[0-9]{1,4})?))|(?:([0-9,]+(?:\\.[0-9]{1,4})?)\\s*(?:$SUPPORTED_CURRENCY_CODES_PATTERN)\\b)",
       Pattern.CASE_INSENSITIVE,
     )
 
@@ -112,28 +120,23 @@ object SmartTransactionParser {
     val bigDecimalAmount = runCatching { BigDecimal(cleanedAmount) }.getOrNull() ?: return null
 
     val matchedSubstring = amountMatcher.group(0)?.uppercase().orEmpty()
+    val codeMatcher = Pattern.compile("\\b[A-Z]{3}\\b").matcher(matchedSubstring)
     val currencyCode =
       when {
-        matchedSubstring.contains("KWD") -> "KWD"
-        matchedSubstring.contains("AED") -> "AED"
-        matchedSubstring.contains("SAR") -> "SAR"
-        matchedSubstring.contains("QAR") -> "QAR"
-        matchedSubstring.contains("BHD") -> "BHD"
-        matchedSubstring.contains("OMR") -> "OMR"
-        matchedSubstring.contains("USD") -> "USD"
-        matchedSubstring.contains("€") || matchedSubstring.contains("EUR") -> "EUR"
-        matchedSubstring.contains("£") || matchedSubstring.contains("GBP") -> "GBP"
-        matchedSubstring.contains("₹") || matchedSubstring.contains("RS") || matchedSubstring.contains("INR") -> "INR"
+        codeMatcher.find() -> codeMatcher.group()
+        matchedSubstring.contains("₹") || matchedSubstring.contains("RS") -> "INR"
+        matchedSubstring.contains("€") -> "EUR"
+        matchedSubstring.contains("£") -> "GBP"
         else -> return null
       }
+    if (!Money.isSupportedCurrency(currencyCode)) return null
 
     val fractionDigits = Money.resolveFractionDigits(currencyCode)
+    // Do not silently round a notification amount to the currency's minor-unit scale.
+    if (bigDecimalAmount.stripTrailingZeros().scale().coerceAtLeast(0) > fractionDigits) return null
     val amountMinor =
       runCatching {
-        bigDecimalAmount
-          .setScale(fractionDigits, RoundingMode.HALF_EVEN)
-          .movePointRight(fractionDigits)
-          .longValueExact()
+        bigDecimalAmount.movePointRight(fractionDigits).longValueExact()
       }.getOrNull() ?: return null
 
     if (amountMinor <= 0L) return null
