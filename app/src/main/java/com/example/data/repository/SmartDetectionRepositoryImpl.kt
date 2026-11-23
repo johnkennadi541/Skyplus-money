@@ -379,7 +379,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     correctedAmountMinor: Long?,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(eventId.isNotBlank()) { "Event ID is required" }
         require(selectedAccountId.isNotBlank()) { "Selected account ID is required" }
@@ -394,7 +394,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
 
           val parsedType =
             correctedType
-              ?: runCatching { TransactionType.valueOf(event.detectedType) }
+              ?: runCatchingPreservingCancellation { TransactionType.valueOf(event.detectedType) }
                 .getOrDefault(TransactionType.EXPENSE)
           val finalType =
             if (parsedType == TransactionType.PENDING) TransactionType.EXPENSE else parsedType
@@ -501,7 +501,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
 
   override suspend fun dismissReviewEvent(userId: String, eventId: String): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(eventId.isNotBlank()) { "Event ID is required" }
         database.withTransaction {
@@ -529,7 +529,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
 
   override suspend fun clearDetectionHistory(userId: String): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         eventDao.clearAllEvents(userId)
       }
@@ -545,7 +545,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     rule: AccountMappingRule,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(rule.userId == authenticatedUserId) {
           "Mapping rule ownership cannot be assigned across users"
@@ -562,7 +562,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
 
   override suspend fun deleteAccountMappingRule(userId: String, ruleId: String): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(ruleId.isNotBlank()) { "Rule ID is required" }
         mappingDao.deleteRule(userId, ruleId)
@@ -593,7 +593,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     settings: DetectionSettings,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(settings.userId == authenticatedUserId) {
           "Detection settings ownership cannot be modified across users"
