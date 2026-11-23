@@ -596,13 +596,13 @@ private fun CardFormDialog(
             formError = "Choose an account first"
           } else if (issuer.isBlank()) {
             formError = "Enter the card issuer"
-          } else if (cycle !in 1..28) {
+          } else if (cycle == null || cycle !in 1..28) {
             formError = "Statement closing day must be between 1 and 28"
-          } else if (due !in 0..45) {
+          } else if (due == null || due !in 0..45) {
             formError = "Payment due offset must be between 0 and 45"
-          } else if (feeMonth !in 1..12) {
+          } else if (feeMonth == null || feeMonth !in 1..12) {
             formError = "Annual fee month must be between 1 and 12"
-          } else if (reminderEnabled && reminderLead !in 1..30) {
+          } else if (reminderEnabled && (reminderLead == null || reminderLead !in 1..30)) {
             formError = "Reminder lead time must be between 1 and 30 days"
           } else {
             formError = null
