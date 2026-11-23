@@ -41,7 +41,7 @@ class ReportExportGeneratorTest {
 
   private val exportGenerator = ReportExportGenerator()
 
-  private fun buildSampleSnapshot() =
+  private fun buildSampleSnapshot(lastPriceUpdateDate: Long = 1_751_900_000_000L) =
     calcEngine.calculateSnapshot(
       window =
         ReportDateWindow(
@@ -109,7 +109,7 @@ class ReportExportGeneratorTest {
             realizedPnlMinor = 5_000L,
             currentMarketPriceDecimal = "125.00",
             currentValuationMinor = 125_000L,
-            lastPriceUpdateDate = 1_751_900_000_000L,
+            lastPriceUpdateDate = lastPriceUpdateDate,
           ),
         ),
       investmentTransactions = emptyList(),
@@ -155,6 +155,16 @@ class ReportExportGeneratorTest {
     val documentXml = entries.getValue("word/document.xml")
     assertTrue(documentXml.contains("Realized"))
     assertTrue(documentXml.contains("Price as of"))
+  }
+
+
+  @Test
+  fun `csv export labels missing first NAV without epoch date`() {
+    val snapshot = buildSampleSnapshot(lastPriceUpdateDate = 0L)
+    val csvText = String(exportGenerator.generateExport(snapshot, ReportExportFormat.CSV).bytes, StandardCharsets.UTF_8)
+
+    assertTrue(csvText.contains("Awaiting first price"))
+    assertFalse("Missing first NAV must not be rendered as an epoch date", csvText.contains("1970-01-01"))
   }
 
   @Test
