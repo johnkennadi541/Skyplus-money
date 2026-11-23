@@ -185,7 +185,7 @@ class InvestmentRepositoryImpl @Inject constructor(
             totalChargesMinor = mutation.newTotalChargesMinor,
             currentMarketPriceDecimal = marketPriceText,
             currentValuationMinor = mutation.newValuationMinor,
-            lastPriceUpdateDate = now,
+            lastPriceUpdateDate = if (allowAutoForHolding) 0L else now,
             lastPriceSource = PriceSourceType.MANUAL,
             lastPriceProviderLabel = "Manual",
             autoPriceUpdateEnabled = allowAutoForHolding,
@@ -586,6 +586,10 @@ class InvestmentRepositoryImpl @Inject constructor(
               lastPriceUpdateDate = priceDate,
               lastPriceSource = PriceSourceType.MANUAL,
               lastPriceProviderLabel = "Manual",
+              // A deliberate manual override pauses NAV automation until the user opts in again.
+              autoPriceUpdateEnabled =
+                if (existing.category == InvestmentCategory.MUTUAL_FUNDS) false
+                else existing.autoPriceUpdateEnabled,
               updatedAt = now,
             )
 
@@ -656,9 +660,9 @@ class InvestmentRepositoryImpl @Inject constructor(
             "A valid 5–7 digit AMFI scheme code is required for automatic NAV updates"
           }
           requireIndiaInvestmentCurrency(existing.currencyCode)
-          require(priceDate >= existing.purchaseDate) {
-            "Market quote date cannot be before the original purchase"
-          }
+          // Provider NAVs can be dated before the purchase day (e.g. a fund bought
+          // today uses the latest completed business-day NAV), so compare against the
+          // last accepted price observation rather than the transaction date.
 
           // Never roll the stored market valuation back to an older provider observation.
           if (priceDate < existing.lastPriceUpdateDate) {
