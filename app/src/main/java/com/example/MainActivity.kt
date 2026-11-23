@@ -5,12 +5,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.core.designsystem.theme.SkyplusOceanTheme
 import com.example.core.security.DatabaseSecurityMonitor
+import com.example.domain.model.AuthSessionState
 import com.example.feature.accounts.AccountsViewModel
 import com.example.feature.authentication.AuthViewModel
 import com.example.feature.budgets.BudgetsViewModel
@@ -64,6 +66,13 @@ class MainActivity : ComponentActivity() {
       val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
       val homeUiState by homeViewModel.uiState.collectAsStateWithLifecycle()
       val themePreference by settingsViewModel.themePreference.collectAsStateWithLifecycle()
+      val profileFirstName by settingsViewModel.profileFirstName.collectAsStateWithLifecycle()
+      LaunchedEffect(authUiState.sessionState) {
+        val authenticated = authUiState.sessionState as? AuthSessionState.Authenticated
+        if (authenticated != null) {
+          settingsViewModel.bindProfile(authenticated.user.uid, authenticated.user.displayName)
+        }
+      }
       val databaseSecurityError by databaseSecurityMonitor.securityIssue.collectAsStateWithLifecycle()
 
       SkyplusOceanTheme(themePreference = themePreference) {
@@ -93,6 +102,13 @@ class MainActivity : ComponentActivity() {
           homeDashboardViewModel = homeDashboardViewModel,
           cardsViewModel = cardsViewModel,
           savingsGoalsViewModel = savingsGoalsViewModel,
+          profileFirstName = profileFirstName,
+          onSaveProfileFirstName = { firstName ->
+            val authenticated = authUiState.sessionState as? AuthSessionState.Authenticated
+            if (authenticated != null) {
+              settingsViewModel.saveProfileFirstName(authenticated.user.uid, firstName)
+            }
+          },
         )
       }
     }
