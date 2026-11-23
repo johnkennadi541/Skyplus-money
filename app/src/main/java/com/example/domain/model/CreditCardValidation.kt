@@ -55,3 +55,42 @@ object CreditCardValidation {
     require(parsed >= BigDecimal.ZERO) { "APR cannot be negative" }
   }
 }
+
+object CreditCardStatementValidation {
+  fun requireValid(statement: CreditCardStatement, authenticatedUserId: String) {
+    require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
+    require(statement.userId == authenticatedUserId) { "Statement ownership cannot be assigned across users" }
+    require(statement.cardId.isNotBlank()) { "A credit card is required" }
+    require(Money.isSupportedCurrency(statement.currencyCode)) { "Statement currency is not supported" }
+    require(statement.statementDate > 0L) { "Statement date is required" }
+    require(statement.dueDate >= statement.statementDate) { "Payment due date cannot be before statement date" }
+    require(statement.statementBalanceMinor >= 0L) { "Statement balance cannot be negative" }
+    require(statement.minimumDueMinor >= 0L) { "Minimum due cannot be negative" }
+    require(statement.minimumDueMinor <= statement.statementBalanceMinor) {
+      "Minimum due cannot exceed the statement balance"
+    }
+    require(statement.feesMinor >= 0L) { "Fees cannot be negative" }
+    require(statement.interestMinor >= 0L) { "Interest cannot be negative" }
+    require(statement.notes == null || statement.notes.length <= 500) { "Statement notes are too long" }
+  }
+}
+
+object CreditCardRewardValidation {
+  fun requireValid(event: CreditCardRewardEvent, authenticatedUserId: String) {
+    require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
+    require(event.userId == authenticatedUserId) { "Reward event ownership cannot be assigned across users" }
+    require(event.cardId.isNotBlank()) { "A credit card is required" }
+    require(event.eventDate > 0L) { "Reward event date is required" }
+    require(event.pointsDelta != 0L) { "Reward points change cannot be zero" }
+    require(event.cashValueMinor >= 0L) { "Reward cash value cannot be negative" }
+    require(Money.isSupportedCurrency(event.currencyCode)) { "Reward currency is not supported" }
+    require(event.description.isNotBlank() && event.description.length <= 160) {
+      "Enter a reward description up to 160 characters"
+    }
+    when (event.eventType) {
+      CreditCardRewardEventType.EARN -> require(event.pointsDelta > 0L) { "Earned points must be positive" }
+      CreditCardRewardEventType.REDEEM -> require(event.pointsDelta < 0L) { "Redeemed points must be negative" }
+      CreditCardRewardEventType.ADJUSTMENT -> Unit
+    }
+  }
+}
