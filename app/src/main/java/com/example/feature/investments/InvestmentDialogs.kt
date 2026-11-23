@@ -15,7 +15,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Calculate
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
@@ -50,6 +54,7 @@ import com.example.domain.model.Money
 import com.example.domain.model.ProviderSupportLevel
 import com.example.domain.usecase.FormatMoneyUseCase
 import com.example.domain.usecase.InvestmentCalculationEngine
+import com.example.feature.calculator.SmartCalculatorAmountDialog
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.text.SimpleDateFormat
@@ -122,6 +127,7 @@ fun InvestmentFormDialog(
   }
   var notes by remember(existingHolding) { mutableStateOf(existingHolding?.notes ?: "") }
   var validationError by remember { mutableStateOf<String?>(null) }
+  var calculatorTarget by remember { mutableStateOf<String?>(null) }
 
   AlertDialog(
     onDismissRequest = onDismiss,
@@ -258,6 +264,11 @@ fun InvestmentFormDialog(
               label = { Text("Buy Price *") },
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
               singleLine = true,
+              trailingIcon = {
+                IconButton(onClick = { calculatorTarget = "buy" }, modifier = Modifier.testTag("investment_buy_price_calculator_button")) {
+                  Icon(Icons.Rounded.Calculate, contentDescription = "Calculate buy price")
+                }
+              },
               modifier = Modifier.weight(1f).testTag("investment_buy_price_input"),
             )
           }
@@ -272,6 +283,11 @@ fun InvestmentFormDialog(
               label = { Text("Charges ($selectedCurrency)") },
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
               singleLine = true,
+              trailingIcon = {
+                IconButton(onClick = { calculatorTarget = "charges" }, modifier = Modifier.testTag("investment_charges_calculator_button")) {
+                  Icon(Icons.Rounded.Calculate, contentDescription = "Calculate investment charges")
+                }
+              },
               modifier = Modifier.weight(1f).testTag("investment_charges_input"),
             )
             OutlinedTextField(
@@ -280,6 +296,11 @@ fun InvestmentFormDialog(
               label = { Text("Market Price (opt)") },
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
               singleLine = true,
+              trailingIcon = {
+                IconButton(onClick = { calculatorTarget = "market" }, modifier = Modifier.testTag("investment_market_price_calculator_button")) {
+                  Icon(Icons.Rounded.Calculate, contentDescription = "Calculate market price")
+                }
+              },
               modifier = Modifier.weight(1f).testTag("investment_market_price_input"),
             )
           }
@@ -311,6 +332,26 @@ fun InvestmentFormDialog(
           maxLines = 2,
           modifier = Modifier.fillMaxWidth().testTag("investment_notes_input"),
         )
+
+        calculatorTarget?.let { target ->
+          val initialExpression = when (target) {
+            "buy" -> purchasePriceText
+            "charges" -> chargesText
+            else -> currentMarketPriceText
+          }
+          SmartCalculatorAmountDialog(
+            initialExpression = initialExpression,
+            onApply = { calculatedAmount ->
+              when (target) {
+                "buy" -> purchasePriceText = calculatedAmount
+                "charges" -> chargesText = calculatedAmount
+                else -> currentMarketPriceText = calculatedAmount
+              }
+              calculatorTarget = null
+            },
+            onDismiss = { calculatorTarget = null },
+          )
+        }
 
         if (validationError != null) {
           Text(
