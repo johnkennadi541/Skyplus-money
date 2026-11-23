@@ -27,7 +27,9 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
+import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.Buffer
 import okio.Timeout
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -100,6 +102,41 @@ class Phase3InvestmentDatabaseAndRepoTest {
         override fun timeout(): Timeout = Timeout.NONE
       }
     }
+
+  @Test
+  fun `market feed rejects oversized unknown length response without parsing it`() = runTest {
+    val oversizedJson = """{"status":"SUCCESS","data":[{"date":"01-01-2026","nav":"100.00"}]}""" +
+      " ".repeat(70 * 1024)
+    val provider =
+      AmfiMfApiMarketPriceDataSource(
+        fakeCallFactory { request ->
+          Response.Builder()
+            .request(request)
+            .protocol(Protocol.HTTP_1_1)
+            .code(200)
+            .message("OK")
+            .body(
+              object : ResponseBody() {
+                override fun contentType() = "application/json".toMediaType()
+                override fun contentLength(): Long = -1L
+                override fun source() = Buffer().writeUtf8(oversizedJson)
+              }
+            )
+            .build()
+        },
+        testDispatchers,
+      )
+
+    val result =
+      provider.fetchLatestQuote(
+        MarketQuoteRequest("holding_size_test", InvestmentCategory.MUTUAL_FUNDS, "12345", null, "INR")
+      )
+
+    assertTrue(
+      "Oversized response with unknown content length must be rejected",
+      result is MarketQuoteFetchResult.InvalidResponse,
+    )
+  }
 
   @Test
   fun `create edit additional buy partial sell complete sell and delete persist accurately`() = runTest {
