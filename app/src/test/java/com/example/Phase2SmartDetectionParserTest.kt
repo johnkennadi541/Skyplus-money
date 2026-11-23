@@ -103,6 +103,14 @@ class Phase2SmartDetectionParserTest {
   }
 
   @Test
+  fun `parses Indian rupee symbol and rejects ambiguous dollar currency symbol`() {
+    val rupee = SmartTransactionParser.parse("₹ 1,250.00 debited from A/c XX4321 paid to Grocery Ref INR123456")!!
+    assertEquals("INR", rupee.currencyCode)
+    assertEquals(125000L, rupee.amountMinor)
+    assertNull(SmartTransactionParser.parse("$ 25.00 spent at Store on card ending 7788 Ref USD123456"))
+  }
+
+  @Test
   fun `strictly rejects OTP PIN MPIN TPIN CVV password and security notifications`() {
     val sensitiveAlerts =
       listOf(
