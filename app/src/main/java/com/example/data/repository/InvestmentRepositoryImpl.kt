@@ -161,6 +161,11 @@ class InvestmentRepositoryImpl @Inject constructor(
         val holdingId = UUID.randomUUID().toString()
         val allowAutoForHolding =
           autoPriceUpdateEnabled && category == InvestmentCategory.MUTUAL_FUNDS
+        if (allowAutoForHolding) {
+          require(isValidAmfiSchemeCode(symbolOrTicker)) {
+            "Enter a valid 5–7 digit AMFI scheme code to enable automatic NAV updates"
+          }
+        }
 
         val holding =
           InvestmentHolding(
@@ -180,7 +185,7 @@ class InvestmentRepositoryImpl @Inject constructor(
             totalChargesMinor = mutation.newTotalChargesMinor,
             currentMarketPriceDecimal = marketPriceText,
             currentValuationMinor = mutation.newValuationMinor,
-            lastPriceUpdateDate = purchaseDate,
+            lastPriceUpdateDate = now,
             lastPriceSource = PriceSourceType.MANUAL,
             lastPriceProviderLabel = "Manual",
             autoPriceUpdateEnabled = allowAutoForHolding,
@@ -212,7 +217,7 @@ class InvestmentRepositoryImpl @Inject constructor(
             id = UUID.randomUUID().toString(),
             holdingId = holdingId,
             userId = authenticatedUserId,
-            priceDate = purchaseDate,
+            priceDate = now,
             unitPriceDecimal = marketPriceText,
             valuationMinor = mutation.newValuationMinor,
             totalInvestedMinor = mutation.newOpenCostBasisMinor,
@@ -266,6 +271,11 @@ class InvestmentRepositoryImpl @Inject constructor(
           }
           val allowAuto =
             holding.autoPriceUpdateEnabled && existingDomain.category == InvestmentCategory.MUTUAL_FUNDS
+          if (allowAuto) {
+            require(isValidAmfiSchemeCode(holding.symbolOrTicker)) {
+              "Enter a valid 5–7 digit AMFI scheme code to enable automatic NAV updates"
+            }
+          }
           val now = System.currentTimeMillis()
           val updated =
             existingDomain.copy(
@@ -305,6 +315,9 @@ class InvestmentRepositoryImpl @Inject constructor(
             investmentDao.getHoldingById(authenticatedUserId, holdingId)?.toDomain()
               ?: throw SecurityException("Investment holding does not belong to authenticated user")
           if (enabled) requireIndiaInvestmentCurrency(existing.currencyCode)
+          if (enabled && !isValidAmfiSchemeCode(existing.symbolOrTicker)) {
+            throw IllegalStateException("A valid 5–7 digit AMFI scheme code is required for automatic NAV updates")
+          }
           if (enabled && existing.category != InvestmentCategory.MUTUAL_FUNDS) {
             throw IllegalStateException(
               "Automatic market price updates are only available for Mutual Funds with an AMFI scheme code"
@@ -403,7 +416,7 @@ class InvestmentRepositoryImpl @Inject constructor(
               id = UUID.randomUUID().toString(),
               holdingId = holdingId,
               userId = authenticatedUserId,
-              priceDate = transactionDate,
+              priceDate = now,
               unitPriceDecimal = existing.currentMarketPriceDecimal,
               valuationMinor = mutation.newValuationMinor,
               totalInvestedMinor = mutation.newOpenCostBasisMinor,
@@ -639,6 +652,9 @@ class InvestmentRepositoryImpl @Inject constructor(
           require(existing.category == InvestmentCategory.MUTUAL_FUNDS) {
             "Automatic market updates are restricted to Indian mutual funds"
           }
+          require(isValidAmfiSchemeCode(existing.symbolOrTicker)) {
+            "A valid 5–7 digit AMFI scheme code is required for automatic NAV updates"
+          }
           requireIndiaInvestmentCurrency(existing.currencyCode)
           require(priceDate >= existing.purchaseDate) {
             "Market quote date cannot be before the original purchase"
@@ -844,6 +860,9 @@ class InvestmentRepositoryImpl @Inject constructor(
         )
       }
     }
+
+  private fun isValidAmfiSchemeCode(value: String?): Boolean =
+    value?.matches(Regex("^[0-9]{5,7}$")) == true
 
   private fun requireIndiaInvestmentCurrency(currencyCode: String): String {
     val normalized = currencyCode.trim().uppercase()
