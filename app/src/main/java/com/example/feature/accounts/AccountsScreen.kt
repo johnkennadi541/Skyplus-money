@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CreditCard
+import androidx.compose.material.icons.rounded.Calculate
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
@@ -75,6 +76,7 @@ import com.example.domain.model.AccountType
 import com.example.domain.model.FinancialAccount
 import com.example.domain.model.Money
 import com.example.domain.usecase.FormatMoneyUseCase
+import com.example.feature.calculator.SmartCalculatorAmountDialog
 
 @Composable
 fun AccountsScreen(
@@ -476,6 +478,7 @@ fun AddEditAccountDialog(
   var balanceStr by remember {
     mutableStateOf(accountToEdit?.initialBalance?.toBigDecimal()?.toPlainString().orEmpty())
   }
+  var showBalanceCalculator by remember { mutableStateOf(false) }
   var institutionName by remember { mutableStateOf(accountToEdit?.institutionName.orEmpty()) }
   var last4 by remember { mutableStateOf(accountToEdit?.accountNumberLast4.orEmpty()) }
   var selectedColor by remember { mutableStateOf(accountToEdit?.colorHex ?: "#0A2540") }
@@ -571,8 +574,27 @@ fun AddEditAccountDialog(
             label = { Text("Opening Balance") },
             placeholder = { Text("0.00") },
             singleLine = true,
+            trailingIcon = {
+              IconButton(
+                onClick = { showBalanceCalculator = true },
+                modifier = Modifier.testTag("account_balance_calculator_button"),
+              ) {
+                Icon(Icons.Rounded.Calculate, contentDescription = "Calculate opening balance")
+              }
+            },
             modifier = Modifier.fillMaxWidth().testTag("account_balance_input"),
           )
+          if (showBalanceCalculator) {
+            SmartCalculatorAmountDialog(
+              initialExpression = balanceStr,
+              decimalScale = Money.resolveFractionDigits(currencyCode),
+              onApply = { calculatedAmount ->
+                balanceStr = calculatedAmount
+                showBalanceCalculator = false
+              },
+              onDismiss = { showBalanceCalculator = false },
+            )
+          }
         } else {
           Row(
             modifier = Modifier.fillMaxWidth(),
