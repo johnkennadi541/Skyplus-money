@@ -350,6 +350,26 @@ class Phase3InvestmentDatabaseAndRepoTest {
   }
 
   @Test
+  fun `buy and sell transactions reject dates earlier than latest recorded transaction`() = runTest {
+    val repo = buildRepo(AmfiMfApiMarketPriceDataSource(fakeCallFactory { throw IOException("offline") }, testDispatchers))
+    val uid = "uid_transaction_order"
+    val purchaseDate = 1_750_000_000_000L
+    val holding = repo.createHoldingWithInitialBuy(
+      authenticatedUserId = uid, name = "Chronology Test Fund", category = InvestmentCategory.STOCKS,
+      symbolOrTicker = "TEST", isin = null, brokerOrPlatform = null, currencyCode = "INR",
+      purchaseDate = purchaseDate, quantityDecimal = "10", purchasePriceDecimal = "100",
+      chargesMinor = 0L, currentMarketPriceDecimal = "100", autoPriceUpdateEnabled = false, notes = null,
+    ).getOrThrow()
+    val latestTradeDate = purchaseDate + 86_400_000L
+    repo.recordAdditionalPurchase(uid, holding.id, latestTradeDate, "5", "110", 0L, null).getOrThrow()
+    val backdatedBuy = repo.recordAdditionalPurchase(uid, holding.id, latestTradeDate - 1L, "1", "105", 0L, null)
+    val backdatedSell = repo.recordSale(uid, holding.id, latestTradeDate - 1L, "1", "120", 0L, null)
+    assertTrue("Backdated buy must be rejected to preserve WAC chronology", backdatedBuy.isFailure)
+    assertTrue("Backdated sell must be rejected to preserve WAC chronology", backdatedSell.isFailure)
+    assertEquals("15", repo.getHoldingById(uid, holding.id)?.quantityDecimal)
+    assertEquals(2, repo.getTransactionsForHolding(uid, holding.id).first().size)
+  }
+  @Test
   fun `rejected automatic quote is counted as an error not a manual skip`() = runTest {
     val uid = "uid_invalid_quote_source"
     syncPreferences.setAutoUpdateConsent(uid, true)
