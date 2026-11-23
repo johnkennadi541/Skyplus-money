@@ -77,7 +77,7 @@ class DailyAutoEntryReportFormatterTest {
     assertTrue(report.body.contains("KWD  Income: 0.000 (0)  •  Expense: 1.250 (1)"))
     assertTrue(report.body.contains("AUTO EXPENSE • Cafe • 15.00 INR • A/c ••4321"))
     assertTrue(report.body.contains("REVIEWED EXPENSE • Reviewed Shop • 25.00 INR • A/c ••4321"))
-    assertTrue(report.body.contains("INCOME • Salary • 100.00 INR • A/c ••4321"))
+    assertTrue(report.body.contains("AUTO INCOME • Salary • 100.00 INR • A/c ••4321"))
     assertTrue(report.body.contains("Needs attention: 1"))
     assertTrue(report.body.contains("Duplicates skipped: 1"))
     assertTrue(report.body.contains("Source: SMS notifications only"))
@@ -99,7 +99,7 @@ class DailyAutoEntryReportFormatterTest {
     val report = DailyAutoEntryReportFormatter.format(0L, events)
 
     assertEquals(0, report.postedCount)
-    assertTrue(report.body.contains("No automatic entries were posted."))
+    assertTrue(report.body.contains("No entries were posted."))
     assertTrue(report.body.contains("Needs attention: 1"))
     assertTrue(!report.body.contains("INCOME • Unmapped sender"))
   }
@@ -127,7 +127,7 @@ class DailyAutoEntryReportFormatterTest {
     dedupFingerprint = id,
     status = status,
     mappedAccountId = if (status == DetectionEventStatus.AUTO_SAVED) "account-$id" else null,
-    createdTransactionId = if (status == DetectionEventStatus.AUTO_SAVED) "transaction-$id" else null,
+    createdTransactionId = if (status in setOf(DetectionEventStatus.AUTO_SAVED, DetectionEventStatus.APPROVED)) "transaction-$id" else null,
     receivedAt = 1_700_000_000_000L,
   )
 }
