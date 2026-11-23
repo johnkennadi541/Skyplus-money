@@ -10,6 +10,7 @@ import com.example.domain.model.MarketSyncSummary
 import com.example.domain.model.Money
 import com.example.domain.model.PortfolioCurrencySummary
 import com.example.domain.repository.InvestmentRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import java.math.BigDecimal
@@ -96,6 +97,8 @@ class CreateInvestmentUseCase @Inject constructor(
       try {
         val chargesBd = calculationEngine.parseNonNegativeDecimal(chargesDecimal, "Transaction charges")
         Money.fromBigDecimal(chargesBd, currencyCode, RoundingMode.HALF_UP).minorUnits
+      } catch (cancelled: CancellationException) {
+        throw cancelled
       } catch (e: Exception) {
         return Result.failure(e)
       }
@@ -137,6 +140,8 @@ class RecordInvestmentBuyUseCase @Inject constructor(
       try {
         val chargesBd = calculationEngine.parseNonNegativeDecimal(chargesDecimal, "Transaction charges")
         Money.fromBigDecimal(chargesBd, currencyCode, RoundingMode.HALF_UP).minorUnits
+      } catch (cancelled: CancellationException) {
+        throw cancelled
       } catch (e: Exception) {
         return Result.failure(e)
       }
@@ -171,6 +176,8 @@ class RecordInvestmentSellUseCase @Inject constructor(
       try {
         val chargesBd = calculationEngine.parseNonNegativeDecimal(chargesDecimal, "Transaction charges")
         Money.fromBigDecimal(chargesBd, currencyCode, RoundingMode.HALF_UP).minorUnits
+      } catch (cancelled: CancellationException) {
+        throw cancelled
       } catch (e: Exception) {
         return Result.failure(e)
       }
