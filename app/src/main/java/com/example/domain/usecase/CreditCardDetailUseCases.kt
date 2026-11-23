@@ -14,6 +14,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 
 @Singleton
 class ObserveCreditCardStatementSummariesUseCase @Inject constructor(
@@ -69,8 +70,7 @@ class ObserveCreditCardSpendingAnalyticsUseCase @Inject constructor(
     calendar.add(Calendar.MONTH, 1)
     val end = calendar.timeInMillis
 
-    return transactionRepository.getTransactionsByAccount(userId, card.accountId).let { flow ->
-      kotlinx.coroutines.flow.map(flow) { transactions ->
+    return transactionRepository.getTransactionsByAccount(userId, card.accountId).map { transactions ->
         val expenses = transactions.filter {
           it.type == TransactionType.EXPENSE &&
             it.status == TransactionStatus.COMPLETED &&
@@ -90,7 +90,6 @@ class ObserveCreditCardSpendingAnalyticsUseCase @Inject constructor(
           transactionCount = expenses.size,
           categoryTotalsMinor = categoryTotals,
         )
-      }
     }
   }
 }
