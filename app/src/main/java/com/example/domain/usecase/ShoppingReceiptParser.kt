@@ -3,6 +3,8 @@ package com.example.domain.usecase
 import java.math.BigDecimal
 import java.security.MessageDigest
 import java.util.Locale
+import java.text.SimpleDateFormat
+import java.util.TimeZone
 import com.example.domain.model.Money
 
 data class ShoppingReceiptDraft(
@@ -10,6 +12,7 @@ data class ShoppingReceiptDraft(
   val merchantCandidate: String?,
   val totalDecimal: String?,
   val currencyCodeCandidate: String?,
+  val purchaseDateMillis: Long?,
   val needsReview: Boolean,
   val warnings: List<String>,
 )
@@ -40,6 +43,17 @@ object ShoppingReceiptParser {
     val distinctAmounts = candidates.map { it.second.stripTrailingZeros() }.distinct()
     val amount = distinctAmounts.singleOrNull()
     val code = candidates.mapNotNull { it.third?.takeIf { codeValue -> Money.isSupportedCurrency(codeValue) } }.distinct().singleOrNull()
+    val isoDates = normalized.mapNotNull { line ->
+      Regex("""\\b(20\\d{2}-\\d{2}-\\d{2})\\b""").find(line)?.groupValues?.get(1)
+    }.distinct()
+    val purchaseDate = isoDates.singleOrNull()?.let { dateText ->
+      runCatching {
+        SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply {
+          isLenient = false
+          timeZone = TimeZone.getTimeZone("UTC")
+        }.parse(dateText)?.time
+      }.getOrNull()
+    }
     val merchant = normalized.firstOrNull()?.takeIf { line ->
       line.length in 2..60 && !line.contains(Regex("""(?i)(receipt|invoice|tax|date|time)"""))
     }
@@ -53,6 +67,7 @@ object ShoppingReceiptParser {
       merchantCandidate = merchant,
       totalDecimal = amount?.stripTrailingZeros()?.toPlainString(),
       currencyCodeCandidate = code,
+      purchaseDateMillis = purchaseDate,
       needsReview = warnings.isNotEmpty(),
       warnings = warnings,
     )
