@@ -12,6 +12,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.Call
 import okhttp3.Request
+import okio.Buffer
 import kotlinx.coroutines.CancellationException
 import java.io.IOException
 import java.math.BigDecimal
@@ -114,15 +115,24 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
             )
           }
 
-          // Read at most one byte beyond the limit so chunked/unknown-length responses
-          // cannot force an unbounded allocation.
-          val responseBytes = body.source().readByteArray(MAX_RESPONSE_BYTES + 1L)
-          if (responseBytes.size > MAX_RESPONSE_BYTES) {
-            responseBytes.fill(0)
+          // Stream at most MAX_RESPONSE_BYTES + 1 bytes. This also handles
+          // chunked/unknown-length responses without an unbounded allocation.
+          val boundedBuffer = Buffer()
+          val source = body.source()
+          var totalRead = 0L
+          while (totalRead <= MAX_RESPONSE_BYTES) {
+            val remaining = MAX_RESPONSE_BYTES + 1L - totalRead
+            val read = source.read(boundedBuffer, minOf(8_192L, remaining))
+            if (read == -1L) break
+            totalRead += read
+          }
+          if (totalRead > MAX_RESPONSE_BYTES) {
+            boundedBuffer.clear()
             return@withContext MarketQuoteFetchResult.InvalidResponse(
               message = "Market feed response exceeded the permitted size; existing price was preserved."
             )
           }
+          val responseBytes = boundedBuffer.readByteArray()
           val rawBody = try {
             responseBytes.toString(Charsets.UTF_8).trim()
           } finally {
