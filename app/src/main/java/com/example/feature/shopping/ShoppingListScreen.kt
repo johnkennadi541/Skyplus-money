@@ -143,6 +143,23 @@ fun ShoppingListScreen(
       viewModel.recordStorePrice(itemId, storeName, unitPrice, recordedAt, notes)
     },
     onDeleteStorePrice = { priceId -> viewModel.deleteStorePrice(priceId) },
+    onSavePantryItem = { item, onSuccess -> viewModel.savePantryItem(item, onSuccess) },
+    onDeletePantryItem = { itemId -> viewModel.deletePantryItem(itemId) },
+    onCreateMealPlan = { plan, onSuccess -> viewModel.createMealPlan(plan, onSuccess) },
+    onDeleteMealPlan = { planId -> viewModel.deleteMealPlan(planId) },
+    onAddMealIngredientsToList = { plan, listId, currentPantry ->
+      val needed = ShoppingMealPlannerEngine.remainingAfterPantry(
+        ShoppingMealPlannerEngine.requirements(plan.ingredients),
+        currentPantry,
+      )
+      needed.forEach { ingredient ->
+        viewModel.addItem(
+          listId, ingredient.name, ShoppingInputParser.suggestCategory(ingredient.name),
+          ingredient.quantityDecimal, ingredient.unit, "0", null,
+          "Added from meal plan: " + plan.title,
+        )
+      }
+    },
     onPostReceiptExpense = { draft, accountId, currencyCode, totalMinor, merchant ->
       val receipt = ShoppingReceipt(
         userId = "pending",
@@ -186,6 +203,11 @@ fun ShoppingListContent(
   onRecordStorePrice: (String, String, String, Long, String?) -> Unit = { _, _, _, _, _ -> },
   onDeleteStorePrice: (String) -> Unit = {},
   onPostReceiptExpense: (ShoppingReceiptDraft, String, String, Long, String?) -> Unit = { _, _, _, _, _ -> },
+  onSavePantryItem: (ShoppingPantryItem, () -> Unit) -> Unit = { _, _ -> },
+  onDeletePantryItem: (String) -> Unit = {},
+  onCreateMealPlan: (ShoppingMealPlan, () -> Unit) -> Unit = { _, _ -> },
+  onDeleteMealPlan: (String) -> Unit = {},
+  onAddMealIngredientsToList: (ShoppingMealPlan, String, List<ShoppingPantryItem>) -> Unit = { _, _, _ -> },
   modifier: Modifier = Modifier,
 ) {
   val formatMoneyUseCase = remember { FormatMoneyUseCase() }
@@ -202,6 +224,8 @@ fun ShoppingListContent(
   var compareItemId by remember { mutableStateOf<String?>(null) }
   var importedDrafts by remember { mutableStateOf<List<ShoppingItemDraft>>(emptyList()) }
   var receiptDraft by remember { mutableStateOf<ShoppingReceiptDraft?>(null) }
+  var showPantryDialog by remember { mutableStateOf(false) }
+  var showMealPlanDialog by remember { mutableStateOf(false) }
 
   val lists = workspace.lists
   val activeList = remember(lists, selectedListId) {
@@ -326,6 +350,11 @@ fun ShoppingListContent(
       }
     }
 
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs)) {
+      OutlinedButton(onClick = { showPantryDialog = true }, modifier = Modifier.weight(1f)) { Text("Add Pantry Stock") }
+      OutlinedButton(onClick = { showMealPlanDialog = true }, modifier = Modifier.weight(1f)) { Text("Plan a Meal") }
+    }
+
     OceanCard(modifier = Modifier.fillMaxWidth().testTag("shopping_pantry_card")) {
       Column(
         modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
@@ -361,9 +390,16 @@ fun ShoppingListContent(
         Text("Meal Planner", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         if (mealPlans.isEmpty()) Text("No meals planned yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         mealPlans.take(4).forEach { plan ->
-          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(plan.title)
-            Text(plan.mealType.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall)
+          Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+              Text(plan.title, fontWeight = FontWeight.Medium)
+              Text(plan.mealType.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall)
+            }
+            if (plan.ingredients.isNotEmpty() && activeList != null) {
+              Text(plan.ingredients.joinToString { it.name + " " + it.quantityDecimal + " " + it.unit }, style = MaterialTheme.typography.bodySmall)
+              TextButton(onClick = { onAddMealIngredientsToList(plan, activeList.id, pantry) }) { Text("Add missing ingredients to list") }
+            }
+            TextButton(onClick = { onDeleteMealPlan(plan.id) }) { Text("Remove plan") }
           }
         }
       }
@@ -669,6 +705,19 @@ fun ShoppingListContent(
         onPostReceiptExpense(draft, accountId, currencyCode, totalMinor, merchant)
         receiptDraft = null
       },
+    )
+  }
+
+  if (showPantryDialog) {
+    ShoppingPantryItemDialog(
+      onDismiss = { showPantryDialog = false },
+      onSave = { item -> onSavePantryItem(item) { showPantryDialog = false } },
+    )
+  }
+  if (showMealPlanDialog) {
+    ShoppingMealPlanDialog(
+      onDismiss = { showMealPlanDialog = false },
+      onSave = { plan -> onCreateMealPlan(plan) { showMealPlanDialog = false } },
     )
   }
 
