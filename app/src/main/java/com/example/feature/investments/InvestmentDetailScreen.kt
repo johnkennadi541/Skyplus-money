@@ -224,6 +224,11 @@ fun InvestmentDetailContent(
               OceanStatusBadge(text = "Stale Price >7d", tone = BadgeTone.WARNING)
             } else if (performance.isFullyExited) {
               OceanStatusBadge(text = "Fully Exited", tone = BadgeTone.GOLD)
+            } else if (holding.lastPriceUpdateDate <= 0L) {
+              OceanStatusBadge(
+                text = holding.lastPriceProviderLabel ?: "Awaiting current price",
+                tone = BadgeTone.WARNING,
+              )
             } else {
               OceanStatusBadge(text = holding.lastPriceSource.displayName, tone = BadgeTone.POSITIVE)
             }
