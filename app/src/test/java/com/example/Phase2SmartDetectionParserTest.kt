@@ -33,6 +33,34 @@ class Phase2SmartDetectionParserTest {
   }
 
   @Test
+  fun `confidence reasons contain no amount merchant account or reference values`() {
+    val parsed =
+      SmartTransactionParser.parse(
+        "Rs. 1,450.50 debited from A/c XX4321 paid to Swiggy Ref 432187654321",
+        "com.google.android.apps.nbu.paisa.user",
+        1_700_000_000_000L,
+      )!!
+
+    val reasons = parsed.confidenceReasons.joinToString(" ")
+    assertFalse(reasons.contains("1,450.50"))
+    assertFalse(reasons.contains("1450.50"))
+    assertFalse(reasons.contains("4321"))
+    assertFalse(reasons.contains("432187654321"))
+    assertFalse(reasons.contains("Swiggy", ignoreCase = true))
+    assertEquals(
+      listOf(
+        "Valid amount and currency parsed",
+        "Status verified as Completed",
+        "Direction identified as Debit/Expense",
+        "Account hint detected",
+        "Reference ID detected",
+        "Merchant/Payee identified",
+      ),
+      parsed.confidenceReasons,
+    )
+  }
+
+  @Test
   fun `parses credit card purchase without misclassifying credit substring as income`() {
     val msg = "Spent USD 89.95 on your Credit Card ending 7788 at Amazon Marketplace Ref TXN99887766"
     val parsed = SmartTransactionParser.parse(msg, "com.chase.sig.android", 1_700_000_000_000L)
