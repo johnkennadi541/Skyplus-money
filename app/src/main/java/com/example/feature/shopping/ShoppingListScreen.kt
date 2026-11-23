@@ -170,6 +170,7 @@ fun ShoppingListScreen(
         merchant = merchant,
         currencyCode = currencyCode,
         totalMinor = totalMinor,
+        purchaseDate = purchaseDate,
       )
       viewModel.saveReceiptReview(receipt) { saved ->
         viewModel.postReceiptExpense(saved.id, accountId)
@@ -205,7 +206,7 @@ fun ShoppingListContent(
   onDeleteItem: (String, () -> Unit) -> Unit = { _, _ -> },
   onRecordStorePrice: (String, String, String, Long, String?) -> Unit = { _, _, _, _, _ -> },
   onDeleteStorePrice: (String) -> Unit = {},
-  onPostReceiptExpense: (ShoppingReceiptDraft, String, String, Long, String?) -> Unit = { _, _, _, _, _ -> },
+  onPostReceiptExpense: (ShoppingReceiptDraft, String, String, Long, String?, Long?) -> Unit = { _, _, _, _, _, _ -> },
   onSavePantryItem: (ShoppingPantryItem, () -> Unit) -> Unit = { _, _ -> },
   onDeletePantryItem: (String) -> Unit = {},
   onCreateMealPlan: (ShoppingMealPlan, () -> Unit) -> Unit = { _, _ -> },
@@ -746,8 +747,8 @@ fun ShoppingListContent(
       draft = draft,
       accounts = accounts,
       onDismiss = { receiptDraft = null },
-      onConfirm = { accountId, currencyCode, totalMinor, merchant ->
-        onPostReceiptExpense(draft, accountId, currencyCode, totalMinor, merchant)
+      onConfirm = { accountId, currencyCode, totalMinor, merchant, purchaseDate ->
+        onPostReceiptExpense(draft, accountId, currencyCode, totalMinor, merchant, purchaseDate)
         receiptDraft = null
       },
     )
