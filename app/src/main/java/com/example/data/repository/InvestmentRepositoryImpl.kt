@@ -286,6 +286,20 @@ class InvestmentRepositoryImpl @Inject constructor(
           require(holding.purchaseDate == existingDomain.purchaseDate) {
             "Original purchase date is immutable; record a new BUY transaction for later purchases"
           }
+          val normalizedExistingTicker =
+            existingDomain.symbolOrTicker?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }
+          val normalizedUpdatedTicker =
+            holding.symbolOrTicker?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }
+          require(normalizedUpdatedTicker == normalizedExistingTicker) {
+            "Instrument ticker or AMFI scheme code is immutable after the initial purchase"
+          }
+          val normalizedExistingIsin =
+            existingDomain.isin?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }
+          val normalizedUpdatedIsin =
+            holding.isin?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }
+          require(normalizedUpdatedIsin == normalizedExistingIsin) {
+            "Instrument ISIN is immutable after the initial purchase"
+          }
           val allowAuto =
             holding.autoPriceUpdateEnabled && existingDomain.category == InvestmentCategory.MUTUAL_FUNDS
           if (allowAuto) {
