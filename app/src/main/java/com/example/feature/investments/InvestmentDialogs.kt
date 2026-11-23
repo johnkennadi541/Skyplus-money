@@ -604,6 +604,7 @@ fun RecordTradeDialog(
         if (calculatorTarget != null) {
           SmartCalculatorAmountDialog(
             initialExpression = if (calculatorTarget == "price") unitPriceText else chargesText,
+            decimalScale = Money.resolveFractionDigits(holding.currencyCode),
             onApply = { calculatedAmount ->
               if (calculatorTarget == "price") unitPriceText = calculatedAmount else chargesText = calculatedAmount
               calculatorTarget = null
