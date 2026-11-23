@@ -159,6 +159,42 @@ class Phase2DeduplicationRemediationTest {
   }
 
   @Test
+  fun `duplicate last four across accounts is ambiguous and never auto-posted`() = runTest {
+    accountRepo.createAccount(
+      uid,
+      FinancialAccount(
+        id = "acc_3",
+        userId = uid,
+        name = "Other Bank 4321",
+        type = AccountType.BANK,
+        currencyCode = "INR",
+        initialBalanceMinor = 300_000L,
+        currentBalanceMinor = 300_000L,
+        accountNumberLast4 = "4321",
+      ),
+    )
+    val parsed = ParsedFinancialMessage(
+      amountMinor = 5_000L,
+      currencyCode = "INR",
+      type = TransactionType.EXPENSE,
+      status = TransactionStatus.COMPLETED,
+      merchantOrPayee = "Cafe",
+      accountLast4Hint = "4321",
+      referenceId = "AMBIG123456",
+      confidenceScore = 0.99f,
+      confidenceLevel = DetectionConfidence.HIGH,
+      confidenceReasons = listOf("test"),
+      timestamp = 1_700_000_000_000L,
+    )
+
+    val event = detectionRepo.processIncomingEvent(uid, "com.android.messaging", "Bank", parsed).getOrThrow()
+
+    assertEquals(DetectionEventStatus.IN_REVIEW, event.status)
+    assertEquals(500_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
+    assertEquals(300_000L, accountRepo.getAccountById(uid, "acc_3")!!.currentBalanceMinor)
+  }
+
+  @Test
   fun `transfer detections are not posted as one-sided automatic ledger entries`() = runTest {
     val parsed = ParsedFinancialMessage(
       amountMinor = 10_000L,
