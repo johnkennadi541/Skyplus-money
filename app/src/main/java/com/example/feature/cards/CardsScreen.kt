@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Calculate
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.Icon
@@ -61,6 +62,7 @@ import com.example.core.designsystem.component.SkyplusInlineMessage
 import com.example.core.designsystem.component.SkyplusMessageTone
 import com.example.core.designsystem.component.SkyplusPrimaryButton
 import com.example.core.designsystem.component.SkyplusTextField
+import com.example.feature.calculator.SmartCalculatorAmountDialog
 import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
 import com.example.domain.model.CreditCard
@@ -490,6 +492,7 @@ private fun CardFormDialog(
   var reminderDays by remember { mutableStateOf((existingCard?.reminderDaysBefore ?: 3).toString()) }
   var notes by remember { mutableStateOf(existingCard?.notes.orEmpty()) }
   var formError by remember { mutableStateOf<String?>(null) }
+  var calculatorTarget by remember { mutableStateOf<String?>(null) }
   val selectedCurrencyCode = existingCard?.currencyCode
     ?: linkableAccounts.firstOrNull { it.id == selectedAccountId }?.currencyCode.orEmpty()
   val context = LocalContext.current
@@ -551,7 +554,17 @@ private fun CardFormDialog(
           label = "Last 4 digits",
           placeholder = "1234",
         )
-        SkyplusTextField(value = limitText, onValueChange = { limitText = it }, label = "Credit limit (${selectedCurrencyCode})", placeholder = "100000")
+        SkyplusTextField(
+          value = limitText,
+          onValueChange = { limitText = it },
+          label = "Credit limit (${selectedCurrencyCode})",
+          placeholder = "100000",
+          trailingContent = {
+            IconButton(onClick = { calculatorTarget = "limit" }, modifier = Modifier.testTag("card_limit_calculator_button")) {
+              Icon(Icons.Rounded.Calculate, contentDescription = "Calculate credit limit")
+            }
+          },
+        )
         SkyplusTextField(value = aprText, onValueChange = { aprText = it }, label = "APR %", placeholder = "36.0")
         SkyplusTextField(
           value = billingCycleDay,
@@ -565,8 +578,28 @@ private fun CardFormDialog(
           label = "Payment due days after closing (0–45)",
           placeholder = "20",
         )
-        SkyplusTextField(value = joiningFeeText, onValueChange = { joiningFeeText = it }, label = "Joining fee (${selectedCurrencyCode})", placeholder = "0")
-        SkyplusTextField(value = annualFeeText, onValueChange = { annualFeeText = it }, label = "Annual fee (${selectedCurrencyCode})", placeholder = "0")
+        SkyplusTextField(
+          value = joiningFeeText,
+          onValueChange = { joiningFeeText = it },
+          label = "Joining fee (${selectedCurrencyCode})",
+          placeholder = "0",
+          trailingContent = {
+            IconButton(onClick = { calculatorTarget = "joining" }, modifier = Modifier.testTag("card_joining_fee_calculator_button")) {
+              Icon(Icons.Rounded.Calculate, contentDescription = "Calculate joining fee")
+            }
+          },
+        )
+        SkyplusTextField(
+          value = annualFeeText,
+          onValueChange = { annualFeeText = it },
+          label = "Annual fee (${selectedCurrencyCode})",
+          placeholder = "0",
+          trailingContent = {
+            IconButton(onClick = { calculatorTarget = "annual" }, modifier = Modifier.testTag("card_annual_fee_calculator_button")) {
+              Icon(Icons.Rounded.Calculate, contentDescription = "Calculate annual fee")
+            }
+          },
+        )
         SkyplusTextField(
           value = annualFeeMonth,
           onValueChange = { annualFeeMonth = it.filter(Char::isDigit).take(2) },
@@ -634,6 +667,25 @@ private fun CardFormDialog(
           )
         }
         SkyplusTextField(value = notes, onValueChange = { notes = it.take(500) }, label = "Notes", placeholder = "Optional card notes")
+        calculatorTarget?.let { target ->
+          val initialExpression = when (target) {
+            "limit" -> limitText
+            "joining" -> joiningFeeText
+            else -> annualFeeText
+          }
+          SmartCalculatorAmountDialog(
+            initialExpression = initialExpression,
+            onApply = { calculatedAmount ->
+              when (target) {
+                "limit" -> limitText = calculatedAmount
+                "joining" -> joiningFeeText = calculatedAmount
+                else -> annualFeeText = calculatedAmount
+              }
+              calculatorTarget = null
+            },
+            onDismiss = { calculatorTarget = null },
+          )
+        }
         if (formError != null) {
           Text(text = formError!!, style = MaterialTheme.typography.labelSmall, color = OceanTheme.colors.negative)
         }
