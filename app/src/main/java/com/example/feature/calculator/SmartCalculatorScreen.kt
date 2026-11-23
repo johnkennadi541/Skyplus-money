@@ -83,7 +83,7 @@ fun SmartCalculatorScreen(
               when (key) {
                 "AC" -> { expression = ""; result = null; error = null }
                 "=" -> try {
-                  result = SmartCalculatorEngine.evaluate(expression, scale = decimalScale)
+                  result = SmartCalculatorEngine.evaluate(expression)
                   error = null
                 } catch (failure: IllegalArgumentException) {
                   result = null
@@ -160,7 +160,7 @@ fun SmartCalculatorAmountDialog(
                   when (key) {
                     "AC" -> { expression = ""; result = null; error = null }
                     "=" -> try {
-                      result = SmartCalculatorEngine.evaluate(expression)
+                      result = SmartCalculatorEngine.evaluate(expression, scale = decimalScale)
                       error = null
                     } catch (failure: IllegalArgumentException) {
                       result = null
