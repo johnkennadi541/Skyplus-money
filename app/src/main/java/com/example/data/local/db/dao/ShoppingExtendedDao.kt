@@ -45,6 +45,9 @@ interface ShoppingExtendedDao {
   @Query("DELETE FROM shopping_meal_plans WHERE userId = :userId AND id = :id")
   suspend fun deleteMealPlan(userId: String, id: String): Int
 
+  @Query("SELECT * FROM shopping_receipts WHERE userId = :userId AND id = :receiptId LIMIT 1")
+  suspend fun getReceipt(userId: String, receiptId: String): ShoppingReceiptEntity?
+
   @Query("SELECT * FROM shopping_receipts WHERE userId = :userId AND fingerprint = :fingerprint LIMIT 1")
   suspend fun findReceipt(userId: String, fingerprint: String): ShoppingReceiptEntity?
 
