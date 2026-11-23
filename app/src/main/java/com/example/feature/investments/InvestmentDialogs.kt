@@ -467,7 +467,10 @@ fun RecordTradeDialog(
   var tradeType by remember(initialType) { mutableStateOf(initialType) }
   var dateText by remember { mutableStateOf(formatDateIso(System.currentTimeMillis())) }
   var quantityText by remember { mutableStateOf("") }
-  var unitPriceText by remember(holding) { mutableStateOf(holding.currentMarketPriceDecimal) }
+  // Do not prefill a purchase-price fallback as though it were a current quote.
+  var unitPriceText by remember(holding) {
+    mutableStateOf(if (holding.lastPriceUpdateDate > 0L) holding.currentMarketPriceDecimal else "")
+  }
   var chargesText by remember { mutableStateOf("0") }
   var notes by remember { mutableStateOf("") }
   var validationError by remember { mutableStateOf<String?>(null) }
