@@ -52,14 +52,16 @@ class AndroidKeyStoreBackend : KeyWrappingBackend {
     val cipher = Cipher.getInstance(AES_GCM_NO_PADDING)
     cipher.init(Cipher.ENCRYPT_MODE, secretKey)
     val iv = cipher.iv
-    val ciphertext = cipher.doFinal(raw)
+    var ciphertext: ByteArray? = null
     return try {
+      val encryptedBytes = cipher.doFinal(raw)
+      ciphertext = encryptedBytes
       Pair(
-        Base64.encodeToString(ciphertext, Base64.NO_WRAP),
+        Base64.encodeToString(encryptedBytes, Base64.NO_WRAP),
         Base64.encodeToString(iv, Base64.NO_WRAP),
       )
     } finally {
-      ciphertext.fill(0)
+      ciphertext?.fill(0)
       iv.fill(0)
     }
   }
@@ -78,20 +80,22 @@ class AndroidKeyStoreBackend : KeyWrappingBackend {
       keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
         ?: throw UnrecoverableKeyException("Keystore entry '$KEY_ALIAS' is invalid")
     val iv = Base64.decode(ivBase64, Base64.NO_WRAP)
-    val ciphertext = Base64.decode(encryptedBase64, Base64.NO_WRAP)
+    var ciphertext: ByteArray? = null
     try {
-      require(iv.size == GCM_IV_BYTES && ciphertext.size == ENCRYPTED_PASSPHRASE_BYTES) {
+      val decodedCiphertext = Base64.decode(encryptedBase64, Base64.NO_WRAP)
+      ciphertext = decodedCiphertext
+      require(iv.size == GCM_IV_BYTES && decodedCiphertext.size == ENCRYPTED_PASSPHRASE_BYTES) {
         "Stored wrapped database passphrase metadata is malformed"
       }
       val cipher = Cipher.getInstance(AES_GCM_NO_PADDING)
       val spec = GCMParameterSpec(128, iv)
       cipher.init(Cipher.DECRYPT_MODE, entry.secretKey, spec)
-      return cipher.doFinal(ciphertext)
+      return cipher.doFinal(decodedCiphertext)
     } finally {
       // The ciphertext is not plaintext, but clearing decoded working buffers reduces
       // the lifetime of key material and metadata in native/managed heap copies.
       iv.fill(0)
-      ciphertext.fill(0)
+      ciphertext?.fill(0)
     }
   }
 
