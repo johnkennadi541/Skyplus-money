@@ -46,7 +46,7 @@ class InvestmentCalculationEngine @Inject constructor() {
         ProviderPolicyInfo(
           category = InvestmentCategory.MUTUAL_FUNDS,
           supportLevel = ProviderSupportLevel.FREE_OPT_IN_PUBLIC_FEED,
-          providerName = "MFapi.in / AMFI India Official Feed (EOD)",
+          providerName = "MFapi.in third-party API • AMFI-sourced EOD NAV",
           summaryReason =
             "Supports Indian mutual funds identified by 5–7 digit AMFI scheme code. End-of-day NAVs only; no API key required; rate-limited with 12h local cache.",
         ),
