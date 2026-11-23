@@ -172,17 +172,17 @@ fun InvestmentsContent(
   var showSyncSettingsDialog by remember { mutableStateOf(false) }
   var priceUpdateTarget by remember { mutableStateOf<InvestmentHolding?>(null) }
 
+  // New investment instruments are India-only. Existing legacy currencies remain
+  // filterable so older records are visible, but account/global currencies are not offered.
   val availableCurrencies =
-    remember(performances, accounts) {
-      val fromHoldings = performances.map { it.holding.currencyCode }
-      val fromAccounts = accounts.map { it.currencyCode }
-      (fromHoldings + fromAccounts + listOf("INR", "USD", "EUR", "GBP")).distinct()
+    remember(performances) {
+      (performances.map { it.holding.currencyCode } + listOf("INR")).distinct()
     }
 
   val activeCurrency =
     selectedCurrency
       ?: performances.firstOrNull()?.holding?.currencyCode
-      ?: accounts.firstOrNull()?.currencyCode
+      ?: "INR"
       ?: "INR"
 
   val filteredPerformances =
@@ -487,8 +487,8 @@ fun InvestmentsContent(
   if (showCreateDialog) {
     InvestmentFormDialog(
       existingHolding = null,
-      defaultCurrency = activeCurrency,
-      availableCurrencies = availableCurrencies,
+      defaultCurrency = "INR",
+      availableCurrencies = listOf("INR"),
       calculationEngine = calculationEngine,
       onDismiss = { showCreateDialog = false },
       onCreateSubmit = { name, cat, sym, isin, broker, curr, date, qty, buyPrice, charges, mktPrice, autoOptIn, notes ->
