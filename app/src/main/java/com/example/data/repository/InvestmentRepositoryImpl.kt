@@ -45,6 +45,8 @@ class InvestmentRepositoryImpl @Inject constructor(
   companion object {
     const val AUTO_SYNC_COOLDOWN_MILLIS: Long = 12L * 60L * 60L * 1000L
     const val MAX_REQUESTS_PER_SYNC_CYCLE: Int = 5
+    const val INDIA_CURRENCY_CODE: String = "INR"
+    private const val MAX_FUTURE_CLOCK_SKEW_MILLIS = 5L * 60L * 1000L
   }
 
   override fun getHoldings(userId: String): Flow<List<InvestmentHolding>> =
@@ -124,9 +126,12 @@ class InvestmentRepositoryImpl @Inject constructor(
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(name.isNotBlank()) { "Investment name is required" }
         require(purchaseDate > 0L) { "Purchase date must be valid" }
+        require(purchaseDate <= System.currentTimeMillis() + MAX_FUTURE_CLOCK_SKEW_MILLIS) {
+          "Purchase date cannot be in the future"
+        }
         require(chargesMinor >= 0L) { "Transaction charges cannot be negative" }
 
-        val normalizedCurrency = currencyCode.trim().uppercase()
+        val normalizedCurrency = requireIndiaInvestmentCurrency(currencyCode)
         Money.resolveFractionDigits(normalizedCurrency)
 
         val buyQty = calculationEngine.parsePositiveDecimal(quantityDecimal, "Units / quantity")
@@ -249,6 +254,7 @@ class InvestmentRepositoryImpl @Inject constructor(
           }
 
           val existingDomain = existing.toDomain()
+          requireIndiaInvestmentCurrency(existingDomain.currencyCode)
           require(holding.category == existingDomain.category) {
             "Investment category is part of the recorded instrument identity and cannot be changed after purchase"
           }
@@ -298,6 +304,7 @@ class InvestmentRepositoryImpl @Inject constructor(
           val existing =
             investmentDao.getHoldingById(authenticatedUserId, holdingId)?.toDomain()
               ?: throw SecurityException("Investment holding does not belong to authenticated user")
+          if (enabled) requireIndiaInvestmentCurrency(existing.currencyCode)
           if (enabled && existing.category != InvestmentCategory.MUTUAL_FUNDS) {
             throw IllegalStateException(
               "Automatic market price updates are only available for Mutual Funds with an AMFI scheme code"
@@ -338,6 +345,13 @@ class InvestmentRepositoryImpl @Inject constructor(
           val existing =
             investmentDao.getHoldingById(authenticatedUserId, holdingId)?.toDomain()
               ?: throw SecurityException("Investment holding does not belong to authenticated user")
+          requireIndiaInvestmentCurrency(existing.currencyCode)
+          require(transactionDate >= existing.purchaseDate) {
+            "Additional purchase date cannot be before the original purchase"
+          }
+          require(transactionDate <= System.currentTimeMillis() + MAX_FUTURE_CLOCK_SKEW_MILLIS) {
+            "Transaction date cannot be in the future"
+          }
 
           val buyQty = calculationEngine.parsePositiveDecimal(quantityDecimal, "Purchase quantity")
           val buyPrice = calculationEngine.parsePositiveDecimal(unitPriceDecimal, "Purchase price")
@@ -433,6 +447,13 @@ class InvestmentRepositoryImpl @Inject constructor(
           val existing =
             investmentDao.getHoldingById(authenticatedUserId, holdingId)?.toDomain()
               ?: throw SecurityException("Investment holding does not belong to authenticated user")
+          requireIndiaInvestmentCurrency(existing.currencyCode)
+          require(transactionDate >= existing.purchaseDate) {
+            "Sale date cannot be before the original purchase"
+          }
+          require(transactionDate <= System.currentTimeMillis() + MAX_FUTURE_CLOCK_SKEW_MILLIS) {
+            "Transaction date cannot be in the future"
+          }
 
           val sellQty = calculationEngine.parsePositiveDecimal(quantityDecimal, "Sale quantity")
           val sellPrice = calculationEngine.parseNonNegativeDecimal(unitPriceDecimal, "Sale price")
@@ -519,6 +540,9 @@ class InvestmentRepositoryImpl @Inject constructor(
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holdingId.isNotBlank()) { "Holding ID is required" }
         require(priceDate > 0L) { "Price update date must be valid" }
+        require(priceDate <= System.currentTimeMillis() + MAX_FUTURE_CLOCK_SKEW_MILLIS) {
+          "Manual price date cannot be in the future"
+        }
 
         val parsedPrice = calculationEngine.parsePositiveDecimal(newUnitPriceDecimal, "Market price")
         val normalizedPriceText = parsedPrice.stripTrailingZeros().toPlainString()
@@ -527,6 +551,10 @@ class InvestmentRepositoryImpl @Inject constructor(
           val existing =
             investmentDao.getHoldingById(authenticatedUserId, holdingId)?.toDomain()
               ?: throw SecurityException("Investment holding does not belong to authenticated user")
+          requireIndiaInvestmentCurrency(existing.currencyCode)
+          require(priceDate >= existing.purchaseDate) {
+            "Price date cannot be before the original purchase"
+          }
 
           val currentQty =
             calculationEngine.parseNonNegativeDecimal(existing.quantityDecimal, "Current quantity")
@@ -589,8 +617,13 @@ class InvestmentRepositoryImpl @Inject constructor(
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holdingId.isNotBlank()) { "Holding ID is required" }
         require(priceDate > 0L) { "Price date must be valid" }
-        require(source != PriceSourceType.MANUAL) {
-          "Automatic market-price updates must identify a non-manual provider source"
+        require(source == PriceSourceType.MFAPI_AMFI_EOD) {
+          "Only the approved Indian mutual-fund NAV provider is supported for automatic updates"
+        }
+        require(
+          syncPreferencesDataSource.syncSettings(authenticatedUserId).first().autoUpdateConsentEnabled
+        ) {
+          "Global automatic market-data consent is disabled"
         }
         require(priceDate <= System.currentTimeMillis() + 5L * 60L * 1000L) {
           "Market quote timestamp cannot be in the future"
@@ -603,6 +636,13 @@ class InvestmentRepositoryImpl @Inject constructor(
           val existing =
             investmentDao.getHoldingById(authenticatedUserId, holdingId)?.toDomain()
               ?: throw SecurityException("Investment holding does not belong to authenticated user")
+          require(existing.category == InvestmentCategory.MUTUAL_FUNDS) {
+            "Automatic market updates are restricted to Indian mutual funds"
+          }
+          requireIndiaInvestmentCurrency(existing.currencyCode)
+          require(priceDate >= existing.purchaseDate) {
+            "Market quote date cannot be before the original purchase"
+          }
 
           // Never roll the stored market valuation back to an older provider observation.
           if (priceDate < existing.lastPriceUpdateDate) {
@@ -723,7 +763,10 @@ class InvestmentRepositoryImpl @Inject constructor(
             continue
           }
 
-          if (holding.category != InvestmentCategory.MUTUAL_FUNDS) {
+          if (
+            holding.category != InvestmentCategory.MUTUAL_FUNDS ||
+            !holding.currencyCode.equals(INDIA_CURRENCY_CODE, ignoreCase = true)
+          ) {
             unsupportedCount++
             continue
           }
@@ -801,6 +844,14 @@ class InvestmentRepositoryImpl @Inject constructor(
         )
       }
     }
+
+  private fun requireIndiaInvestmentCurrency(currencyCode: String): String {
+    val normalized = currencyCode.trim().uppercase()
+    require(normalized == INDIA_CURRENCY_CODE) {
+      "Investment instruments are currently limited to India and INR."
+    }
+    return normalized
+  }
 
   override suspend fun deleteHolding(
     authenticatedUserId: String,
