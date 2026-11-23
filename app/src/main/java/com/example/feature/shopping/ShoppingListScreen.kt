@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -77,6 +78,7 @@ import com.example.domain.model.ShoppingListSummary
 import com.example.domain.model.ShoppingReceipt
 import com.example.domain.model.ShoppingPantryItem
 import com.example.domain.model.ShoppingMealPlan
+import com.example.domain.model.ShoppingMealIngredient
 import com.example.domain.usecase.FormatMoneyUseCase
 import com.example.domain.usecase.ShoppingCalculationEngine
 import com.example.domain.usecase.ShoppingWorkspaceSnapshot
@@ -84,6 +86,7 @@ import com.example.domain.usecase.ShoppingInputParser
 import com.example.domain.usecase.ShoppingReceiptDraft
 import com.example.domain.usecase.ShoppingInsightsEngine
 import com.example.domain.usecase.ShoppingPantryEngine
+import com.example.domain.usecase.ShoppingMealPlannerEngine
 import com.example.domain.usecase.ShoppingItemDraft
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -1152,4 +1155,110 @@ private fun ShoppingListItemCard(
       }
     }
   }
+}
+
+
+@Composable
+private fun ShoppingPantryItemDialog(
+  onDismiss: () -> Unit,
+  onSave: (ShoppingPantryItem) -> Unit,
+) {
+  var name by remember { mutableStateOf("") }
+  var quantity by remember { mutableStateOf("1") }
+  var unit by remember { mutableStateOf("piece") }
+  var threshold by remember { mutableStateOf("1") }
+  var expiryDate by remember { mutableStateOf("") }
+  val quantityValid = runCatching { java.math.BigDecimal(quantity) >= java.math.BigDecimal.ZERO }.getOrDefault(false)
+  val thresholdValid = runCatching { java.math.BigDecimal(threshold) >= java.math.BigDecimal.ZERO }.getOrDefault(false)
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("Add pantry stock") },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(name, { name = it }, label = { Text("Item name") }, singleLine = true)
+        OutlinedTextField(quantity, { quantity = it }, label = { Text("Current quantity") }, singleLine = true)
+        OutlinedTextField(unit, { unit = it }, label = { Text("Unit (kg, litre, piece…)") }, singleLine = true)
+        OutlinedTextField(threshold, { threshold = it }, label = { Text("Low-stock threshold") }, singleLine = true)
+        OutlinedTextField(expiryDate, { expiryDate = it }, label = { Text("Expiry date (YYYY-MM-DD, optional)") }, singleLine = true)
+      }
+    },
+    confirmButton = {
+      Button(
+        enabled = name.isNotBlank() && unit.isNotBlank() && quantityValid && thresholdValid &&
+          (expiryDate.isBlank() || runCatching { SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply { isLenient = false }.parse(expiryDate) }.getOrNull() != null),
+        onClick = {
+          val expiry = expiryDate.takeIf { it.isNotBlank() }?.let {
+            SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply { isLenient = false }.parse(it)?.time
+          }
+          onSave(
+            ShoppingPantryItem(
+              userId = "pending", name = name.trim(), quantityDecimal = quantity,
+              unit = unit.trim(), lowStockThresholdDecimal = threshold, expiryAt = expiry,
+              category = ShoppingInputParser.suggestCategory(name),
+            )
+          )
+        },
+      ) { Text("Save Stock") }
+    },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+  )
+}
+
+@Composable
+private fun ShoppingMealPlanDialog(
+  onDismiss: () -> Unit,
+  onSave: (ShoppingMealPlan) -> Unit,
+) {
+  var title by remember { mutableStateOf("") }
+  var plannedDate by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date())) }
+  var mealType by remember { mutableStateOf("DINNER") }
+  var ingredientsText by remember { mutableStateOf("") }
+  val ingredients = remember(ingredientsText) { ShoppingInputParser.parse(ingredientsText) }
+  val dateMillis = runCatching {
+    SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply { isLenient = false }.parse(plannedDate)?.time
+  }.getOrNull()
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("Plan a meal") },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(title, { title = it }, label = { Text("Meal name") }, singleLine = true)
+        OutlinedTextField(plannedDate, { plannedDate = it }, label = { Text("Date (YYYY-MM-DD)") }, singleLine = true)
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+          listOf("BREAKFAST", "LUNCH", "DINNER", "SNACK").forEach { type ->
+            FilterChip(selected = mealType == type, onClick = { mealType = type }, label = { Text(type.lowercase().replaceFirstChar { it.uppercase() }) })
+          }
+        }
+        OutlinedTextField(
+          ingredientsText,
+          { ingredientsText = it },
+          label = { Text("Ingredients: Rice 1 kg, Milk 2 litre") },
+          minLines = 3,
+        )
+        Text("Ingredients will be checked against pantry stock before adding to your list.", style = MaterialTheme.typography.bodySmall)
+      }
+    },
+    confirmButton = {
+      Button(
+        enabled = title.isNotBlank() && dateMillis != null && ingredients.isNotEmpty() &&
+          ingredients.all { runCatching { java.math.BigDecimal(it.quantityDecimal) > java.math.BigDecimal.ZERO }.getOrDefault(false) },
+        onClick = {
+          val planId = java.util.UUID.randomUUID().toString()
+          onSave(
+            ShoppingMealPlan(
+              id = planId, userId = "pending", title = title.trim(), plannedDate = dateMillis!!,
+              mealType = mealType,
+              ingredients = ingredients.map { draft ->
+                ShoppingMealIngredient(
+                  userId = "pending", mealPlanId = planId, name = draft.name,
+                  quantityDecimal = draft.quantityDecimal, unit = draft.unit,
+                )
+              },
+            )
+          )
+        },
+      ) { Text("Save Meal") }
+    },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+  )
 }
