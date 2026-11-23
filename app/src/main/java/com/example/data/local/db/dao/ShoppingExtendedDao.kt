@@ -18,6 +18,9 @@ interface ShoppingExtendedDao {
   @Query("SELECT * FROM shopping_pantry WHERE userId = :userId AND id = :id LIMIT 1")
   suspend fun getPantryItem(userId: String, id: String): ShoppingPantryEntity?
 
+  @Query("SELECT * FROM shopping_pantry WHERE userId = :userId AND name = :name COLLATE NOCASE AND unit = :unit COLLATE NOCASE LIMIT 1")
+  suspend fun getPantryItemByNameAndUnit(userId: String, name: String, unit: String): ShoppingPantryEntity?
+
   @Insert(onConflict = OnConflictStrategy.ABORT)
   suspend fun insertPantryItem(item: ShoppingPantryEntity)
 
