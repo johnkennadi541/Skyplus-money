@@ -20,6 +20,12 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class SkyplusNotificationListenerService : NotificationListenerService() {
 
+  private companion object {
+    const val MAX_TITLE_CHARS = 256
+    const val MAX_NOTIFICATION_TEXT_CHARS = 2_048
+    const val MAX_COMBINED_CONTENT_CHARS = 4_096
+  }
+
   @Inject lateinit var detectionRepository: SmartDetectionRepository
   @Inject lateinit var authRepository: AuthRepository
   @Inject lateinit var consentRepository: ConsentRepository
@@ -48,11 +54,13 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
     if (packageName != defaultSmsPackage) return
 
     val extras = sbn.notification.extras ?: return
-    val title = extras.getCharSequence("android.title")?.toString().orEmpty()
-    val text = extras.getCharSequence("android.text")?.toString().orEmpty()
-    val bigText = extras.getCharSequence("android.bigText")?.toString().orEmpty()
+    // Bound untrusted notification text before parsing so a malformed or oversized
+    // default-SMS notification cannot cause excessive memory or regex work.
+    val title = extras.getCharSequence("android.title")?.toString()?.take(MAX_TITLE_CHARS).orEmpty()
+    val text = extras.getCharSequence("android.text")?.toString()?.take(MAX_NOTIFICATION_TEXT_CHARS).orEmpty()
+    val bigText = extras.getCharSequence("android.bigText")?.toString()?.take(MAX_NOTIFICATION_TEXT_CHARS).orEmpty()
 
-    val combinedContent = "$title $text $bigText".trim()
+    val combinedContent = "$title $text $bigText".take(MAX_COMBINED_CONTENT_CHARS).trim()
     if (combinedContent.isBlank()) return
 
     serviceScope.launch {
