@@ -116,10 +116,12 @@ class SmartDetectionRepositoryImpl @Inject constructor(
           }
 
           if (resolvedAccountId == null && !parsed.accountLast4Hint.isNullOrBlank()) {
-            val matchingAccount = accounts.firstOrNull { it.accountNumberLast4 == parsed.accountLast4Hint }
-            if (matchingAccount != null) {
-              resolvedAccountId = matchingAccount.id
-              resolvedAccountName = matchingAccount.name
+            val matchingAccounts = accounts.filter { it.accountNumberLast4 == parsed.accountLast4Hint }
+            // A repeated last-four value across multiple institutions is ambiguous.
+            // Never choose the first matching account by list order.
+            if (matchingAccounts.size == 1) {
+              resolvedAccountId = matchingAccounts.single().id
+              resolvedAccountName = matchingAccounts.single().name
             }
           }
 
