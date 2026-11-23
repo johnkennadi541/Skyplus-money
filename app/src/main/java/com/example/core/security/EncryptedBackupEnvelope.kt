@@ -56,12 +56,12 @@ class EncryptedBackupEnvelope(
     }
 
     val buffer = ByteBuffer.wrap(envelope)
-    val magic = ByteArray(MAGIC.size).also(buffer::get)
+    val magic = ByteArray(MAGIC.size).also { buffer.get(it) }
     require(magic.contentEquals(MAGIC)) { "Unrecognized backup format" }
     require(buffer.get() == VERSION) { "Unsupported backup version" }
-    val salt = ByteArray(SALT_BYTES).also(buffer::get)
-    val iv = ByteArray(IV_BYTES).also(buffer::get)
-    val ciphertext = ByteArray(buffer.remaining()).also(buffer::get)
+    val salt = ByteArray(SALT_BYTES).also { buffer.get(it) }
+    val iv = ByteArray(IV_BYTES).also { buffer.get(it) }
+    val ciphertext = ByteArray(buffer.remaining()).also { buffer.get(it) }
     val keyBytes = deriveKey(recoverySecret, salt)
     return try {
       val cipher = Cipher.getInstance(TRANSFORMATION)
@@ -94,7 +94,7 @@ class EncryptedBackupEnvelope(
     private const val PBKDF2_ITERATIONS = 310_000
     private const val KEY_BITS = 256
     private const val TAG_BITS = 128
-    private const val TAG_BYTES = 128
+    private const val TAG_BYTES = 16
     private const val SALT_BYTES = 16
     private const val IV_BYTES = 12
     private const val MIN_SECRET_LENGTH = 12
