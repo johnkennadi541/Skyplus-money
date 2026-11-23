@@ -159,7 +159,7 @@ fun ShoppingListScreen(
         viewModel.addItem(
           listId, ingredient.name, ShoppingInputParser.suggestCategory(ingredient.name),
           ingredient.quantityDecimal, ingredient.unit, "0", null,
-          "Added from meal plan: " + plan.title,
+          "Added from meal plan: " + plan.title + " · price not entered",
         )
       }
     },
@@ -461,7 +461,7 @@ fun ShoppingListContent(
                     suggestion.unit,
                     "0",
                     null,
-                    "Added from Smart Suggestions",
+                    "Added from Smart Suggestions · price not entered",
                   ) {}
                 },
               ) { Text("Add to Shopping List") }
