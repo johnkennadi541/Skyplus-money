@@ -336,9 +336,9 @@ class Phase3ReportsIntegrationAndUiTest {
     composeTestRule.waitForIdle()
 
     composeTestRule.onNodeWithTag("reports_screen").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("export_save_pdf_button").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("export_save_csv_button").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("export_save_docx_button").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("export_save_pdf_button").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("export_save_csv_button").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("export_save_docx_button").performScrollTo().assertIsDisplayed()
     composeTestRule.onNodeWithTag("email_reports_enable_switch").performScrollTo().assertIsDisplayed()
     composeTestRule.onNodeWithTag("confirm_launch_email_button").assertIsDisplayed()
   }
