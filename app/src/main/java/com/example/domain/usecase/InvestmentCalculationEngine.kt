@@ -165,6 +165,12 @@ class InvestmentCalculationEngine @Inject constructor() {
     currencyCode: String,
   ): BuyMutation {
     require(chargesMinor >= 0L) { "Transaction charges cannot be negative" }
+    require(currentOpenCostBasisMinor >= 0L) { "Open cost basis cannot be negative" }
+    require(currentTotalBuyCostMinor >= 0L) { "Cumulative buy cost cannot be negative" }
+    require(currentTotalChargesMinor >= 0L) { "Cumulative charges cannot be negative" }
+    require(currentOpenCostBasisMinor <= currentTotalBuyCostMinor) {
+      "Open cost basis cannot exceed cumulative buy cost"
+    }
     val normalizedCurrency = currencyCode.trim().uppercase()
     val currentQty = parseNonNegativeDecimal(currentQuantityDecimal, "Current quantity")
     val addQty = parsePositiveDecimal(buyQuantityDecimal, "Purchase quantity")
@@ -203,6 +209,7 @@ class InvestmentCalculationEngine @Inject constructor() {
   ): SellMutation {
     require(chargesMinor >= 0L) { "Transaction charges cannot be negative" }
     require(currentOpenCostBasisMinor >= 0L) { "Open cost basis cannot be negative" }
+    require(currentTotalChargesMinor >= 0L) { "Cumulative charges cannot be negative" }
 
     val normalizedCurrency = currencyCode.trim().uppercase()
     val currentQty = parsePositiveDecimal(currentQuantityDecimal, "Available holding quantity")
