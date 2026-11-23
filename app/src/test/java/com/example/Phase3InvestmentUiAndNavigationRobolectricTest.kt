@@ -107,9 +107,10 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
           quantityDecimal = "1",
           totalInvestedMinor = 50000_00L,
           totalBuyCostMinor = 50000_00L,
-          currentMarketPriceDecimal = "52000",
-          currentValuationMinor = 52000_00L,
-          lastPriceUpdateDate = now,
+          currentMarketPriceDecimal = "50000",
+          currentValuationMinor = 50000_00L,
+          lastPriceUpdateDate = 0L,
+          lastPriceProviderLabel = "Awaiting current price",
         ),
       )
 
@@ -159,6 +160,8 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
 
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("portfolio_summary_card").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Estimated Valuation (INR)").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("awaiting_price_summary_note").assertIsDisplayed()
     composeTestRule.onNodeWithTag("stale_price_warning_badge").assertIsDisplayed()
     composeTestRule.onNodeWithTag("investments_list").performScrollToNode(hasTestTag("asset_allocation_chart_card"))
     composeTestRule.onNodeWithTag("asset_allocation_canvas").assertIsDisplayed()
