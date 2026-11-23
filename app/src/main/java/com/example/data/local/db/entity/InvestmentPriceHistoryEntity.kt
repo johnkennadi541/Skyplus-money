@@ -49,7 +49,11 @@ data class InvestmentPriceHistoryEntity(
       realizedPnlMinor = realizedPnlMinor,
       currencyCode = currencyCode,
       source =
-        runCatching { PriceSourceType.valueOf(source) }.getOrDefault(PriceSourceType.MANUAL),
+        try {
+          PriceSourceType.valueOf(source)
+        } catch (_: IllegalArgumentException) {
+          PriceSourceType.MANUAL
+        },
       providerLabel = providerLabel,
       createdAt = createdAt,
     )
