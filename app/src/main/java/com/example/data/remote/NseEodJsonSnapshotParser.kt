@@ -73,7 +73,12 @@ internal object NseEodJsonSnapshotParser {
     var rejectedPriceCount = 0
     rawPrices.forEach { (rawSymbol, element) ->
       val symbol = normalizeSymbol(rawSymbol)
-      val price = runCatching { element.jsonPrimitive.content.toBigDecimal() }.getOrNull()
+      val price =
+        try {
+          element.jsonPrimitive.content.toBigDecimal()
+        } catch (_: NumberFormatException) {
+          null
+        }
       if (symbol == null || price == null || price <= BigDecimal.ZERO) {
         rejectedPriceCount++
       } else {
