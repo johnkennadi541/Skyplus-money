@@ -133,6 +133,7 @@ import com.example.feature.transactions.TransactionsViewModel
 fun SkyplusAuthGateRoot(
   authUiState: AuthUiState,
   openReportsRequest: Long = 0L,
+  openCardsRequest: Long = 0L,
   homeUiState: HomeFoundationUiState,
   themePreference: ThemePreference,
   onContinueWithGoogle: (android.content.Context) -> Unit,
@@ -194,6 +195,7 @@ fun SkyplusAuthGateRoot(
             homeUiState = homeUiState,
             themePreference = themePreference,
             openReportsRequest = openReportsRequest,
+            openCardsRequest = openCardsRequest,
             onToggleTheme = onToggleTheme,
             onSelectTheme = onSelectTheme,
             authenticatedUser = session.user,
@@ -310,6 +312,19 @@ fun SkyplusAppShell(
       }
     }
   }
+
+  LaunchedEffect(openCardsRequest, currentDestination) {
+    if (
+      openCardsRequest > 0L &&
+        currentDestination != null &&
+        currentDestination.hasRoute(SkyplusRoute.Cards::class).not()
+    ) {
+      navController.navigate(SkyplusRoute.Cards) {
+        launchSingleTop = true
+      }
+    }
+  }
+
   val showTopLevelNav =
     TopLevelTab.entries.any { tab -> currentDestination?.hasRoute(tab.route::class) == true } ||
       currentDestination == null
