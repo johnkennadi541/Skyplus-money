@@ -373,9 +373,10 @@ fun ShoppingListContent(
         Text("Pantry & Expiry", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         if (pantry.isEmpty()) Text("No pantry stock tracked yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         pantry.take(5).forEach { item ->
-          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(item.name)
+          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(item.name, modifier = Modifier.weight(1f))
             Text(item.quantityDecimal + " " + item.unit, style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = { onDeletePantryItem(item.id) }) { Text("Remove") }
           }
         }
         pantryAlerts.take(5).forEach { alert ->
@@ -424,6 +425,7 @@ fun ShoppingListContent(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
               Text(plan.title, fontWeight = FontWeight.Medium)
               Text(plan.mealType.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall)
+              Text(SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date(plan.plannedDate)), style = MaterialTheme.typography.bodySmall)
             }
             if (plan.ingredients.isNotEmpty() && activeList != null) {
               Text(plan.ingredients.joinToString { it.name + " " + it.quantityDecimal + " " + it.unit }, style = MaterialTheme.typography.bodySmall)
