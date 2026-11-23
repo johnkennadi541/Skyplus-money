@@ -348,6 +348,27 @@ class Phase2SecurityRemediationTest {
   }
 
   @Test
+  fun `nonempty database sidecar without key refuses passphrase regeneration`() {
+    val prefs = context.getSharedPreferences("missing_sidecar_key_${System.nanoTime()}", Context.MODE_PRIVATE)
+    val dbFile = File(context.cacheDir, "missing_main_db_${System.nanoTime()}.db")
+    val sidecarFile = File("${dbFile.path}-wal").apply { writeText("sidecar data") }
+    try {
+      val provider = DatabasePassphraseProvider(context, simpleBackend, prefs) { dbFile }
+      var caught: DatabaseSecurityException? = null
+      try {
+        provider.getOrCreatePassphrase()
+      } catch (error: DatabaseSecurityException) {
+        caught = error
+      }
+      assertEquals(PassphraseFailureReason.MISSING_KEY_FOR_EXISTING_DATABASE, caught?.reason)
+      assertNull(prefs.getString(DatabasePassphraseProvider.KEY_ENCRYPTED_PASSPHRASE, null))
+    } finally {
+      sidecarFile.delete()
+      dbFile.delete()
+    }
+  }
+
+  @Test
   fun `security monitor tracks fail-closed state and recovers when retry succeeds`() {
     val monitor = DatabaseSecurityMonitor()
     var shouldFail = true
