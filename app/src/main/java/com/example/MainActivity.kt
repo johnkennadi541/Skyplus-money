@@ -34,11 +34,18 @@ class MainActivity : ComponentActivity() {
   @Inject lateinit var databaseSecurityMonitor: DatabaseSecurityMonitor
 
   private var openReportsRequest by mutableStateOf(0L)
+  private var openCardsRequest by mutableStateOf(0L)
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     if (intent.getBooleanExtra(EXTRA_OPEN_DAILY_REPORT, false)) {
       openReportsRequest = System.currentTimeMillis()
+    }
+    if (intent.getBooleanExtra(EXTRA_OPEN_CREDIT_CARDS, false)) {
+      openCardsRequest = System.currentTimeMillis()
+    }
+    if (intent.getBooleanExtra(EXTRA_OPEN_CREDIT_CARDS, false)) {
+      openCardsRequest = System.currentTimeMillis()
     }
     enableEdgeToEdge()
     setContent {
@@ -66,6 +73,7 @@ class MainActivity : ComponentActivity() {
         SkyplusAuthGateRoot(
           authUiState = authUiState,
           openReportsRequest = openReportsRequest,
+          openCardsRequest = openCardsRequest,
           homeUiState = homeUiState,
           themePreference = themePreference,
           onContinueWithGoogle = authViewModel::onContinueWithGoogle,
@@ -102,5 +110,6 @@ class MainActivity : ComponentActivity() {
 
   companion object {
     const val EXTRA_OPEN_DAILY_REPORT = "com.skyplus.money.OPEN_DAILY_AUTO_ENTRY_REPORT"
+    const val EXTRA_OPEN_CREDIT_CARDS = "com.skyplus.money.OPEN_CREDIT_CARDS"
   }
 }
