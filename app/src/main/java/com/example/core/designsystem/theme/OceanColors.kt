@@ -5,12 +5,10 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 // ============================================================================================
-// SKYPLUS MONEY palette — Stage 1
-//
-// Navy foundation, teal secondary, YELLOW accent. Gold is gone: the previous #D4AF37 gold read
-// as luxury branding and is explicitly not part of this identity. The accent is #FACC15 yellow
-// with a deep amber (#A16207) reserved for light-mode text and icons where pure yellow would
-// fail contrast on white.
+// SKYPLUS MONEY — Google-inspired Stage 2 palette.
+// Google Blue is the primary interaction colour; navy remains the structural foundation.
+// Yellow is a restrained accent, while green/red retain semantic success/error meaning.
+// This is an independent SKYPLUS palette, not a reproduction of Google's brand identity.
 // ============================================================================================
 
 // Brand & structural navy
@@ -21,8 +19,8 @@ val SubtleOceanBlueElevated = Color(0xFF143252)
 val OceanBorderBlue = Color(0xFF1E446B)
 
 val DeepOceanBlue = Color(0xFF0B4F7C)
-val OceanPrimaryLightMode = Color(0xFF0B4A74)
-val OceanPrimaryDarkMode = Color(0xFF4CA8E0)
+val OceanPrimaryLightMode = Color(0xFF4285F4) // Google-inspired blue
+val OceanPrimaryDarkMode = Color(0xFF8AB4F8) // accessible blue on dark surfaces
 
 val OceanTeal = Color(0xFF0D9488)
 val OceanTealBright = Color(0xFF2DD4BF)
