@@ -246,6 +246,11 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
     composeTestRule.onNodeWithTag("detail_buy_more_button").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("trade_price_input").assertTextEquals("")
+    composeTestRule.onNodeWithTag("cancel_trade_dialog").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("detail_update_price_button").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("manual_price_input").assertTextEquals("")
   }
 
   @Test
