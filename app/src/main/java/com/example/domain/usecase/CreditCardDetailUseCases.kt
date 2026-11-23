@@ -37,6 +37,7 @@ object CreditCardStatementCalculator {
         Math.addExact(total, payment.amountMinor)
       }
       val remainingMinor = (statement.statementBalanceMinor - paidMinor).coerceAtLeast(0L)
+      val remainingMinimumMinor = (statement.minimumDueMinor - paidMinor).coerceAtLeast(0L)
       val status = when {
         remainingMinor == 0L -> CreditCardStatementStatus.PAID
         statement.dueDate < nowMillis -> CreditCardStatementStatus.OVERDUE
@@ -48,6 +49,7 @@ object CreditCardStatementCalculator {
         currencyCode = card.currencyCode,
         paidAmountMinor = paidMinor,
         remainingDueMinor = remainingMinor,
+        remainingMinimumDueMinor = remainingMinimumMinor,
         status = status,
       )
     }
