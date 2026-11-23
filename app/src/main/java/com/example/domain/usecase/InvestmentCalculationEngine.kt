@@ -305,6 +305,7 @@ class InvestmentCalculationEngine @Inject constructor() {
     val isStale =
       !isExited &&
         holding.category.isMarketTraded &&
+        holding.lastPriceUpdateDate > 0L &&
         (nowMillis - holding.lastPriceUpdateDate) > STALE_PRICE_THRESHOLD_MILLIS
 
     return InvestmentHoldingPerformance(
