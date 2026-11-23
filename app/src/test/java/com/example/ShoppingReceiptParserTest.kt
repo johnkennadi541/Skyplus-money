@@ -25,7 +25,7 @@ class ShoppingReceiptParserTest {
   }
 
   @Test fun `parses symbol amounts without guessing an ISO currency`() {
-    val result = ShoppingReceiptParser.parse("Corner Shop\nTotal $4.25")
+    val result = ShoppingReceiptParser.parse("Corner Shop\nTotal \\$4.25")
     assertEquals("4.25", result.totalDecimal)
     assertNull(result.currencyCodeCandidate)
     assertTrue(result.needsReview)
