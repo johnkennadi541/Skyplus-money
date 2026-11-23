@@ -52,10 +52,15 @@ class AndroidKeyStoreBackend : KeyWrappingBackend {
     cipher.init(Cipher.ENCRYPT_MODE, secretKey)
     val iv = cipher.iv
     val ciphertext = cipher.doFinal(raw)
-    return Pair(
-      Base64.encodeToString(ciphertext, Base64.NO_WRAP),
-      Base64.encodeToString(iv, Base64.NO_WRAP),
-    )
+    return try {
+      Pair(
+        Base64.encodeToString(ciphertext, Base64.NO_WRAP),
+        Base64.encodeToString(iv, Base64.NO_WRAP),
+      )
+    } finally {
+      ciphertext.fill(0)
+      iv.fill(0)
+    }
   }
 
   override fun decrypt(encryptedBase64: String, ivBase64: String): ByteArray {
@@ -68,10 +73,17 @@ class AndroidKeyStoreBackend : KeyWrappingBackend {
         ?: throw UnrecoverableKeyException("Keystore entry '$KEY_ALIAS' is invalid")
     val iv = Base64.decode(ivBase64, Base64.NO_WRAP)
     val ciphertext = Base64.decode(encryptedBase64, Base64.NO_WRAP)
-    val cipher = Cipher.getInstance(AES_GCM_NO_PADDING)
-    val spec = GCMParameterSpec(128, iv)
-    cipher.init(Cipher.DECRYPT_MODE, entry.secretKey, spec)
-    return cipher.doFinal(ciphertext)
+    try {
+      val cipher = Cipher.getInstance(AES_GCM_NO_PADDING)
+      val spec = GCMParameterSpec(128, iv)
+      cipher.init(Cipher.DECRYPT_MODE, entry.secretKey, spec)
+      return cipher.doFinal(ciphertext)
+    } finally {
+      // The ciphertext is not plaintext, but clearing decoded working buffers reduces
+      // the lifetime of key material and metadata in native/managed heap copies.
+      iv.fill(0)
+      ciphertext.fill(0)
+    }
   }
 
   companion object {
