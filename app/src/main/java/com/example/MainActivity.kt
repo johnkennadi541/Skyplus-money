@@ -150,7 +150,7 @@ class MainActivity : FragmentActivity() {
 
   override fun onStart() {
     super.onStart()
-    if (appLockState.requiresUnlock) requestBiometricUnlock()
+    if (appLockState.requiresUnlock && !credentialPromptActive) requestBiometricUnlock()
   }
 
   override fun onStop() {
