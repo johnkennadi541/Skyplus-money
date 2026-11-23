@@ -10,6 +10,7 @@ import com.example.domain.repository.ConsentRepository
 import com.example.domain.repository.SmartDetectionRepository
 import com.example.feature.smartdetection.engine.SmartTransactionParser
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
@@ -80,7 +81,14 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
 
     // Enforce Phase 1D Legal Consent Gate in background ingestion: fail closed on missing,
     // outdated, or unreadable consent records.
-    val consent = runCatching { consentRepository.getConsent(userId) }.getOrNull()
+    val consent =
+      try {
+        consentRepository.getConsent(userId)
+      } catch (cancelled: CancellationException) {
+        throw cancelled
+      } catch (_: Exception) {
+        null
+      }
     if (consent == null || !consent.isUpToDate) return
 
     val settings = detectionRepository.getDetectionSettings(userId).first()
