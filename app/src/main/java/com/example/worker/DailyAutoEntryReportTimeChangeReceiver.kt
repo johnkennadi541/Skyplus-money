@@ -32,10 +32,12 @@ class DailyAutoEntryReportTimeChangeReceiver : BroadcastReceiver() {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     scope.launch {
       try {
-        val session = authRepository.observeAuthSession().first()
-        val userId = (session as? AuthSessionState.Authenticated)?.user?.uid ?: return@launch
-        val settings = reportPreferences.observeDailyAutoEntrySettings(userId).first()
-        scheduler.updateSchedule(userId, settings)
+        runCatching {
+          val session = authRepository.observeAuthSession().first()
+          val userId = (session as? AuthSessionState.Authenticated)?.user?.uid ?: return@runCatching
+          val settings = reportPreferences.observeDailyAutoEntrySettings(userId).first()
+          scheduler.updateSchedule(userId, settings)
+        }
       } finally {
         pendingResult.finish()
         scope.cancel()
