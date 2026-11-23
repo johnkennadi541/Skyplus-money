@@ -82,6 +82,7 @@ data class CreditCardStatement(
   val id: String = UUID.randomUUID().toString(),
   val userId: String,
   val cardId: String,
+  val currencyCode: String,
   val statementDate: Long,
   val dueDate: Long,
   val statementBalanceMinor: Long,
@@ -93,9 +94,7 @@ data class CreditCardStatement(
   val updatedAt: Long = System.currentTimeMillis(),
 ) {
   val statementBalance: Money
-    get() = Money.fromMinorUnits(statementBalanceMinor, currencyCode = currencyCodeHint)
-  // Currency is resolved from the linked card when a statement is displayed.
-  private val currencyCodeHint: String = "INR"
+    get() = Money.fromMinorUnits(statementBalanceMinor, currencyCode)
 }
 
 /** Statement with ledger-derived payment status; it never trusts a manually toggled paid flag. */
