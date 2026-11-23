@@ -10,7 +10,7 @@ import org.junit.Test
 
 class ShoppingReceiptParserTest {
   @Test fun `extracts explicitly labelled grand total and merchant candidate`() {
-    val result = ShoppingReceiptParser.parse("Fresh Market\nDate 2026-11-23\nTomatoes 2.000\nSubtotal 4.000\nGrand Total KWD 4.250")
+    val result = ShoppingReceiptParser.parse("Corner Shop\nTotal \$4.25")
     assertEquals("4.25", result.totalDecimal)
     assertEquals("KWD", result.currencyCodeCandidate)
     assertEquals("Fresh Market", result.merchantCandidate)
