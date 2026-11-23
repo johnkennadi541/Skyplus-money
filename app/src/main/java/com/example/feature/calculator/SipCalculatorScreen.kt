@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -63,7 +65,7 @@ fun SipCalculatorScreen(
   val error = outcome.exceptionOrNull()?.message
 
   Column(
-    modifier = modifier.fillMaxSize().padding(20.dp).testTag("sip_calculator_screen"),
+    modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp).testTag("sip_calculator_screen"),
     verticalArrangement = Arrangement.spacedBy(14.dp),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -127,7 +129,7 @@ fun SipCalculatorScreen(
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    Spacer(Modifier.weight(1f))
+    Spacer(Modifier.height(8.dp))
   }
 
   if (showAmountCalculator) {
