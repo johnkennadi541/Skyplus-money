@@ -7,6 +7,7 @@ import okio.Buffer
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import java.io.IOException
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -67,6 +68,23 @@ class GoogleDriveBackupApiTest {
       assertEquals("backup-file-2", download.requestUrl!!.pathSegments.last())
       assertEquals("media", download.requestUrl!!.queryParameter("alt"))
       assertArrayEquals(payload, downloaded)
+    }
+  }
+
+  @Test(expected = IOException::class)
+  fun `download rejects oversized chunked backup before allocating full payload`(): Unit = runBlocking {
+    MockWebServer().use { server ->
+      server.enqueue(
+        MockResponse().setBody(
+          """{"files":[{"id":"backup-file-large","name":"SKYPLUS MONEY Backup.spm"}]}"""
+        )
+      )
+      server.enqueue(
+        MockResponse().setChunkedBody(Buffer().writeUtf8("123456789"), 3)
+      )
+
+      val api = GoogleDriveBackupApi(OkHttpClient(), server.url("/").toString(), 8)
+      api.downloadEncryptedBackup("test-access-token")
     }
   }
 
