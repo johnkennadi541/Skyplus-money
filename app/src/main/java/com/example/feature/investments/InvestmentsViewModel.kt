@@ -221,7 +221,7 @@ class InvestmentsViewModel @Inject constructor(
     }
   }
 
-  fun syncMarketPricesNow(allowOverwriteManual: Boolean = false) {
+  fun syncMarketPricesNow() {
     viewModelScope.launch(dispatchers.io) {
       val uid = requireAuthenticatedUid() ?: return@launch
       _isSyncing.value = true
@@ -229,7 +229,6 @@ class InvestmentsViewModel @Inject constructor(
         val result =
           syncMarketPricesUseCase.syncNow(
             authenticatedUserId = uid,
-            allowOverwriteManual = allowOverwriteManual,
             forceBypassCooldown = true,
           )
         result.fold(
