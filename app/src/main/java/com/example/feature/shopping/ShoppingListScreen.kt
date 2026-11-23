@@ -320,11 +320,11 @@ fun ShoppingListContent(
       }
     }
 
+    ShoppingReceiptCaptureAction(
+      onReceiptReady = { receiptDraft = it },
+      modifier = Modifier.fillMaxWidth(),
+    )
     if (activeList != null) {
-      ShoppingReceiptCaptureAction(
-        onReceiptReady = { receiptDraft = it },
-        modifier = Modifier.fillMaxWidth(),
-      )
       ShoppingCaptureActions(
         onDraftsReady = { drafts -> importedDrafts = drafts },
         modifier = Modifier.fillMaxWidth(),
