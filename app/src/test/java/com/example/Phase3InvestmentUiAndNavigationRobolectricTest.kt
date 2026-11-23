@@ -243,6 +243,7 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
 
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithText("Awaiting current price").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("investment_detail_list").performScrollToNode(hasTestTag("detail_buy_more_button"))
     composeTestRule.onNodeWithTag("detail_buy_more_button").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("trade_price_input").assertTextEquals("")
