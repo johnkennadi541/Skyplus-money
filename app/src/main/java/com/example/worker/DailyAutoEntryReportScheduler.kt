@@ -1,7 +1,6 @@
 package com.example.worker
 
 import android.content.Context
-import androidx.hilt.work.HiltWorker
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -17,7 +16,7 @@ import javax.inject.Singleton
 class DailyAutoEntryReportScheduler @Inject constructor(
   @ApplicationContext private val context: Context,
 ) {
-  fun updateSchedule(userId: String, settings: DailyAutoEntryReportSettings) {
+  fun updateSchedule(userId: String, settings: DailyAutoEntryReportSettings, appendAfterCurrent: Boolean = false) {
     if (userId.isBlank()) return
     val workManager = WorkManager.getInstance(context)
     val uniqueName = uniqueWorkName(userId)
@@ -52,7 +51,8 @@ class DailyAutoEntryReportScheduler @Inject constructor(
       .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
       .build()
 
-    workManager.enqueueUniqueWork(uniqueName, ExistingWorkPolicy.REPLACE, request)
+    val policy = if (appendAfterCurrent) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.REPLACE
+    workManager.enqueueUniqueWork(uniqueName, policy, request)
   }
 
   fun cancel(userId: String) {
