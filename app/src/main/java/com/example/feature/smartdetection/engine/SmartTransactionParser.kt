@@ -30,7 +30,7 @@ object SmartTransactionParser {
 
   private val AMOUNT_PATTERN =
     Pattern.compile(
-      "(?:(?:₹|Rs\\.?|(?:$SUPPORTED_CURRENCY_CODES_PATTERN)\\b)\\s*([0-9,]+(?:\\.[0-9]{1,4})?))|(?:([0-9,]+(?:\\.[0-9]{1,4})?)\\s*(?:$SUPPORTED_CURRENCY_CODES_PATTERN)\\b)",
+      "(?:(?:₹|Rs\\.?|€|£|(?:$SUPPORTED_CURRENCY_CODES_PATTERN)\\b)\\s*([0-9,]+(?:\\.[0-9]{1,4})?))|(?:([0-9,]+(?:\\.[0-9]{1,4})?)\\s*(?:$SUPPORTED_CURRENCY_CODES_PATTERN)\\b)",
       Pattern.CASE_INSENSITIVE,
     )
 
