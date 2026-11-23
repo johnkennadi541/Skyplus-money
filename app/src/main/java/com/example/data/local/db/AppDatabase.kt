@@ -13,6 +13,7 @@ import com.example.data.local.db.dao.InvestmentDao
 import com.example.data.local.db.dao.LoanDao
 import com.example.data.local.db.dao.SavingsGoalDao
 import com.example.data.local.db.dao.ShoppingDao
+import com.example.data.local.db.dao.ShoppingExtendedDao
 import com.example.data.local.db.dao.TransactionDetectionEventDao
 import com.example.data.local.db.entity.AccountMappingRuleEntity
 import com.example.data.local.db.entity.BudgetEntity
@@ -32,6 +33,10 @@ import com.example.data.local.db.entity.SavingsContributionEntity
 import com.example.data.local.db.entity.SavingsGoalEntity
 import com.example.data.local.db.entity.ShoppingListEntity
 import com.example.data.local.db.entity.ShoppingStorePriceEntity
+import com.example.data.local.db.entity.ShoppingPantryEntity
+import com.example.data.local.db.entity.ShoppingMealPlanEntity
+import com.example.data.local.db.entity.ShoppingMealIngredientEntity
+import com.example.data.local.db.entity.ShoppingReceiptEntity
 import com.example.data.local.db.entity.TransactionDetectionEventEntity
 
 @Database(
@@ -55,8 +60,12 @@ import com.example.data.local.db.entity.TransactionDetectionEventEntity
     ShoppingListEntity::class,
     ShoppingItemEntity::class,
     ShoppingStorePriceEntity::class,
+    ShoppingPantryEntity::class,
+    ShoppingMealPlanEntity::class,
+    ShoppingMealIngredientEntity::class,
+    ShoppingReceiptEntity::class,
   ],
-  version = 10,
+  version = 11,
   exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -72,4 +81,5 @@ abstract class AppDatabase : RoomDatabase() {
   abstract fun loanDao(): LoanDao
   abstract fun investmentDao(): InvestmentDao
   abstract fun shoppingDao(): ShoppingDao
+  abstract fun shoppingExtendedDao(): ShoppingExtendedDao
 }
