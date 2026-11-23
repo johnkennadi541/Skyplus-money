@@ -348,6 +348,7 @@ class Phase3ShoppingDatabaseAndRepoTest {
           DatabaseMigrations.MIGRATION_7_8,
           DatabaseMigrations.MIGRATION_8_9,
           DatabaseMigrations.MIGRATION_9_10,
+          DatabaseMigrations.MIGRATION_10_11,
         )
         .build()
 
