@@ -82,6 +82,16 @@ class CreditCardMigration9To10Test {
     db.query("SELECT name FROM sqlite_master WHERE type='table' AND name=?", arrayOf<Any>(name))
       .use { it.moveToFirst() }
 
+  private fun columnExists(table: String, column: String) =
+    db.query("PRAGMA table_info($table)").use { cursor ->
+      val nameIndex = cursor.getColumnIndex("name")
+      var found = false
+      while (cursor.moveToNext()) {
+        if (cursor.getString(nameIndex) == column) found = true
+      }
+      found
+    }
+
   private fun indexExists(name: String) =
     db.query("SELECT name FROM sqlite_master WHERE type='index' AND name=?", arrayOf<Any>(name))
       .use { it.moveToFirst() }
@@ -92,6 +102,8 @@ class CreditCardMigration9To10Test {
 
     assertTrue(tableExists("credit_card_statements"))
     assertTrue(tableExists("credit_card_reward_events"))
+    assertTrue(columnExists("credit_cards", "joiningFeeMinor"))
+    assertTrue(columnExists("credit_card_statements", "lateFeeMinor"))
     assertTrue(indexExists("index_credit_card_statements_cardId"))
     assertTrue(indexExists("index_credit_card_reward_events_cardId"))
 
