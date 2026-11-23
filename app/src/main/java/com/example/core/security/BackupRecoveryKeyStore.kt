@@ -2,9 +2,6 @@ package com.example.core.security
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Base64
-import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,18 +12,23 @@ import javax.inject.Singleton
  * one-time displayed key separately so it can be entered on a replacement device.
  */
 @Singleton
-class BackupRecoveryKeyStore @Inject constructor(
-  context: Context,
+class BackupRecoveryKeyStore internal constructor(
+  private val preferences: SharedPreferences,
+  private val backend: KeyWrappingBackend,
 ) {
-  private val preferences: SharedPreferences =
-    context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
-  private val backend: KeyWrappingBackend = AndroidKeyStoreBackend()
+  @Inject
+  constructor(context: Context) : this(
+    context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
+    AndroidKeyStoreBackend(),
+  )
 
   @Synchronized
   fun store(recoveryKey: CharArray) {
     require(recoveryKey.size == RECOVERY_KEY_LENGTH) { "Invalid recovery key length" }
     require(recoveryKey.all { it in RECOVERY_KEY_ALPHABET }) { "Invalid recovery key characters" }
-    val plainBytes = String(recoveryKey).toByteArray(StandardCharsets.US_ASCII)
+
+    // Encode directly from the mutable CharArray; avoid creating an immutable plaintext String.
+    val plainBytes = ByteArray(recoveryKey.size) { index -> recoveryKey[index].code.toByte() }
     try {
       val (ciphertext, iv) = backend.encrypt(plainBytes)
       check(
@@ -52,13 +54,20 @@ class BackupRecoveryKeyStore @Inject constructor(
     check(!ciphertext.isNullOrBlank() && !iv.isNullOrBlank()) {
       "Protected recovery key metadata is incomplete"
     }
+
     val plaintext = backend.decrypt(ciphertext, iv)
     try {
-      val key = String(plaintext, StandardCharsets.US_ASCII)
-      check(key.length == RECOVERY_KEY_LENGTH && key.all { it in RECOVERY_KEY_ALPHABET }) {
+      check(plaintext.size == RECOVERY_KEY_LENGTH) {
         "Protected recovery key failed validation"
       }
-      return key.toCharArray()
+      val key = CharArray(plaintext.size) { index ->
+        (plaintext[index].toInt() and 0xff).toChar()
+      }
+      check(key.all { it in RECOVERY_KEY_ALPHABET }) {
+        key.fill('\u0000')
+        "Protected recovery key failed validation"
+      }
+      return key
     } finally {
       plaintext.fill(0)
     }
