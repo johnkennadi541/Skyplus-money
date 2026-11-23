@@ -68,6 +68,7 @@ import com.example.core.designsystem.component.OceanStatusBadge
 import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
 import com.example.domain.model.Budget
+import com.example.feature.calculator.SmartCalculatorAmountDialog
 import com.example.domain.model.BudgetAlertStatus
 import com.example.domain.model.BudgetPeriodType
 import com.example.domain.model.BudgetStatus
@@ -662,6 +663,7 @@ private fun BudgetFormDialog(
   var name by remember { mutableStateOf(initialName) }
   var category by remember { mutableStateOf(initialCategory) }
   var amountDecimal by remember { mutableStateOf(initialAmount) }
+  var showBudgetCalculator by remember { mutableStateOf(false) }
   var currency by remember { mutableStateOf(initialCurrency) }
   var periodType by remember { mutableStateOf(initialPeriodType) }
   var threshold by remember { mutableIntStateOf(initialThreshold) }
@@ -723,16 +725,40 @@ private fun BudgetFormDialog(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
         ) {
-          OutlinedTextField(
-            value = amountDecimal,
-            onValueChange = {
-              amountDecimal = it
-              formError = null
-            },
-            label = { Text("Amount") },
-            singleLine = true,
-            modifier = Modifier.weight(1f).testTag("budget_amount_input"),
-          )
+          Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            OutlinedTextField(
+              value = amountDecimal,
+              onValueChange = {
+                amountDecimal = it
+                formError = null
+              },
+              label = { Text("Amount") },
+              singleLine = true,
+              modifier = Modifier.fillMaxWidth().testTag("budget_amount_input"),
+            )
+            androidx.compose.material3.TextButton(
+              onClick = { showBudgetCalculator = true },
+              modifier = Modifier.testTag("budget_amount_calculator_button"),
+            ) {
+              androidx.compose.material3.Icon(
+                imageVector = androidx.compose.material.icons.Icons.Rounded.Calculate,
+                contentDescription = null,
+              )
+              Text("Calculate")
+            }
+          }
+
+          if (showBudgetCalculator) {
+            SmartCalculatorAmountDialog(
+              initialExpression = amountDecimal,
+              onApply = { calculatedAmount ->
+                amountDecimal = calculatedAmount
+                formError = null
+                showBudgetCalculator = false
+              },
+              onDismiss = { showBudgetCalculator = false },
+            )
+          }
 
           ExposedDropdownMenuBox(
             expanded = currencyExpanded,
