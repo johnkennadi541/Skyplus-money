@@ -505,6 +505,7 @@ fun LoanDetailContent(
           if (showPaymentCalculator) {
             SmartCalculatorAmountDialog(
               initialExpression = amountText,
+              decimalScale = Money.resolveFractionDigits(loan.currencyCode),
               onApply = { calculatedAmount ->
                 amountText = calculatedAmount
                 showPaymentCalculator = false
