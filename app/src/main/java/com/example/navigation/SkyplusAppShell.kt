@@ -159,6 +159,8 @@ fun SkyplusAuthGateRoot(
   homeDashboardViewModel: HomeDashboardViewModel? = null,
   cardsViewModel: CardsViewModel? = null,
   savingsGoalsViewModel: SavingsGoalsViewModel? = null,
+  profileFirstName: String = "",
+  onSaveProfileFirstName: (String) -> Unit = {},
 ) {
   if (databaseSecurityError != null) {
     DatabaseSecurityErrorScreen(
@@ -213,6 +215,8 @@ fun SkyplusAuthGateRoot(
             homeDashboardViewModel = homeDashboardViewModel,
             cardsViewModel = cardsViewModel,
             savingsGoalsViewModel = savingsGoalsViewModel,
+            profileFirstName = profileFirstName,
+            onSaveProfileFirstName = onSaveProfileFirstName,
             modifier = modifier,
           )
         }
@@ -300,6 +304,8 @@ fun SkyplusAppShell(
   homeDashboardViewModel: HomeDashboardViewModel? = null,
   cardsViewModel: CardsViewModel? = null,
   savingsGoalsViewModel: SavingsGoalsViewModel? = null,
+  profileFirstName: String = "",
+  onSaveProfileFirstName: (String) -> Unit = {},
 ) {
   val backStackEntry by navController.currentBackStackEntryAsState()
   val currentDestination = backStackEntry?.destination
@@ -561,6 +567,8 @@ fun SkyplusAppShell(
                 onNavigateBack = { navController.popBackStack() },
                 onOpenInvestments = { navController.navigate(SkyplusRoute.Investments) },
                 onSignOut = onSignOut,
+                profileFirstName = profileFirstName,
+                onSaveProfileFirstName = onSaveProfileFirstName,
               )
             }
             composable<SkyplusRoute.Investments> {
