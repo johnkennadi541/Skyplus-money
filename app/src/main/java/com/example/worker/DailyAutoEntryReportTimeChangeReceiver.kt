@@ -21,6 +21,7 @@ class DailyAutoEntryReportTimeChangeReceiver : BroadcastReceiver() {
   @Inject lateinit var authRepository: AuthRepository
   @Inject lateinit var reportPreferences: ReportPreferencesDataSource
   @Inject lateinit var scheduler: DailyAutoEntryReportScheduler
+  @Inject lateinit var creditCardReminderScheduler: CreditCardReminderScheduler
 
   override fun onReceive(context: Context, intent: Intent) {
     if (
@@ -37,6 +38,7 @@ class DailyAutoEntryReportTimeChangeReceiver : BroadcastReceiver() {
           val userId = (session as? AuthSessionState.Authenticated)?.user?.uid ?: return@runCatching
           val settings = reportPreferences.observeDailyAutoEntrySettings(userId).first()
           scheduler.updateSchedule(userId, settings)
+          creditCardReminderScheduler.updateSchedule(userId)
         }
       } finally {
         pendingResult.finish()
