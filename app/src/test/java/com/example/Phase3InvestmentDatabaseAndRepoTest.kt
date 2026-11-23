@@ -862,6 +862,33 @@ class Phase3InvestmentDatabaseAndRepoTest {
 
     mode = "OFFLINE"
     assertTrue(provider.fetchLatestQuote(validReq) is MarketQuoteFetchResult.NetworkError)
+
+    // Provider payload validation: never accept zero/negative NAV, impossible/future
+    // dates, or a SUCCESS response with no NAV observations.
+    val zeroNav = provider.parseMfApiResponse(
+      """{"status":"SUCCESS","data":[{"date":"18-11-2026","nav":"0"}]}"""
+    )
+    assertTrue(zeroNav is MarketQuoteFetchResult.InvalidResponse)
+
+    val negativeNav = provider.parseMfApiResponse(
+      """{"status":"SUCCESS","data":[{"date":"18-11-2026","nav":"-1"}]}"""
+    )
+    assertTrue(negativeNav is MarketQuoteFetchResult.InvalidResponse)
+
+    val impossibleDate = provider.parseMfApiResponse(
+      """{"status":"SUCCESS","data":[{"date":"31-02-2026","nav":"100"}]}"""
+    )
+    assertTrue(impossibleDate is MarketQuoteFetchResult.InvalidResponse)
+
+    val futureDate = provider.parseMfApiResponse(
+      """{"status":"SUCCESS","data":[{"date":"31-12-9999","nav":"100"}]}"""
+    )
+    assertTrue(futureDate is MarketQuoteFetchResult.InvalidResponse)
+
+    val emptyData = provider.parseMfApiResponse(
+      """{"status":"SUCCESS","data":[]}"""
+    )
+    assertTrue(emptyData is MarketQuoteFetchResult.InvalidResponse)
   }
 
   @Test
