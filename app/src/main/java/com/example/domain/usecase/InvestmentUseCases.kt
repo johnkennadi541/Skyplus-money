@@ -96,7 +96,7 @@ class CreateInvestmentUseCase @Inject constructor(
       try {
         val chargesBd = calculationEngine.parseNonNegativeDecimal(chargesDecimal, "Transaction charges")
         Money.fromBigDecimal(chargesBd, currencyCode, RoundingMode.HALF_UP).minorUnits
-      } catch (e: Throwable) {
+      } catch (e: Exception) {
         return Result.failure(e)
       }
 
@@ -137,7 +137,7 @@ class RecordInvestmentBuyUseCase @Inject constructor(
       try {
         val chargesBd = calculationEngine.parseNonNegativeDecimal(chargesDecimal, "Transaction charges")
         Money.fromBigDecimal(chargesBd, currencyCode, RoundingMode.HALF_UP).minorUnits
-      } catch (e: Throwable) {
+      } catch (e: Exception) {
         return Result.failure(e)
       }
 
@@ -171,7 +171,7 @@ class RecordInvestmentSellUseCase @Inject constructor(
       try {
         val chargesBd = calculationEngine.parseNonNegativeDecimal(chargesDecimal, "Transaction charges")
         Money.fromBigDecimal(chargesBd, currencyCode, RoundingMode.HALF_UP).minorUnits
-      } catch (e: Throwable) {
+      } catch (e: Exception) {
         return Result.failure(e)
       }
 
