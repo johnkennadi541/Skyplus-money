@@ -71,10 +71,11 @@ class ShoppingExtendedRepositoryImpl @Inject constructor(
         )
         database.withTransaction {
           val existing = shoppingDao.getPantryItem(authenticatedUserId, item.id)
+            ?: shoppingDao.getPantryItemByNameAndUnit(authenticatedUserId, entity.name, entity.unit)
           if (existing == null) shoppingDao.insertPantryItem(entity)
           else {
             val rows = shoppingDao.updatePantryItem(
-              userId = authenticatedUserId, id = item.id, name = entity.name, category = entity.category,
+              userId = authenticatedUserId, id = existing.id, name = entity.name, category = entity.category,
               quantity = entity.quantityDecimal, unit = entity.unit, threshold = entity.lowStockThresholdDecimal,
               expiryAt = entity.expiryAt, updatedAt = entity.updatedAt,
             )
