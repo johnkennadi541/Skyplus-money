@@ -523,6 +523,7 @@ object DatabaseMigrations {
           )
           """.trimIndent()
         )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_credit_card_statements_cardId ON credit_card_statements(cardId)")
         db.execSQL(
           "CREATE UNIQUE INDEX IF NOT EXISTS index_credit_card_statements_userId_cardId_statementDate ON credit_card_statements(userId, cardId, statementDate)"
         )
@@ -547,6 +548,7 @@ object DatabaseMigrations {
           )
           """.trimIndent()
         )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_credit_card_reward_events_cardId ON credit_card_reward_events(cardId)")
         db.execSQL(
           "CREATE INDEX IF NOT EXISTS index_credit_card_reward_events_userId_cardId_eventDate ON credit_card_reward_events(userId, cardId, eventDate)"
         )
