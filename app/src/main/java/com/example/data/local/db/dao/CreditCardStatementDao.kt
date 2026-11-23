@@ -28,6 +28,7 @@ interface CreditCardStatementDao {
         statementBalanceMinor = :statementBalanceMinor,
         minimumDueMinor = :minimumDueMinor,
         feesMinor = :feesMinor,
+        lateFeeMinor = :lateFeeMinor,
         interestMinor = :interestMinor,
         notes = :notes,
         updatedAt = :updatedAt
@@ -42,6 +43,7 @@ interface CreditCardStatementDao {
     statementBalanceMinor: Long,
     minimumDueMinor: Long,
     feesMinor: Long,
+    lateFeeMinor: Long,
     interestMinor: Long,
     notes: String?,
     updatedAt: Long,
