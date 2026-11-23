@@ -10,10 +10,10 @@ import org.junit.Test
 
 class ShoppingReceiptParserTest {
   @Test fun `extracts explicitly labelled grand total and merchant candidate`() {
-    val result = ShoppingReceiptParser.parse("Corner Shop\nTotal \$4.25")
+    val result = ShoppingReceiptParser.parse("Corner Shop\nDate 2026-11-23\nGrand Total 4.25 KWD")
     assertEquals("4.25", result.totalDecimal)
     assertEquals("KWD", result.currencyCodeCandidate)
-    assertEquals("Fresh Market", result.merchantCandidate)
+    assertEquals("Corner Shop", result.merchantCandidate)
     assertTrue(result.purchaseDateMillis != null)
     assertFalse(result.needsReview)
   }
@@ -25,7 +25,7 @@ class ShoppingReceiptParserTest {
   }
 
   @Test fun `parses symbol amounts without guessing an ISO currency`() {
-    val result = ShoppingReceiptParser.parse("Corner Shop\nTotal \\$4.25")
+    val result = ShoppingReceiptParser.parse("Corner Shop\nTotal " + 36.toChar() + "4.25")
     assertEquals("4.25", result.totalDecimal)
     assertNull(result.currencyCodeCandidate)
     assertTrue(result.needsReview)
