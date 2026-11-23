@@ -84,6 +84,18 @@ object ShoppingInputParser {
     else -> "piece"
   }
 
+  fun suggestCategory(name: String): String {
+    val value = name.lowercase(Locale.ROOT)
+    return when {
+      listOf("milk", "cheese", "yogurt", "yoghurt", "butter", "bread", "egg", "curd").any(value::contains) -> "Dairy & Bakery"
+      listOf("tomato", "onion", "potato", "carrot", "apple", "banana", "fruit", "vegetable").any(value::contains) -> "Fresh Produce"
+      listOf("soap", "detergent", "cleaner", "tissue", "toilet", "dishwash", "sponge").any(value::contains) -> "Household"
+      listOf("shampoo", "toothpaste", "toothbrush", "lotion", "shaving").any(value::contains) -> "Personal Care"
+      listOf("rice", "flour", "sugar", "salt", "oil", "pasta", "dal", "lentil", "coffee", "tea", "chicken", "fish", "meat").any(value::contains) -> "Groceries"
+      else -> "Other"
+    }
+  }
+
   /** Merge only exact normalized name + unit matches; quantity is summed with BigDecimal. */
   fun mergeDuplicates(items: List<ShoppingItemDraft>): List<ShoppingItemDraft> {
     val merged = linkedMapOf<Pair<String, String>, ShoppingItemDraft>()
