@@ -236,7 +236,12 @@ fun InvestmentDetailContent(
             if (holding.lastPriceUpdateDate > 0L) {
               "as of ${dateFormatter.format(Date(holding.lastPriceUpdateDate))}"
             } else {
-              "awaiting first NAV"
+              holding.lastPriceProviderLabel
+                ?: if (holding.category == InvestmentCategory.MUTUAL_FUNDS && holding.autoPriceUpdateEnabled) {
+                  "awaiting first NAV"
+                } else {
+                  "awaiting current price"
+                }
             }
           DetailMetricRow("Current Unit Price", "${holding.currentMarketPriceDecimal} $curr ($priceDateLabel)")
           DetailMetricRow("Avg Cost / Unit", "${performance.averageCostPerUnitDisplay} $curr")
