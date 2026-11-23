@@ -147,6 +147,40 @@ class Phase3InvestmentDatabaseAndRepoTest {
   }
 
   @Test
+  fun `missing initial market price is not recorded as a fresh quote or price history point`() = runTest {
+    val uid = "uid_awaiting_market_price"
+    val repo = buildRepo(
+      object : MarketPriceDataSource {
+        override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult =
+          MarketQuoteFetchResult.UnsupportedCategoryOrIdentifier("manual only")
+      }
+    )
+
+    val holding = repo.createHoldingWithInitialBuy(
+      authenticatedUserId = uid,
+      name = "Manual-only Equity",
+      category = InvestmentCategory.STOCKS,
+      symbolOrTicker = "TEST",
+      isin = null,
+      brokerOrPlatform = null,
+      currencyCode = "INR",
+      purchaseDate = System.currentTimeMillis(),
+      quantityDecimal = "2",
+      purchasePriceDecimal = "100",
+      chargesMinor = 0L,
+      currentMarketPriceDecimal = null,
+      autoPriceUpdateEnabled = false,
+      notes = null,
+    ).getOrThrow()
+
+    assertEquals("100", holding.currentMarketPriceDecimal) // Cost-price fallback only.
+    assertEquals(0L, holding.lastPriceUpdateDate)
+    assertEquals("Awaiting current price", holding.lastPriceProviderLabel)
+    assertTrue(repo.getPriceHistoryForHolding(uid, holding.id).first().isEmpty())
+    assertEquals(1, repo.getTransactionsForHolding(uid, holding.id).first().size)
+  }
+
+  @Test
   fun `new investment holdings reject non INR currencies`() = runTest {
     val repo = buildRepo(
       object : MarketPriceDataSource {
