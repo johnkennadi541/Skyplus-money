@@ -91,7 +91,6 @@ fun CardsScreen(
 ) {
   val cards by viewModel.cards.collectAsStateWithLifecycle()
   val linkableAccounts by viewModel.linkableAccounts.collectAsStateWithLifecycle()
-  val accounts by viewModel.accounts.collectAsStateWithLifecycle()
   val selectedCardStatements by viewModel.selectedCardStatements.collectAsStateWithLifecycle()
   val selectedCardRewardEvents by viewModel.selectedCardRewardEvents.collectAsStateWithLifecycle()
   val selectedCardTransactions by viewModel.selectedCardTransactions.collectAsStateWithLifecycle()
@@ -102,7 +101,6 @@ fun CardsScreen(
   CardsContent(
     cards = cards,
     linkableAccounts = linkableAccounts,
-    accounts = accounts,
     selectedCardStatements = selectedCardStatements,
     selectedCardRewardEvents = selectedCardRewardEvents,
     selectedCardTransactions = selectedCardTransactions,
@@ -126,7 +124,6 @@ fun CardsScreen(
 fun CardsContent(
   cards: List<CreditCardSummary>,
   linkableAccounts: List<FinancialAccount>,
-  accounts: List<FinancialAccount> = linkableAccounts,
   selectedCardStatements: List<com.example.domain.model.CreditCardStatementSummary> = emptyList(),
   selectedCardRewardEvents: List<com.example.domain.model.CreditCardRewardEvent> = emptyList(),
   selectedCardTransactions: List<com.example.domain.model.FinancialTransaction> = emptyList(),
