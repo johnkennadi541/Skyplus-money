@@ -59,7 +59,7 @@ jobs:
   # the signing secrets are never reachable from a pull request.
   debug-apk:
     needs: build-and-test
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/stage3-pr3-savings-goals'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: debug-signing
     permissions:
