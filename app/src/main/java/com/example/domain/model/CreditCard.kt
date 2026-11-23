@@ -147,3 +147,15 @@ data class CreditCardSummary(
   val isOverLimit: Boolean
     get() = card.creditLimitMinor > 0L && outstandingMinor > card.creditLimitMinor
 }
+
+data class CreditCardSpendingAnalytics(
+  val currencyCode: String,
+  val periodStart: Long,
+  val periodEnd: Long,
+  val totalSpentMinor: Long,
+  val transactionCount: Int,
+  val categoryTotalsMinor: Map<String, Long>,
+) {
+  val totalSpent: Money
+    get() = Money.fromMinorUnits(totalSpentMinor, currencyCode)
+}
