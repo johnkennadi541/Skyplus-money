@@ -40,6 +40,11 @@
 - The Resend API key is configured as a server secret and is not shipped in the Android app.
 - The repository does not contain Firestore/Storage security-rules files, so deployed Firebase rules cannot be verified from this repository snapshot.
 
-## 7. Audit Scope & Verification
+## 7. CI Signing Controls
+- Pull-request Android build/test jobs do not receive signing secrets; the signed debug-APK job is restricted to the main branch and the protected `debug-signing` environment.
+- The manual release-APK and one-time release-keystore workflows now have job-level main-branch guards so a manually selected feature branch cannot run code with signing secrets.
+- The GitHub integration used for this source review could not read repository branch-protection settings. Confirm that `main` requires reviewed changes and that release signing secrets are stored with appropriate access controls; a workflow branch guard is not a substitute for branch protection.
+
+## 8. Audit Scope & Verification
 - This document describes source-level controls reviewed in the repository; it is not a third-party penetration test or a verification of live Firebase project configuration.
 - CI compilation and automated tests provide regression evidence but do not replace real-device SQLCipher/Keystore testing, dependency vulnerability scanning, or independent security testing.
