@@ -182,6 +182,7 @@ class ShoppingExtendedRepositoryImpl @Inject constructor(
         }
         val account = accountDao.getAccountById(authenticatedUserId, accountId)
           ?: throw SecurityException("Selected account does not belong to authenticated user")
+        require(account.isActive) { "Selected account is inactive" }
         require(account.currencyCode.equals(receipt.currencyCode, ignoreCase = true)) {
           "Receipt currency " + receipt.currencyCode + " does not match selected account currency " + account.currencyCode
         }
