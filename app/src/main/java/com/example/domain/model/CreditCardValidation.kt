@@ -28,6 +28,7 @@ object CreditCardValidation {
     require(card.issuerName.isNotBlank()) { "Issuer name cannot be blank" }
     require(card.currencyCode.isNotBlank()) { "Card currency is required" }
     require(card.creditLimitMinor >= 0L) { "Credit limit cannot be negative" }
+    require(card.joiningFeeMinor >= 0L) { "Joining fee cannot be negative" }
     require(card.annualFeeMinor >= 0L) { "Annual fee cannot be negative" }
     require(card.annualFeeMonth in 1..12) { "Annual fee month must be between 1 and 12" }
     require(card.reminderDaysBefore in 1..30) { "Reminder lead time must be between 1 and 30 days" }
@@ -70,6 +71,7 @@ object CreditCardStatementValidation {
       "Minimum due cannot exceed the statement balance"
     }
     require(statement.feesMinor >= 0L) { "Fees cannot be negative" }
+    require(statement.lateFeeMinor >= 0L) { "Late fee cannot be negative" }
     require(statement.interestMinor >= 0L) { "Interest cannot be negative" }
     require(statement.notes == null || statement.notes.length <= 500) { "Statement notes are too long" }
   }
