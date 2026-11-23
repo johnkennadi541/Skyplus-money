@@ -83,7 +83,7 @@ fun SmartCalculatorScreen(
               when (key) {
                 "AC" -> { expression = ""; result = null; error = null }
                 "=" -> try {
-                  result = SmartCalculatorEngine.evaluate(expression)
+                  result = SmartCalculatorEngine.evaluate(expression, scale = decimalScale)
                   error = null
                 } catch (failure: IllegalArgumentException) {
                   result = null
@@ -130,6 +130,7 @@ fun SmartCalculatorScreen(
 @Composable
 fun SmartCalculatorAmountDialog(
   initialExpression: String,
+  decimalScale: Int = 2,
   onApply: (String) -> Unit,
   onDismiss: () -> Unit,
 ) {
@@ -179,7 +180,7 @@ fun SmartCalculatorAmountDialog(
     },
     confirmButton = {
       androidx.compose.material3.TextButton(
-        enabled = result != null && result!! > BigDecimal.ZERO,
+        enabled = result != null && result!! >= BigDecimal.ZERO,
         onClick = { onApply(result!!.stripTrailingZeros().toPlainString()) },
       ) { Text("Use amount") }
     },
