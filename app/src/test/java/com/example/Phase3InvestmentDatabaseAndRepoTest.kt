@@ -320,8 +320,8 @@ class Phase3InvestmentDatabaseAndRepoTest {
 
     // Reset persisted DataStore state so this test is isolated from earlier tests.
     // The preference store is application-scoped and can survive between Robolectric tests.
-    repo.setAutoUpdateConsent(false)
-    assertFalse(syncPreferences.syncSettings.first().autoUpdateConsentEnabled)
+    repo.setAutoUpdateConsent("uid_man", false)
+    assertFalse(syncPreferences.syncSettings("uid_man").first().autoUpdateConsentEnabled)
 
     // Attempting auto-apply without holding opt-in or allowOverwriteManual MUST NOT overwrite manual price
     val overwrittenWhenDisabled =
@@ -338,7 +338,7 @@ class Phase3InvestmentDatabaseAndRepoTest {
     assertEquals("95.5", repo.getHoldingById("uid_man", mfHolding.id)?.currentMarketPriceDecimal)
 
     // Now user explicitly opts in globally AND per holding -> sync succeeds cleanly!
-    repo.setAutoUpdateConsent(true)
+    repo.setAutoUpdateConsent("uid_man", true)
     repo.setHoldingAutoPriceUpdate("uid_man", mfHolding.id, true).getOrThrow()
     val summary = repo.syncEligibleMarketPrices("uid_man", forceBypassCooldown = true).getOrThrow()
     assertEquals(1, summary.updatedCount)
@@ -402,7 +402,7 @@ class Phase3InvestmentDatabaseAndRepoTest {
       ).isFailure,
     )
 
-    repo.setAutoUpdateConsent(true)
+    repo.setAutoUpdateConsent("uid_quote_guard", true)
     repo.setHoldingAutoPriceUpdate("uid_quote_guard", created.id, true).getOrThrow()
     val currentQuoteDate = System.currentTimeMillis() - 2L * 24L * 60L * 60L * 1000L
     repo.updateManualMarketPrice(
