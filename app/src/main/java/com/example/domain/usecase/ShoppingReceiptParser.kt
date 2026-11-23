@@ -3,6 +3,7 @@ package com.example.domain.usecase
 import java.math.BigDecimal
 import java.security.MessageDigest
 import java.util.Locale
+import com.example.domain.model.Money
 
 data class ShoppingReceiptDraft(
   val fingerprint: String,
@@ -16,7 +17,7 @@ data class ShoppingReceiptDraft(
 /** Extracts only explicit total labels; ambiguous totals remain a review-only draft. */
 object ShoppingReceiptParser {
   private val totalLine = Regex(
-    """(?i)^\s*(grand\s+total|total\s+due|amount\s+due|total)\s*[:\-]?\s*(?:(USD|INR|KWD|EUR|GBP|AED|SAR)\s*)?([0-9][0-9,]*(?:\.[0-9]{1,3})?)\s*$"""
+    """(?i)^\s*(grand\s+total|total\s+due|amount\s+due|total)\s*[:\-]?\s*(?:([A-Z]{3})\s*)?([0-9][0-9,]*(?:\.[0-9]{1,3})?)\s*$"""
   )
 
 
@@ -38,7 +39,7 @@ object ShoppingReceiptParser {
     val candidates = if (preferred.isNotEmpty()) preferred else totals
     val distinctAmounts = candidates.map { it.second.stripTrailingZeros() }.distinct()
     val amount = distinctAmounts.singleOrNull()
-    val code = candidates.mapNotNull { it.third }.distinct().singleOrNull()
+    val code = candidates.mapNotNull { it.third?.takeIf(Money::isSupportedCurrency) }.distinct().singleOrNull()
     val merchant = normalized.firstOrNull()?.takeIf { line ->
       line.length in 2..60 && !line.contains(Regex("""(?i)(receipt|invoice|tax|date|time)"""))
     }
