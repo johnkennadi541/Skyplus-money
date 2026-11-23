@@ -86,7 +86,10 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
 
     val settings = detectionRepository.getDetectionSettings(userId).first()
     if (!settings.isNotificationDetectionEnabled) return
-    if (!settings.permittedPackages.contains(packageName)) return
+
+    // The current default SMS app package is the sole permitted source. Do not
+    // apply the legacy bank/UPI notification allowlist here: it would reject the
+    // SMS app itself and can never authorize email or other notification sources.
 
     // On-device parsing with expanded sensitive token filter
     val parsed = SmartTransactionParser.parse(combinedContent, packageName, timestamp) ?: return
