@@ -244,6 +244,106 @@ class Phase3InvestmentDatabaseAndRepoTest {
   }
 
   @Test
+  fun `buy cost basis is immutable to metadata edits and older or failed quotes preserve last valuation`() = runTest {
+    val repo =
+      buildRepo(
+        object : MarketPriceDataSource {
+          override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult =
+            MarketQuoteFetchResult.NetworkError("offline")
+        }
+      )
+
+    val created =
+      repo.createHoldingWithInitialBuy(
+        authenticatedUserId = "uid_quote_guard",
+        name = "Index Fund",
+        category = InvestmentCategory.MUTUAL_FUNDS,
+        symbolOrTicker = "119598",
+        isin = null,
+        brokerOrPlatform = "Broker",
+        currencyCode = "INR",
+        purchaseDate = 1_750_000_000_000L,
+        quantityDecimal = "10",
+        purchasePriceDecimal = "100.00",
+        chargesMinor = 25L,
+        currentMarketPriceDecimal = "105.00",
+        autoPriceUpdateEnabled = false,
+        notes = null,
+      ).getOrThrow()
+
+    val originalBuy = repo.getTransactionsForHolding("uid_quote_guard", created.id).first().single()
+    val originalCostBasis = created.totalInvestedMinor
+
+    assertTrue(
+      "Metadata editing must not rewrite the recorded purchase date",
+      repo.updateHoldingMetadata(
+        "uid_quote_guard",
+        created.copy(purchaseDate = created.purchaseDate + 86_400_000L),
+      ).isFailure,
+    )
+    assertTrue(
+      "Metadata editing must not change the holding currency",
+      repo.updateHoldingMetadata(
+        "uid_quote_guard",
+        created.copy(currencyCode = "USD"),
+      ).isFailure,
+    )
+    assertTrue(
+      "Metadata editing must not change the instrument category",
+      repo.updateHoldingMetadata(
+        "uid_quote_guard",
+        created.copy(category = InvestmentCategory.STOCKS),
+      ).isFailure,
+    )
+
+    repo.setAutoUpdateConsent(true)
+    repo.setHoldingAutoPriceUpdate("uid_quote_guard", created.id, true).getOrThrow()
+    val currentQuoteDate = System.currentTimeMillis() - 2L * 24L * 60L * 60L * 1000L
+    repo.updateManualMarketPrice(
+      authenticatedUserId = "uid_quote_guard",
+      holdingId = created.id,
+      newUnitPriceDecimal = "110.00",
+      priceDate = currentQuoteDate,
+    ).getOrThrow()
+
+    val rejectedOlderQuote =
+      repo.applyAutomaticMarketPrice(
+        authenticatedUserId = "uid_quote_guard",
+        holdingId = created.id,
+        newUnitPriceDecimal = "90.00",
+        priceDate = currentQuoteDate - 86_400_000L,
+        source = PriceSourceType.MFAPI_AMFI_EOD,
+        providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
+        allowOverwriteManual = false,
+      ).getOrThrow()
+    assertFalse("Older quote must not roll back the current valuation", rejectedOlderQuote)
+
+    val futureQuote =
+      repo.applyAutomaticMarketPrice(
+        authenticatedUserId = "uid_quote_guard",
+        holdingId = created.id,
+        newUnitPriceDecimal = "999.00",
+        priceDate = System.currentTimeMillis() + 86_400_000L,
+        source = PriceSourceType.MFAPI_AMFI_EOD,
+        providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
+        allowOverwriteManual = false,
+      )
+    assertTrue("Future-dated provider quote must be rejected", futureQuote.isFailure)
+
+    val beforeOfflineSync = repo.getHoldingById("uid_quote_guard", created.id)!!
+    val sync = repo.syncEligibleMarketPrices("uid_quote_guard", forceBypassCooldown = true).getOrThrow()
+    val afterOfflineSync = repo.getHoldingById("uid_quote_guard", created.id)!!
+
+    assertEquals(1, sync.errorCount)
+    assertEquals(beforeOfflineSync.currentMarketPriceDecimal, afterOfflineSync.currentMarketPriceDecimal)
+    assertEquals(beforeOfflineSync.currentValuationMinor, afterOfflineSync.currentValuationMinor)
+    assertEquals(originalCostBasis, afterOfflineSync.totalInvestedMinor)
+    val buyAfterSync = repo.getTransactionsForHolding("uid_quote_guard", created.id).first().single()
+    assertEquals(originalBuy.unitPriceDecimal, buyAfterSync.unitPriceDecimal)
+    assertEquals(originalBuy.transactionDate, buyAfterSync.transactionDate)
+  }
+
+  @Test
   fun `amfi mfapi provider handles success 429 rate limit http error malformed json unsupported category and offline cleanly`() = runTest {
     val validJson =
       """
