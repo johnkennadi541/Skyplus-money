@@ -538,7 +538,6 @@ class InvestmentRepositoryImpl @Inject constructor(
               authenticatedUserId,
             )
           check(rows == 1) { "Failed to update holding after sale" }
-          investmentDao.insertPriceHistory(InvestmentPriceHistoryEntity.fromDomain(snapshot))
           tx
         }
       }
