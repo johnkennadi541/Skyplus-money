@@ -81,6 +81,7 @@ import com.example.feature.consent.LegalConsentPreviewScreen
 import com.example.feature.consent.LegalConsentScreen
 import com.example.feature.cards.CardsScreen
 import com.example.feature.calculator.SmartCalculatorScreen
+import com.example.feature.calculator.SipCalculatorScreen
 import com.example.feature.cards.CardsViewModel
 import com.example.feature.dashboard.HomeDashboardScreen
 import com.example.feature.goals.SavingsGoalsScreen
@@ -503,6 +504,7 @@ fun SkyplusAppShell(
                 onOpenBudgets = { navController.navigate(SkyplusRoute.Budgets) },
                 onOpenLoans = { navController.navigate(SkyplusRoute.Loans) },
                 onOpenEmiCalculator = { navController.navigate(SkyplusRoute.EmiCalculator) },
+                onOpenSipCalculator = { navController.navigate(SkyplusRoute.SipCalculator) },
                 onOpenShoppingList = { navController.navigate(SkyplusRoute.ShoppingList) },
                 onOpenSmartDetection = { navController.navigate(SkyplusRoute.SmartDetectionSettings) },
                 onOpenReports = { navigateToTab(TopLevelTab.REPORTS) },
@@ -767,6 +769,12 @@ fun SkyplusAppShell(
             }
             composable<SkyplusRoute.SmartCalculator> {
               SmartCalculatorScreen(onNavigateBack = { navController.popBackStack() })
+            }
+            composable<SkyplusRoute.SipCalculator> {
+              SipCalculatorScreen(
+                defaultCurrency = accounts.firstOrNull()?.currencyCode ?: "INR",
+                onNavigateBack = { navController.popBackStack() },
+              )
             }
             composable<SkyplusRoute.EmiCalculator> {
               if (loansViewModel != null) {
