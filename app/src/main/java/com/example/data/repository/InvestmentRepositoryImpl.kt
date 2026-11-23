@@ -435,7 +435,27 @@ class InvestmentRepositoryImpl @Inject constructor(
               updatedAt = now,
             )
 
-          // Trades belong in the transaction ledger; they are not market-price observations.
+          // Record the resulting portfolio state only when a genuine quote exists.
+          // This is a valuation snapshot, not a new market-price observation.
+          val portfolioSnapshot =
+            if (existing.lastPriceUpdateDate > 0L) {
+              InvestmentPriceHistory(
+                id = UUID.randomUUID().toString(),
+                holdingId = holdingId,
+                userId = authenticatedUserId,
+                priceDate = now,
+                unitPriceDecimal = existing.currentMarketPriceDecimal,
+                valuationMinor = mutation.newValuationMinor,
+                totalInvestedMinor = mutation.newOpenCostBasisMinor,
+                realizedPnlMinor = existing.realizedPnlMinor,
+                currencyCode = existing.currencyCode,
+                source = existing.lastPriceSource,
+                providerLabel = "Portfolio snapshot after BUY",
+                createdAt = now,
+              )
+            } else {
+              null
+            }
 
           investmentDao.insertTransaction(InvestmentTransactionEntity.fromDomain(tx))
           val rows =
@@ -444,6 +464,9 @@ class InvestmentRepositoryImpl @Inject constructor(
               authenticatedUserId,
             )
           check(rows == 1) { "Failed to update holding after purchase" }
+          portfolioSnapshot?.let {
+            investmentDao.insertPriceHistory(InvestmentPriceHistoryEntity.fromDomain(it))
+          }
           tx
         }
       }
@@ -529,7 +552,28 @@ class InvestmentRepositoryImpl @Inject constructor(
               updatedAt = now,
             )
 
-          // Do not synthesize a price-history point from a trade and a potentially stale quote.
+          // Record the resulting portfolio state only when a genuine quote exists.
+          // The ledger retains the actual transaction date; this snapshot records when
+          // the changed valuation was recorded, using the last known quote.
+          val portfolioSnapshot =
+            if (existing.lastPriceUpdateDate > 0L) {
+              InvestmentPriceHistory(
+                id = UUID.randomUUID().toString(),
+                holdingId = holdingId,
+                userId = authenticatedUserId,
+                priceDate = now,
+                unitPriceDecimal = existing.currentMarketPriceDecimal,
+                valuationMinor = mutation.newValuationMinor,
+                totalInvestedMinor = mutation.remainingOpenCostBasisMinor,
+                realizedPnlMinor = mutation.newCumulativeRealizedPnlMinor,
+                currencyCode = existing.currencyCode,
+                source = existing.lastPriceSource,
+                providerLabel = "Portfolio snapshot after SELL",
+                createdAt = now,
+              )
+            } else {
+              null
+            }
 
           investmentDao.insertTransaction(InvestmentTransactionEntity.fromDomain(tx))
           val rows =
@@ -538,6 +582,9 @@ class InvestmentRepositoryImpl @Inject constructor(
               authenticatedUserId,
             )
           check(rows == 1) { "Failed to update holding after sale" }
+          portfolioSnapshot?.let {
+            investmentDao.insertPriceHistory(InvestmentPriceHistoryEntity.fromDomain(it))
+          }
           tx
         }
       }
