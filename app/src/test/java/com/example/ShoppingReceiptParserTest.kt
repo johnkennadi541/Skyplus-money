@@ -18,6 +18,19 @@ class ShoppingReceiptParserTest {
     assertFalse(result.needsReview)
   }
 
+  @Test fun `recognises a currency code after the receipt amount`() {
+    val result = ShoppingReceiptParser.parse("Corner Shop\nTotal 4.250 KWD")
+    assertEquals("4.25", result.totalDecimal)
+    assertEquals("KWD", result.currencyCodeCandidate)
+  }
+
+  @Test fun `parses symbol amounts without guessing an ISO currency`() {
+    val result = ShoppingReceiptParser.parse("Corner Shop\nTotal $4.25")
+    assertEquals("4.25", result.totalDecimal)
+    assertNull(result.currencyCodeCandidate)
+    assertTrue(result.needsReview)
+  }
+
   @Test fun `does not guess when total is ambiguous`() {
     val result = ShoppingReceiptParser.parse("Corner Shop\nTotal 12.00\nTotal 15.00")
     assertNull(result.totalDecimal)
