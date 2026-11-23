@@ -1,5 +1,6 @@
 package com.example.data.local.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -25,13 +26,13 @@ data class CreditCardEntity(
   val billingCycleDay: Int,
   val paymentDueDayOffset: Int,
   val aprPercent: String,
-  val annualFeeMinor: Long,
-  val annualFeeMonth: Int,
+  @ColumnInfo(defaultValue = "0") val annualFeeMinor: Long = 0L,
+  @ColumnInfo(defaultValue = "1") val annualFeeMonth: Int = 1,
   val rewardProgramName: String?,
   val isActive: Boolean,
-  val isFrozen: Boolean,
-  val reminderEnabled: Boolean,
-  val reminderDaysBefore: Int,
+  @ColumnInfo(defaultValue = "0") val isFrozen: Boolean = false,
+  @ColumnInfo(defaultValue = "1") val reminderEnabled: Boolean = true,
+  @ColumnInfo(defaultValue = "3") val reminderDaysBefore: Int = 3,
   val notes: String?,
   val createdAt: Long,
   val updatedAt: Long,
