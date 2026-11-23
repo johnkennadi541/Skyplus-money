@@ -340,13 +340,13 @@ fun ShoppingListContent(
           analytics.totalsByCurrency.forEach { total ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
               Text("Actual spend · ${total.currencyCode}")
-              Text(Money.fromMinorUnits(total.actualSpentMinor, total.currencyCode).toString(), fontWeight = FontWeight.SemiBold)
+              Text(formatMoneyUseCase.format(Money.fromMinorUnits(total.actualSpentMinor, total.currencyCode)), fontWeight = FontWeight.SemiBold)
             }
           }
           analytics.categories.take(4).forEach { category ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
               Text(category.category, style = MaterialTheme.typography.bodySmall)
-              Text(Money.fromMinorUnits(category.actualSpentMinor, category.currencyCode).toString(), style = MaterialTheme.typography.bodySmall)
+              Text(formatMoneyUseCase.format(Money.fromMinorUnits(category.actualSpentMinor, category.currencyCode)), style = MaterialTheme.typography.bodySmall)
             }
           }
         }
@@ -421,6 +421,22 @@ fun ShoppingListContent(
               style = MaterialTheme.typography.bodyMedium,
             )
             Text(suggestion.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (activeList != null) {
+              TextButton(
+                onClick = {
+                  onAddItem(
+                    activeList.id,
+                    suggestion.itemName,
+                    ShoppingInputParser.suggestCategory(suggestion.itemName),
+                    suggestion.suggestedQuantityDecimal,
+                    suggestion.unit,
+                    "0",
+                    null,
+                    "Added from Smart Suggestions",
+                  ) {}
+                },
+              ) { Text("Add to Shopping List") }
+            }
           }
         }
       }
