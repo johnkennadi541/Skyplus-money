@@ -1,5 +1,7 @@
 package com.example
 
+import android.app.KeyguardManager
+import android.os.Build
 import android.os.Bundle
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -54,6 +56,7 @@ class MainActivity : FragmentActivity() {
   private var appLockState by mutableStateOf(AppLockState())
   private var biometricPromptActive by mutableStateOf(false)
   private var biometricError by mutableStateOf(false)
+  private var credentialPromptActive = false
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -90,7 +93,7 @@ class MainActivity : FragmentActivity() {
         appLockState = appLockState.onAuthenticationChanged(authenticated != null)
         if (authenticated != null) {
           settingsViewModel.bindProfile(authenticated.user.uid, authenticated.user.displayName)
-          if (appLockState.requiresUnlock) requestBiometricUnlock()
+          if (appLockState.requiresUnlock && !credentialPromptActive) requestBiometricUnlock()
         } else {
           biometricError = false
           biometricPromptActive = false
@@ -159,12 +162,20 @@ class MainActivity : FragmentActivity() {
   }
 
   private fun requestBiometricUnlock() {
-    if (!appLockState.requiresUnlock || biometricPromptActive) return
+    if (!appLockState.requiresUnlock || biometricPromptActive || credentialPromptActive) return
+
+    val biometricOnly = BiometricManager.Authenticators.BIOMETRIC_STRONG
+    // Android 11+ supports biometric + device credential in one prompt. Older
+    // Android versions must use separate biometric and Keyguard credential flows.
     val authenticators =
-      BiometricManager.Authenticators.BIOMETRIC_STRONG or
-        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        biometricOnly or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+      } else {
+        biometricOnly
+      }
     val availability = BiometricManager.from(this).canAuthenticate(authenticators)
     if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R && launchDeviceCredentialFallback()) return
       biometricError = true
       return
     }
@@ -184,7 +195,14 @@ class MainActivity : FragmentActivity() {
 
           override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
             biometricPromptActive = false
-            biometricError = true
+            if (
+              Build.VERSION.SDK_INT < Build.VERSION_CODES.R &&
+              errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON
+            ) {
+              if (!launchDeviceCredentialFallback()) biometricError = true
+            } else {
+              biometricError = true
+            }
           }
 
           override fun onAuthenticationFailed() {
@@ -192,13 +210,52 @@ class MainActivity : FragmentActivity() {
           }
         },
       )
-    val promptInfo =
+    val promptInfoBuilder =
       BiometricPrompt.PromptInfo.Builder()
         .setTitle("Unlock SKYPLUS MONEY")
         .setSubtitle("Verify your identity to access the entire financial app")
         .setAllowedAuthenticators(authenticators)
-        .build()
-    prompt.authenticate(promptInfo)
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+      promptInfoBuilder.setNegativeButtonText("Use device screen lock")
+    }
+    prompt.authenticate(promptInfoBuilder.build())
+  }
+
+  @Suppress("DEPRECATION")
+  private fun launchDeviceCredentialFallback(): Boolean {
+    val keyguard = getSystemService(KEYGUARD_SERVICE) as? KeyguardManager ?: return false
+    if (!keyguard.isDeviceSecure) return false
+    val credentialIntent =
+      keyguard.createConfirmDeviceCredentialIntent(
+        "Unlock SKYPLUS MONEY",
+        "Confirm your device screen lock to continue",
+      ) ?: return false
+
+    credentialPromptActive = true
+    return try {
+      startActivityForResult(credentialIntent, REQUEST_DEVICE_CREDENTIAL)
+      true
+    } catch (_: Exception) {
+      credentialPromptActive = false
+      false
+    }
+  }
+
+  @Deprecated("Deprecated in Android; retained for pre-Android 11 device-credential fallback.")
+  override fun onActivityResult(
+    requestCode: Int,
+    resultCode: Int,
+    data: android.content.Intent?,
+  ) {
+    super.onActivityResult(requestCode, resultCode, data)
+    if (requestCode != REQUEST_DEVICE_CREDENTIAL) return
+    credentialPromptActive = false
+    if (resultCode == RESULT_OK) {
+      biometricError = false
+      appLockState = appLockState.onUnlockSucceeded()
+    } else {
+      biometricError = true
+    }
   }
 
   override fun onNewIntent(intent: android.content.Intent) {
@@ -213,6 +270,7 @@ class MainActivity : FragmentActivity() {
   }
 
   companion object {
+    private const val REQUEST_DEVICE_CREDENTIAL = 9107
     const val EXTRA_OPEN_DAILY_REPORT = "com.skyplus.money.OPEN_DAILY_AUTO_ENTRY_REPORT"
     const val EXTRA_OPEN_CREDIT_CARDS = "com.skyplus.money.OPEN_CREDIT_CARDS"
   }
