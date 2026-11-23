@@ -20,7 +20,7 @@ data class ShoppingReceiptDraft(
 /** Extracts only explicit total labels; ambiguous totals remain a review-only draft. */
 object ShoppingReceiptParser {
   private val totalLine = Regex(
-    """(?i)^\s*(grand\s+total|total\s+due|amount\s+due|total)\s*[:\-]?\s*(?:([A-Z]{3})\s*)?([0-9][0-9,]*(?:\.[0-9]{1,3})?)\s*$"""
+    """(?i)^\s*(grand\s+total|total\s+due|amount\s+due|total)\s*[:\-]?\s*(?:([A-Z]{3}|[₹$€£]|د\.ك)\s*)?([0-9][0-9,]*(?:\.[0-9]{1,3})?)(?:\s*([A-Z]{3}))?\s*$"""
   )
 
 
@@ -36,7 +36,7 @@ object ShoppingReceiptParser {
       val amount = runCatching { BigDecimal(match.groupValues[3].replace(",", "")) }.getOrNull()
         ?: return@mapNotNull null
       if (amount <= BigDecimal.ZERO) return@mapNotNull null
-      Triple(match.groupValues[1].lowercase(Locale.ROOT), amount, match.groupValues[2].uppercase(Locale.ROOT).ifBlank { null })
+      Triple(match.groupValues[1].lowercase(Locale.ROOT), amount, (match.groupValues[2].takeIf { it.length == 3 } ?: match.groupValues[4]).uppercase(Locale.ROOT).ifBlank { null })
     }
     val preferred = totals.filter { it.first in setOf("grand total", "total due", "amount due") }
     val candidates = if (preferred.isNotEmpty()) preferred else totals
