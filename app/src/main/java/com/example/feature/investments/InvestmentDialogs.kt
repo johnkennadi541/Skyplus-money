@@ -157,6 +157,7 @@ fun InvestmentFormDialog(
           InvestmentCategory.entries.forEach { category ->
             FilterChip(
               selected = selectedCategory == category,
+              enabled = !isEditing,
               onClick = {
                 selectedCategory = category
                 if (category != InvestmentCategory.MUTUAL_FUNDS) {
@@ -196,6 +197,7 @@ fun InvestmentFormDialog(
               null
             },
           singleLine = true,
+          enabled = !isEditing,
           modifier = Modifier.fillMaxWidth().testTag("investment_symbol_input"),
         )
 
@@ -208,6 +210,7 @@ fun InvestmentFormDialog(
             onValueChange = { isin = it },
             label = { Text("ISIN (optional)") },
             singleLine = true,
+            enabled = !isEditing,
             modifier = Modifier.weight(1f).testTag("investment_isin_input"),
           )
           OutlinedTextField(
@@ -242,6 +245,7 @@ fun InvestmentFormDialog(
           onValueChange = { dateText = it },
           label = { Text("Purchase Date (YYYY-MM-DD) *") },
           singleLine = true,
+          enabled = !isEditing,
           modifier = Modifier.fillMaxWidth().testTag("investment_date_input"),
         )
 
