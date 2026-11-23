@@ -11,7 +11,7 @@ APK/build distribution: Explicitly deferred until implementation, tests, securit
 - Preserve SQLCipher + Android Keystore fail-closed behavior. No plaintext fallback, destructive migrations, key regeneration, or sensitive financial/credential logging.
 - India-only investment instruments and Indian bank balance enquiry. Global ISO 4217 currency support across the finance app.
 - Exact monetary arithmetic: Long minor units / BigDecimal; never Float/Double for money. Never silently combine currencies.
-- User approval before creating financial entries from detected messages.
+- Automatically create supported, confidently parsed financial ledger entries from eligible bank SMS notifications; no per-entry approval prompt. Send a configurable once-daily summary notification from Reports. Ambiguous/unmatched events must be isolated and clearly reported rather than guessed.
 - No APK build, release, deployment, signing-key changes, or merge to main without separate explicit approval.
 
 ## 1. Credit Card Management — approved: ALL options
@@ -46,7 +46,18 @@ Supported categories: Indian listed stocks/equities, Indian ETFs, Indian mutual 
 - FX rates need provider/source/as-of metadata, stale-rate handling and explicit base currency. Never present an unavailable rate as current or convert silently.
 - Investment instruments remain India-only even when app currency display is global.
 
-## 4. Indian bank balance enquiry — Quick Action
+## 4. SMS-only automatic bank transaction capture and daily report
+- SMS notifications are the only message source. No Gmail/Email OAuth, account connection, inbox access, email notification parsing, or email content processing. Do not inspect notification content from email apps; identify allowed SMS-app packages first and ignore all other packages before reading notification extras.
+- Use only explicitly enabled Android Notification Access and only notifications actually posted by supported SMS apps. Do not request READ_SMS/RECEIVE_SMS, scrape inboxes, use Accessibility/hidden APIs, or claim access to messages that Android does not expose as notifications.
+- For a supported bank SMS with sufficient confidence, automatically create the appropriate ledger entry without asking for per-transaction approval: debit -> expense, credit -> income, and clearly identified own-account transfer -> transfer. Resolve the destination account only from a reliable bank/account reference mapping; never guess an account, currency, amount, direction, or date.
+- If parsing or account mapping is ambiguous, do not create a potentially incorrect ledger entry. Put a minimal exception item in an in-app review/needs-attention list and include it in the daily report. This is an exception safeguard, not a routine approval gate.
+- Make ingestion idempotent across repeated notifications/re-deliveries and bank SMS duplicates. Use a stable transaction fingerprint based on bank, account reference, direction, amount, currency, transaction timestamp/reference; avoid collapsing distinct same-amount transactions. Preserve source provenance without retaining raw SMS bodies.
+- Store only normalized financial fields required for the ledger and audit. Ignore authentication/OTP/security messages; never extract or store OTP, PIN, CVV, passwords, or credentials. No email access under any circumstances.
+- Add a Reports menu item/icon named Daily Auto-Entry Report. The user can enable/disable the report and choose a local report time. Send at most one daily notification at the configured time, subject to Android background scheduling/notification permission and OS delivery constraints.
+- The daily report summarizes that day's automatically posted income, expenses and transfers; totals by currency (never combine currencies silently); entry details and destination accounts; duplicates suppressed; and ambiguous/unmatched notifications needing attention. Tapping the notification opens the report screen. Reschedule correctly after time-zone/time changes, reboot, and preference edits.
+- Do not use the report schedule to delay posting: eligible transactions are posted as soon as their notification is processed; only the summary report is scheduled once daily.
+
+## 5. Indian bank balance enquiry — Quick Action
 - Add a Bank Balance Enquiry quick action with official bank-specific registered-mobile missed-call/SMS instructions and confirmation before opening dialer/SMS composer.
 - No credentials, OTP, PIN, CVV or passwords are requested, read, stored or forwarded.
 - Parse only relevant bank balance/transaction notification content available through an explicitly enabled supported Android notification-access flow; show extracted details for review before posting.
@@ -54,7 +65,7 @@ Supported categories: Indian listed stocks/equities, Indian ETFs, Indian mutual 
 - Ignore and discard authentication/OTP/security messages. Never persist raw notification bodies beyond the minimum transient parsing need. Store only user-approved financial transaction data.
 - User approval is required before any ledger entry. Deduplicate and validate account/currency/amount/date.
 
-## 5. UI / UX redesign — approved direction
+## 6. UI / UX redesign — approved direction
 - App-wide professional, clean, modern visual language inspired by the clarity of Google and Microsoft Fluent, without copying their branding.
 - Replace gold accent with a consistent yellow accent; maintain navy/white foundations and accessible contrast.
 - Distinct, meaningful icons for every feature/category (income, expense, investments, gold, stocks, ETFs, mutual funds, loans, cards, reports, accounts).
@@ -62,7 +73,7 @@ Supported categories: Indian listed stocks/equities, Indian ETFs, Indian mutual 
 - Smooth purposeful transitions, animated allocation charts, price/performance movement and micro-interactions. Respect reduced motion and accessibility.
 - Light/dark themes, responsive layouts, typography/spacing consistency, accessible labels and touch targets. Avoid decorative motion that obscures financial data.
 
-## 6. Delivery gates
+## 7. Delivery gates
 1. Requirements/specification and architecture audit.
 2. Implement credit-card schema/domain/repository/use cases/UI and migration tests.
 3. Implement global currency selection/catalog and FX abstraction/tests.
@@ -74,8 +85,8 @@ Supported categories: Indian listed stocks/equities, Indian ETFs, Indian mutual 
 9. Only after separate approval, build/sign APK and provide a verified install link.
 
 ## Explicit non-goals
-- No unrestricted SMS inbox reading or OTP/password collection.
+- No email access or email notification processing. No unrestricted SMS inbox reading or OTP/password collection.
 - No global stock/investment trading coverage.
 - No paid market-data API assumption.
-- No autonomous financial posting without user approval.
+- No per-entry approval gate for confidently parsed, account-matched bank SMS transactions; ambiguous events must never be guessed or silently posted.
 - No APK build during implementation.
