@@ -145,6 +145,8 @@ dependencies {
   // implementation(libs.moshi.kotlin)
   // "ksp"(libs.moshi.kotlin.codegen)
   implementation(libs.okhttp)
+  // Free on-device Latin-script OCR for shopping-list photo import; no cloud upload.
+  implementation("com.google.mlkit:text-recognition:16.0.1")
   // implementation(libs.play.services.location)
   // implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
