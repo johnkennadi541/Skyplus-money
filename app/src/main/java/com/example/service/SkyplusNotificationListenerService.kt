@@ -59,6 +59,7 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
         packageName = packageName,
         title = title,
         combinedContent = combinedContent,
+        timestamp = sbn.postTime,
       )
     }
   }
