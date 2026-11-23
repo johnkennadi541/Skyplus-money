@@ -3,6 +3,7 @@ package com.example
 import android.content.Context
 import com.example.core.security.BackupRecoveryKeyStore
 import com.example.core.security.KeyWrappingBackend
+import java.security.MessageDigest
 import java.util.Base64
 import javax.crypto.AEADBadTagException
 import org.junit.Assert.assertArrayEquals
@@ -24,7 +25,7 @@ class BackupRecoveryKeyStoreTest {
 
   @Before
   fun setUp() {
-    preferences = RuntimeEnvironment.getApplication<Context>()
+    preferences = RuntimeEnvironment.getApplication()
       .getSharedPreferences("recovery_key_store_test", Context.MODE_PRIVATE)
     preferences.edit().clear().commit()
     store = BackupRecoveryKeyStore(preferences, TestWrappingBackend())
@@ -40,8 +41,8 @@ class BackupRecoveryKeyStoreTest {
     assertTrue(store.hasKey())
     assertArrayEquals(key, restored)
     assertFalse(preferences.all.values.any { it == String(key) })
-    restored?.fill('\u0000')
-    key.fill('\u0000')
+    restored?.fill('\\u0000')
+    key.fill('\\u0000')
   }
 
   @Test
@@ -62,10 +63,13 @@ class BackupRecoveryKeyStoreTest {
   fun `rejects tampered wrapped ciphertext`() {
     val key = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray()
     store.store(key)
-    preferences.edit().putString("wrapped_recovery_key", "tampered").commit()
+    val original = preferences.getString("wrapped_recovery_key", null)!!
+    val bytes = Base64.getDecoder().decode(original)
+    bytes[0] = (bytes[0].toInt() xor 0x01).toByte()
+    preferences.edit().putString("wrapped_recovery_key", Base64.getEncoder().encodeToString(bytes)).commit()
 
     assertThrows(AEADBadTagException::class.java) { store.load() }
-    key.fill('\u0000')
+    key.fill('\\u0000')
   }
 
   @Test
@@ -74,21 +78,30 @@ class BackupRecoveryKeyStoreTest {
 
     assertThrows(IllegalArgumentException::class.java) { store.store(invalid) }
     assertTrue(preferences.all.isEmpty())
-    invalid.fill('\u0000')
+    invalid.fill('\\u0000')
   }
 
   private class TestWrappingBackend : KeyWrappingBackend {
     override fun encrypt(raw: ByteArray): Pair<String, String> {
       val encrypted = raw.map { (it.toInt() xor 0x5a).toByte() }.toByteArray()
-      return Base64.getEncoder().encodeToString(encrypted) to "test-iv"
+      val tag = MessageDigest.getInstance("SHA-256").digest(encrypted)
+      val payload = encrypted + tag
+      return Base64.getEncoder().encodeToString(payload) to "test-iv"
     }
 
     override fun decrypt(encryptedBase64: String, ivBase64: String): ByteArray {
       if (ivBase64 != "test-iv") throw AEADBadTagException("Invalid test IV")
-      val encrypted = try {
+      val payload = try {
         Base64.getDecoder().decode(encryptedBase64)
       } catch (error: IllegalArgumentException) {
         throw AEADBadTagException("Invalid test ciphertext").also { it.initCause(error) }
+      }
+      if (payload.size != 64) throw AEADBadTagException("Invalid test ciphertext length")
+      val encrypted = payload.copyOfRange(0, 32)
+      val suppliedTag = payload.copyOfRange(32, 64)
+      val expectedTag = MessageDigest.getInstance("SHA-256").digest(encrypted)
+      if (!MessageDigest.isEqual(suppliedTag, expectedTag)) {
+        throw AEADBadTagException("Tampered test ciphertext")
       }
       return encrypted.map { (it.toInt() xor 0x5a).toByte() }.toByteArray()
     }
