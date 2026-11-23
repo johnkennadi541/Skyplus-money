@@ -560,4 +560,58 @@ object DatabaseMigrations {
       }
     }
 
+
+  /** Additive shopping workspace tables; existing financial and shopping rows remain untouched. */
+  val MIGRATION_10_11: Migration =
+    object : Migration(10, 11) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS shopping_pantry (
+            id TEXT NOT NULL PRIMARY KEY, userId TEXT NOT NULL, name TEXT NOT NULL,
+            category TEXT NOT NULL, quantityDecimal TEXT NOT NULL, unit TEXT NOT NULL,
+            lowStockThresholdDecimal TEXT NOT NULL, expiryAt INTEGER, updatedAt INTEGER NOT NULL
+          )
+          """.trimIndent()
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_shopping_pantry_userId_name_unit ON shopping_pantry(userId, name, unit)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_shopping_pantry_userId_expiryAt ON shopping_pantry(userId, expiryAt)")
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS shopping_meal_plans (
+            id TEXT NOT NULL PRIMARY KEY, userId TEXT NOT NULL, title TEXT NOT NULL,
+            plannedDate INTEGER NOT NULL, mealType TEXT NOT NULL, notes TEXT,
+            createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL
+          )
+          """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_shopping_meal_plans_userId_plannedDate ON shopping_meal_plans(userId, plannedDate)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_shopping_meal_plans_userId_mealType ON shopping_meal_plans(userId, mealType)")
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS shopping_meal_ingredients (
+            id TEXT NOT NULL PRIMARY KEY, userId TEXT NOT NULL, mealPlanId TEXT NOT NULL,
+            name TEXT NOT NULL, quantityDecimal TEXT NOT NULL, unit TEXT NOT NULL, shoppingItemId TEXT,
+            FOREIGN KEY(mealPlanId) REFERENCES shopping_meal_plans(id) ON UPDATE NO ACTION ON DELETE CASCADE
+          )
+          """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_shopping_meal_ingredients_mealPlanId ON shopping_meal_ingredients(mealPlanId)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_shopping_meal_ingredients_userId_name ON shopping_meal_ingredients(userId, name)")
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS shopping_receipts (
+            id TEXT NOT NULL PRIMARY KEY, userId TEXT NOT NULL, listId TEXT, accountId TEXT,
+            fingerprint TEXT NOT NULL, merchant TEXT, purchaseDate INTEGER, currencyCode TEXT NOT NULL,
+            totalMinor INTEGER NOT NULL, financialTransactionId TEXT, status TEXT NOT NULL,
+            createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL
+          )
+          """.trimIndent()
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_shopping_receipts_userId_fingerprint ON shopping_receipts(userId, fingerprint)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_shopping_receipts_userId_purchaseDate ON shopping_receipts(userId, purchaseDate)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_shopping_receipts_userId_financialTransactionId ON shopping_receipts(userId, financialTransactionId)")
+      }
+    }
+
 }
