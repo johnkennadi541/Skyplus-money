@@ -92,8 +92,9 @@ fun ShoppingReceiptReviewDialog(
 ) {
   var amountText by remember(draft.fingerprint) { mutableStateOf(draft.totalDecimal.orEmpty()) }
   var merchantText by remember(draft.fingerprint) { mutableStateOf(draft.merchantCandidate.orEmpty()) }
-  var selectedAccountId by remember(draft.fingerprint) { mutableStateOf(accounts.firstOrNull()?.id) }
-  val selected = accounts.firstOrNull { it.id == selectedAccountId }
+  var selectedAccountId by remember(draft.fingerprint) { mutableStateOf(accounts.firstOrNull { it.isActive }?.id) }
+  val activeAccounts = accounts.filter { it.isActive }
+  val selected = activeAccounts.firstOrNull { it.id == selectedAccountId }
   val totalMinor = selected?.let { account ->
     runCatching { Money.fromDecimalString(amountText, account.currencyCode).minorUnits }.getOrNull()
   }
@@ -110,7 +111,7 @@ fun ShoppingReceiptReviewDialog(
         OutlinedTextField(value = merchantText, onValueChange = { merchantText = it }, label = { Text("Store / Merchant") })
         OutlinedTextField(value = amountText, onValueChange = { amountText = it }, label = { Text("Receipt total") })
         Text("Choose the account to record this expense:")
-        accounts.forEach { account ->
+        activeAccounts.forEach { account ->
           OutlinedButton(
             onClick = { selectedAccountId = account.id },
             enabled = true,
