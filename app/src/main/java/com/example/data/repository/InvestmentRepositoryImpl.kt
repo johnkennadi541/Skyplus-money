@@ -690,7 +690,7 @@ class InvestmentRepositoryImpl @Inject constructor(
         if (!settings.autoUpdateConsentEnabled) {
           val msg = "Automatic updates are off. Manual price entry remains active."
           syncPreferencesDataSource.recordSyncResult(now, msg)
-          return@runCatching MarketSyncSummary(
+          return@runCatchingPreservingCancellation MarketSyncSummary(
             updatedCount = 0,
             skippedManualCount = 0,
             unsupportedCount = 0,
