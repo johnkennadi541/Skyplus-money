@@ -6,8 +6,12 @@ import com.example.core.common.DispatcherProvider
 import com.example.domain.model.AuthSessionState
 import com.example.domain.model.FinancialAccount
 import com.example.domain.model.ShoppingList
+import com.example.domain.model.ShoppingPantryItem
+import com.example.domain.model.ShoppingMealPlan
+import com.example.domain.model.ShoppingReceipt
 import com.example.domain.repository.AuthRepository
 import com.example.domain.repository.FinancialAccountRepository
+import com.example.domain.repository.ShoppingExtendedRepository
 import com.example.domain.usecase.AddShoppingItemUseCase
 import com.example.domain.usecase.CreateShoppingListUseCase
 import com.example.domain.usecase.DeleteShoppingItemUseCase
@@ -45,6 +49,7 @@ class ShoppingViewModel @Inject constructor(
   private val purchaseShoppingItemUseCase: PurchaseShoppingItemUseCase,
   private val deleteShoppingItemUseCase: DeleteShoppingItemUseCase,
   private val manageStorePriceUseCase: ManageStorePriceUseCase,
+  private val shoppingExtendedRepository: ShoppingExtendedRepository,
   private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
 
@@ -89,6 +94,33 @@ class ShoppingViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList(),
       )
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  val pantry: StateFlow<List<ShoppingPantryItem>> =
+    authRepository.observeAuthSession()
+      .flatMapLatest { session ->
+        val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+        if (uid != null) shoppingExtendedRepository.observePantry(uid) else flowOf(emptyList())
+      }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  val mealPlans: StateFlow<List<ShoppingMealPlan>> =
+    authRepository.observeAuthSession()
+      .flatMapLatest { session ->
+        val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+        if (uid != null) shoppingExtendedRepository.observeMealPlans(uid) else flowOf(emptyList())
+      }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  val receipts: StateFlow<List<ShoppingReceipt>> =
+    authRepository.observeAuthSession()
+      .flatMapLatest { session ->
+        val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+        if (uid != null) shoppingExtendedRepository.observeReceipts(uid) else flowOf(emptyList())
+      }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
   @OptIn(ExperimentalCoroutinesApi::class)
   val workspace: StateFlow<ShoppingWorkspaceSnapshot> =
@@ -412,6 +444,86 @@ class ShoppingViewModel @Inject constructor(
           _isErrorMessage.value = true
           _userMessage.value = error.message ?: "Failed to remove store price"
         },
+      )
+    }
+  }
+
+
+  fun savePantryItem(item: ShoppingPantryItem, onSuccess: () -> Unit = {}) {
+    viewModelScope.launch(dispatchers.io) {
+      val uid = requireAuthenticatedUid() ?: return@launch
+      shoppingExtendedRepository.savePantryItem(uid, item.copy(userId = uid)).fold(
+        onSuccess = {
+          _isErrorMessage.value = false
+          _userMessage.value = "Pantry stock saved"
+          launch(dispatchers.main) { onSuccess() }
+        },
+        onFailure = { error ->
+          _isErrorMessage.value = true
+          _userMessage.value = error.message ?: "Could not save pantry stock"
+        },
+      )
+    }
+  }
+
+  fun deletePantryItem(itemId: String) {
+    viewModelScope.launch(dispatchers.io) {
+      val uid = requireAuthenticatedUid() ?: return@launch
+      shoppingExtendedRepository.deletePantryItem(uid, itemId).fold(
+        onSuccess = { _userMessage.value = "Pantry item removed"; _isErrorMessage.value = false },
+        onFailure = { error -> _userMessage.value = error.message ?: "Could not remove pantry item"; _isErrorMessage.value = true },
+      )
+    }
+  }
+
+  fun createMealPlan(plan: ShoppingMealPlan, onSuccess: () -> Unit = {}) {
+    viewModelScope.launch(dispatchers.io) {
+      val uid = requireAuthenticatedUid() ?: return@launch
+      shoppingExtendedRepository.createMealPlan(uid, plan.copy(userId = uid, ingredients = plan.ingredients.map { it.copy(userId = uid, mealPlanId = plan.id) })).fold(
+        onSuccess = {
+          _userMessage.value = "Meal plan saved"
+          _isErrorMessage.value = false
+          launch(dispatchers.main) { onSuccess() }
+        },
+        onFailure = { error -> _userMessage.value = error.message ?: "Could not save meal plan"; _isErrorMessage.value = true },
+      )
+    }
+  }
+
+  fun deleteMealPlan(planId: String) {
+    viewModelScope.launch(dispatchers.io) {
+      val uid = requireAuthenticatedUid() ?: return@launch
+      shoppingExtendedRepository.deleteMealPlan(uid, planId).fold(
+        onSuccess = { _userMessage.value = "Meal plan removed"; _isErrorMessage.value = false },
+        onFailure = { error -> _userMessage.value = error.message ?: "Could not remove meal plan"; _isErrorMessage.value = true },
+      )
+    }
+  }
+
+  fun saveReceiptReview(receipt: ShoppingReceipt, onSaved: (ShoppingReceipt) -> Unit) {
+    viewModelScope.launch(dispatchers.io) {
+      val uid = requireAuthenticatedUid() ?: return@launch
+      shoppingExtendedRepository.saveReceiptReview(uid, receipt.copy(userId = uid)).fold(
+        onSuccess = { saved ->
+          _isErrorMessage.value = false
+          _userMessage.value = if (saved.status == "POSTED") "This receipt was already recorded" else "Receipt saved for review"
+          launch(dispatchers.main) { onSaved(saved) }
+        },
+        onFailure = { error -> _isErrorMessage.value = true; _userMessage.value = error.message ?: "Could not save receipt" },
+      )
+    }
+  }
+
+  fun postReceiptExpense(receiptId: String, accountId: String, onSuccess: () -> Unit = {}) {
+    viewModelScope.launch(dispatchers.io) {
+      val uid = requireAuthenticatedUid() ?: return@launch
+      shoppingExtendedRepository.postReceiptExpense(uid, receiptId, accountId).fold(
+        onSuccess = {
+          _isErrorMessage.value = false
+          _userMessage.value = "Receipt added to Expenses"
+          launch(dispatchers.main) { onSuccess() }
+        },
+        onFailure = { error -> _isErrorMessage.value = true; _userMessage.value = error.message ?: "Could not post receipt expense" },
       )
     }
   }
