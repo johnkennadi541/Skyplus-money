@@ -51,13 +51,13 @@ fun SkyplusPrimaryButton(
     shape = MaterialTheme.shapes.small,
     colors =
       ButtonDefaults.buttonColors(
-        containerColor = colors.tertiary,
-        contentColor = colors.onTertiary,
-        disabledContainerColor = colors.tertiary.copy(alpha = 0.38f),
-        disabledContentColor = colors.onTertiary.copy(alpha = 0.6f),
+        containerColor = colors.primary,
+        contentColor = colors.onPrimary,
+        disabledContainerColor = colors.primary.copy(alpha = 0.38f),
+        disabledContentColor = colors.onPrimary.copy(alpha = 0.6f),
       ),
   ) {
-    ButtonContent(text = text, loading = loading, icon = icon, tint = colors.onTertiary)
+    ButtonContent(text = text, loading = loading, icon = icon, tint = colors.onPrimary)
   }
 }
 
