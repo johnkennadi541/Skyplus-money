@@ -299,8 +299,12 @@ fun SkyplusAppShell(
   val backStackEntry by navController.currentBackStackEntryAsState()
   val currentDestination = backStackEntry?.destination
 
-  LaunchedEffect(openReportsRequest) {
-    if (openReportsRequest > 0L) {
+  LaunchedEffect(openReportsRequest, currentDestination) {
+    if (
+      openReportsRequest > 0L &&
+        currentDestination != null &&
+        currentDestination.hasRoute(SkyplusRoute.Reports::class).not()
+    ) {
       navController.navigate(SkyplusRoute.Reports) {
         launchSingleTop = true
       }
