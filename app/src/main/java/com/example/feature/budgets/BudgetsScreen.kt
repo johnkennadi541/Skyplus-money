@@ -69,6 +69,7 @@ import com.example.core.designsystem.component.OceanStatusBadge
 import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
 import com.example.domain.model.Budget
+import com.example.domain.model.Money
 import com.example.feature.calculator.SmartCalculatorAmountDialog
 import com.example.domain.model.BudgetAlertStatus
 import com.example.domain.model.BudgetPeriodType
@@ -752,6 +753,7 @@ private fun BudgetFormDialog(
           if (showBudgetCalculator) {
             SmartCalculatorAmountDialog(
               initialExpression = amountDecimal,
+              decimalScale = Money.resolveFractionDigits(currency),
               onApply = { calculatedAmount ->
                 amountDecimal = calculatedAmount
                 formError = null
