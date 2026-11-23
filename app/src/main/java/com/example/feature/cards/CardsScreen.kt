@@ -675,6 +675,7 @@ private fun CardFormDialog(
           }
           SmartCalculatorAmountDialog(
             initialExpression = initialExpression,
+            decimalScale = Money.resolveFractionDigits(selectedCurrencyCode),
             onApply = { calculatedAmount ->
               when (target) {
                 "limit" -> limitText = calculatedAmount
