@@ -27,6 +27,10 @@ import com.example.domain.usecase.ShoppingReceiptParser
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 @Composable
 fun ShoppingReceiptCaptureAction(
@@ -88,16 +92,32 @@ fun ShoppingReceiptReviewDialog(
   draft: ShoppingReceiptDraft,
   accounts: List<FinancialAccount>,
   onDismiss: () -> Unit,
-  onConfirm: (accountId: String, currencyCode: String, totalMinor: Long, merchant: String?) -> Unit,
+  onConfirm: (accountId: String, currencyCode: String, totalMinor: Long, merchant: String?, purchaseDate: Long?) -> Unit,
 ) {
   var amountText by remember(draft.fingerprint) { mutableStateOf(draft.totalDecimal.orEmpty()) }
   var merchantText by remember(draft.fingerprint) { mutableStateOf(draft.merchantCandidate.orEmpty()) }
+  var purchaseDateText by remember(draft.fingerprint) {
+    mutableStateOf(
+      draft.purchaseDateMillis?.let {
+        SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date(it))
+      }.orEmpty()
+    )
+  }
   var selectedAccountId by remember(draft.fingerprint) { mutableStateOf(accounts.firstOrNull { it.isActive }?.id) }
   val activeAccounts = accounts.filter { it.isActive }
   val selected = activeAccounts.firstOrNull { it.id == selectedAccountId }
   val totalMinor = selected?.let { account ->
     runCatching { Money.fromDecimalString(amountText, account.currencyCode).minorUnits }.getOrNull()
   }
+  val purchaseDateMillis = purchaseDateText.takeIf { it.isNotBlank() }?.let { value ->
+    runCatching {
+      SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply {
+        isLenient = false
+        timeZone = TimeZone.getTimeZone("UTC")
+      }.parse(value)?.time
+    }.getOrNull()
+  }
+  val dateValid = purchaseDateText.isBlank() || purchaseDateMillis != null
   val currencyConflict = draft.currencyCodeCandidate != null &&
     selected != null && !draft.currencyCodeCandidate.equals(selected.currencyCode, ignoreCase = true)
 
@@ -110,6 +130,7 @@ fun ShoppingReceiptReviewDialog(
         if (draft.warnings.isNotEmpty()) Text(draft.warnings.joinToString(" "))
         OutlinedTextField(value = merchantText, onValueChange = { merchantText = it }, label = { Text("Store / Merchant") })
         OutlinedTextField(value = amountText, onValueChange = { amountText = it }, label = { Text("Receipt total") })
+        OutlinedTextField(value = purchaseDateText, onValueChange = { purchaseDateText = it }, label = { Text("Purchase date (YYYY-MM-DD, optional)") })
         Text("Choose the account to record this expense:")
         activeAccounts.forEach { account ->
           OutlinedButton(
@@ -127,9 +148,9 @@ fun ShoppingReceiptReviewDialog(
         onClick = {
           val account = selected ?: return@Button
           val minor = totalMinor ?: return@Button
-          onConfirm(account.id, account.currencyCode, minor, merchantText.trim().ifBlank { null })
+          onConfirm(account.id, account.currencyCode, minor, merchantText.trim().ifBlank { null }, purchaseDateMillis)
         },
-        enabled = selected != null && totalMinor != null && totalMinor > 0L && !currencyConflict,
+        enabled = selected != null && totalMinor != null && totalMinor > 0L && !currencyConflict && dateValid,
         modifier = Modifier.testTag("shopping_receipt_confirm_button"),
       ) { Text("Add Expense") }
     },
