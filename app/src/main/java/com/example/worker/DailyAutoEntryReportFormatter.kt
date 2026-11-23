@@ -10,7 +10,9 @@ import java.util.Locale
 
 internal data class DailyAutoEntryReportContent(
   val dateLabel: String,
-  val autoSavedCount: Int,
+  val postedCount: Int,
+  val automaticCount: Int,
+  val reviewedCount: Int,
   val exceptionCount: Int,
   val duplicateCount: Int,
   val body: String,
@@ -19,13 +21,16 @@ internal data class DailyAutoEntryReportContent(
 internal object DailyAutoEntryReportFormatter {
 
   fun format(reportDayStart: Long, events: List<TransactionDetectionEvent>): DailyAutoEntryReportContent {
-    val autoSaved = events.filter {
-      it.status == DetectionEventStatus.AUTO_SAVED && it.createdTransactionId != null
+    val posted = events.filter {
+      it.status in setOf(DetectionEventStatus.AUTO_SAVED, DetectionEventStatus.APPROVED) &&
+        it.createdTransactionId != null
     }
+    val automatic = posted.filter { it.status == DetectionEventStatus.AUTO_SAVED }
+    val reviewed = posted.filter { it.status == DetectionEventStatus.APPROVED }
     val exceptions = events.count { it.status == DetectionEventStatus.IN_REVIEW }
     val duplicates = events.count { it.status == DetectionEventStatus.DUPLICATE }
 
-    val totals = autoSaved.groupBy { it.detectedCurrency }.toSortedMap().map { (currency, currencyEvents) ->
+    val totals = posted.groupBy { it.detectedCurrency }.toSortedMap().map { (currency, currencyEvents) ->
       val incomeEvents = currencyEvents.filter {
         it.detectedType in setOf(TransactionType.INCOME, TransactionType.REFUND, TransactionType.REVERSAL)
       }
@@ -35,30 +40,31 @@ internal object DailyAutoEntryReportFormatter {
       "$currency  Income: ${formatMinor(income, currency)} (${incomeEvents.size})  •  Expense: ${formatMinor(expense, currency)} (${expenseEvents.size})"
     }
 
-    val entryLines = autoSaved.sortedBy { it.receivedAt }.take(MAX_ENTRY_LINES).map { event ->
+    val entryLines = posted.sortedBy { it.receivedAt }.take(MAX_ENTRY_LINES).map { event ->
       val direction = when (event.detectedType) {
         TransactionType.INCOME, TransactionType.REFUND, TransactionType.REVERSAL -> "INCOME"
         TransactionType.EXPENSE -> "EXPENSE"
         else -> event.detectedType.name
       }
+      val origin = if (event.status == DetectionEventStatus.AUTO_SAVED) "AUTO" else "REVIEWED"
       val title = event.detectedMerchant ?: event.senderOrTitle
       val accountHint = event.detectedAccountLast4?.let { " • A/c ••$it" }.orEmpty()
-      "$direction • $title • ${formatMinor(event.detectedAmountMinor, event.detectedCurrency)} ${event.detectedCurrency}$accountHint"
+      "$origin $direction • $title • ${formatMinor(event.detectedAmountMinor, event.detectedCurrency)} ${event.detectedCurrency}$accountHint"
     }
 
     val body = buildString {
-      append("Automatically posted: ${autoSaved.size}")
+      append("Entries posted: ${posted.size} (automatic: ${automatic.size}, reviewed: ${reviewed.size})")
       if (totals.isNotEmpty()) {
         append("\n")
         append(totals.joinToString("\n"))
       } else {
-        append("\nNo automatic entries were posted.")
+        append("\nNo entries were posted.")
       }
       if (entryLines.isNotEmpty()) {
         append("\n\nEntries:")
         append("\n")
         append(entryLines.joinToString("\n"))
-        if (autoSaved.size > entryLines.size) append("\n+ ${autoSaved.size - entryLines.size} more entries")
+        if (posted.size > entryLines.size) append("\n+ ${posted.size - entryLines.size} more entries")
       }
       append("\n\nNeeds attention: $exceptions")
       append("\nDuplicates skipped: $duplicates")
@@ -67,7 +73,9 @@ internal object DailyAutoEntryReportFormatter {
 
     return DailyAutoEntryReportContent(
       dateLabel = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(reportDayStart)),
-      autoSavedCount = autoSaved.size,
+      postedCount = posted.size,
+      automaticCount = automatic.size,
+      reviewedCount = reviewed.size,
       exceptionCount = exceptions,
       duplicateCount = duplicates,
       body = body,
