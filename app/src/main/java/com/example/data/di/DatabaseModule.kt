@@ -23,6 +23,7 @@ import com.example.data.local.db.dao.InvestmentDao
 import com.example.data.local.db.dao.LoanDao
 import com.example.data.local.db.dao.SavingsGoalDao
 import com.example.data.local.db.dao.ShoppingDao
+import com.example.data.local.db.dao.ShoppingExtendedDao
 import com.example.data.local.db.dao.TransactionDetectionEventDao
 import dagger.Module
 import dagger.Provides
@@ -85,6 +86,7 @@ object DatabaseModule {
           DatabaseMigrations.MIGRATION_7_8,
           DatabaseMigrations.MIGRATION_8_9,
           DatabaseMigrations.MIGRATION_9_10,
+          DatabaseMigrations.MIGRATION_10_11,
         )
 
     if (factoryHolder.delegate != null || factoryHolder.lastError != null) {
@@ -119,6 +121,7 @@ object DatabaseModule {
           DatabaseMigrations.MIGRATION_7_8,
           DatabaseMigrations.MIGRATION_8_9,
           DatabaseMigrations.MIGRATION_9_10,
+          DatabaseMigrations.MIGRATION_10_11,
         )
 
     val encryptedFactory =
@@ -239,4 +242,8 @@ object DatabaseModule {
   @Provides
   fun provideShoppingDao(database: AppDatabase): ShoppingDao =
     database.shoppingDao()
+
+  @Provides
+  fun provideShoppingExtendedDao(database: AppDatabase): ShoppingExtendedDao =
+    database.shoppingExtendedDao()
 }
