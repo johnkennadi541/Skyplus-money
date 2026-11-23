@@ -121,3 +121,70 @@ fun SmartCalculatorScreen(
     )
   }
 }
+
+
+/**
+ * Shared calculator dialog for monetary inputs. Applying a result only returns a
+ * decimal string to the caller; it never persists or posts a transaction.
+ */
+@Composable
+fun SmartCalculatorAmountDialog(
+  initialExpression: String,
+  onApply: (String) -> Unit,
+  onDismiss: () -> Unit,
+) {
+  var expression by remember(initialExpression) { mutableStateOf(initialExpression) }
+  var result by remember { mutableStateOf<BigDecimal?>(null) }
+  var error by remember { mutableStateOf<String?>(null) }
+  val keys = listOf("AC", "(", ")", "÷", "7", "8", "9", "×", "4", "5", "6", "−", "1", "2", "3", "+", "%", "0", ".", "=")
+
+  androidx.compose.material3.AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("Calculate amount") },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(expression.ifBlank { "0" }, style = MaterialTheme.typography.titleLarge)
+        Text(
+          result?.stripTrailingZeros()?.toPlainString() ?: "—",
+          style = MaterialTheme.typography.headlineMedium,
+          color = MaterialTheme.colorScheme.primary,
+          modifier = Modifier.testTag("shared_calculator_result"),
+        )
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        keys.chunked(4).forEach { rowKeys ->
+          Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            rowKeys.forEach { key ->
+              androidx.compose.material3.TextButton(
+                onClick = {
+                  when (key) {
+                    "AC" -> { expression = ""; result = null; error = null }
+                    "=" -> try {
+                      result = SmartCalculatorEngine.evaluate(expression)
+                      error = null
+                    } catch (failure: IllegalArgumentException) {
+                      result = null
+                      error = failure.message ?: "Invalid calculation"
+                    }
+                    "−" -> expression += "-"
+                    else -> expression += key
+                  }
+                },
+                modifier = Modifier.weight(1f).testTag("shared_calculator_key_$key"),
+              ) { Text(key) }
+            }
+            repeat(4 - rowKeys.size) { Spacer(Modifier.weight(1f)) }
+          }
+        }
+      }
+    },
+    confirmButton = {
+      androidx.compose.material3.TextButton(
+        enabled = result != null && result!! > BigDecimal.ZERO,
+        onClick = { onApply(result!!.stripTrailingZeros().toPlainString()) },
+      ) { Text("Use amount") }
+    },
+    dismissButton = {
+      androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Cancel") }
+    },
+  )
+}
