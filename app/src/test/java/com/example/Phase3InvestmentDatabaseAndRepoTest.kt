@@ -104,6 +104,20 @@ class Phase3InvestmentDatabaseAndRepoTest {
     }
 
   @Test
+  fun `market sync preferences are isolated by authenticated UID`() = runTest {
+    syncPreferences.setAutoUpdateConsent("uid_market_a", true)
+    syncPreferences.setSyncOnlyOnWifi("uid_market_a", false)
+
+    val userA = syncPreferences.syncSettings("uid_market_a").first()
+    val userB = syncPreferences.syncSettings("uid_market_b").first()
+
+    assertTrue(userA.autoUpdateConsentEnabled)
+    assertFalse(userB.autoUpdateConsentEnabled)
+    assertFalse(userA.syncOnlyOnWifi)
+    assertTrue(userB.syncOnlyOnWifi)
+  }
+
+  @Test
   fun `market feed rejects oversized unknown length response without parsing it`() = runTest {
     val oversizedJson = """{"status":"SUCCESS","data":[{"date":"01-01-2026","nav":"100.00"}]}""" +
       " ".repeat(70 * 1024)
@@ -141,6 +155,8 @@ class Phase3InvestmentDatabaseAndRepoTest {
   @Test
   fun `manual overwrite flag cannot bypass global market update opt in`() = runTest {
     syncPreferences.setAutoUpdateConsent("uid_opt_in_guard", false)
+    // A different Google account's consent must not authorize this user's requests.
+    syncPreferences.setAutoUpdateConsent("uid_other_account", true)
     var fetchCount = 0
     val dataSource =
       object : MarketPriceDataSource {
