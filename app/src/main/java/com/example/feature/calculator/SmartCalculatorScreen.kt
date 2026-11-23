@@ -108,15 +108,14 @@ fun SmartCalculatorScreen(
         }
       }
     }
-    Button(
-      onClick = { result?.let { expression = it.stripTrailingZeros().toPlainString(); error = null } },
-      enabled = result != null,
-      modifier = Modifier.fillMaxWidth().height(54.dp).testTag("smart_calculator_use_amount"),
+    OutlinedButton(
+      onClick = { expression = ""; result = null; error = null },
+      modifier = Modifier.fillMaxWidth().height(54.dp).testTag("smart_calculator_clear_button"),
     ) {
-      Text("Use Amount")
+      Text("Clear calculation")
     }
     Text(
-      "Standalone calculator preview. Amount-field integration and custom settings are next.",
+      "Standalone calculator. Amount-field integration and custom settings are next.",
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
