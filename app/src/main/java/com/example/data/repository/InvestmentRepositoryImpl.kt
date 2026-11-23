@@ -162,6 +162,9 @@ class InvestmentRepositoryImpl @Inject constructor(
         val holdingId = UUID.randomUUID().toString()
         val allowAutoForHolding =
           autoPriceUpdateEnabled && category == InvestmentCategory.MUTUAL_FUNDS
+        // An initial manual value is only a fallback when the user has opted this
+        // mutual fund into automatic NAV updates; the first EOD NAV may be older.
+        val hasRecordedInitialMarketPrice = hasExplicitCurrentMarketPrice && !allowAutoForHolding
         if (allowAutoForHolding) {
           require(isValidAmfiSchemeCode(symbolOrTicker)) {
             "Enter a valid 5–7 digit AMFI scheme code to enable automatic NAV updates"
@@ -188,10 +191,10 @@ class InvestmentRepositoryImpl @Inject constructor(
             currentValuationMinor = mutation.newValuationMinor,
             // If the user did not enter a current price, the purchase price is only a
             // temporary valuation fallback. Do not present it as a fresh market quote.
-            lastPriceUpdateDate = if (hasExplicitCurrentMarketPrice) now else 0L,
+            lastPriceUpdateDate = if (hasRecordedInitialMarketPrice) now else 0L,
             lastPriceSource = PriceSourceType.MANUAL,
             lastPriceProviderLabel =
-              if (hasExplicitCurrentMarketPrice) "Manual"
+              if (hasRecordedInitialMarketPrice) "Manual"
               else if (allowAutoForHolding) "Awaiting first NAV"
               else "Awaiting current price",
             autoPriceUpdateEnabled = allowAutoForHolding,
@@ -221,7 +224,7 @@ class InvestmentRepositoryImpl @Inject constructor(
         // Only persist a market-price history point when the user actually supplied
         // a current price. The purchase price fallback is not a market observation.
         val initialPricePoint =
-          if (hasExplicitCurrentMarketPrice) {
+          if (hasRecordedInitialMarketPrice) {
             InvestmentPriceHistory(
               id = UUID.randomUUID().toString(),
               holdingId = holdingId,
@@ -755,7 +758,13 @@ class InvestmentRepositoryImpl @Inject constructor(
           )
         }
 
-        val holdings = investmentDao.getAllHoldingsSync(authenticatedUserId).map { it.toDomain() }
+        // Process never-quoted and oldest-quoted holdings first. The sync is capped
+        // at five requests per cycle; ordering by recency prevents the same first
+        // five rows from monopolizing every daily run.
+        val holdings =
+          investmentDao.getAllHoldingsSync(authenticatedUserId)
+            .map { it.toDomain() }
+            .sortedWith(compareBy<InvestmentHolding> { it.lastPriceUpdateDate }.thenBy { it.updatedAt })
         var updatedCount = 0
         var skippedManualCount = 0
         var unsupportedCount = 0
