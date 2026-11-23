@@ -98,7 +98,7 @@ fun InvestmentsScreen(
     onSelectCategory = viewModel::selectCategory,
     onToggleAutoConsent = viewModel::setAutoUpdateConsent,
     onToggleWifiOnly = viewModel::setSyncOnlyOnWifi,
-    onSyncNow = { viewModel.syncMarketPricesNow(allowOverwriteManual = false) },
+    onSyncNow = { viewModel.syncMarketPricesNow() },
     onDismissMessage = viewModel::dismissMessage,
     onNavigateBack = onNavigateBack,
     onOpenHoldingDetail = onOpenHoldingDetail,
