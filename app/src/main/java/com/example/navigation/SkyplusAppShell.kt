@@ -80,6 +80,7 @@ import com.example.feature.budgets.BudgetsViewModel
 import com.example.feature.consent.LegalConsentPreviewScreen
 import com.example.feature.consent.LegalConsentScreen
 import com.example.feature.cards.CardsScreen
+import com.example.feature.calculator.SmartCalculatorScreen
 import com.example.feature.cards.CardsViewModel
 import com.example.feature.dashboard.HomeDashboardScreen
 import com.example.feature.goals.SavingsGoalsScreen
@@ -471,6 +472,7 @@ fun SkyplusAppShell(
                 onOpenPortfolio = { navigateToTab(TopLevelTab.PORTFOLIO) },
                 onOpenReports = { navigateToTab(TopLevelTab.REPORTS) },
                 onOpenEmiCalculator = { navController.navigate(SkyplusRoute.EmiCalculator) },
+                onOpenSmartCalculator = { navController.navigate(SkyplusRoute.SmartCalculator) },
                 onOpenLoans = { navController.navigate(SkyplusRoute.Loans) },
                 onOpenSmartDetection = { navController.navigate(SkyplusRoute.SmartDetectionSettings) },
                 onOpenReviewQueue = { navController.navigate(SkyplusRoute.ReviewQueue) },
@@ -762,6 +764,9 @@ fun SkyplusAppShell(
                   onNavigateBack = { navController.popBackStack() },
                 )
               }
+            }
+            composable<SkyplusRoute.SmartCalculator> {
+              SmartCalculatorScreen(onNavigateBack = { navController.popBackStack() })
             }
             composable<SkyplusRoute.EmiCalculator> {
               if (loansViewModel != null) {
