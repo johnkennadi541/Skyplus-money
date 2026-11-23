@@ -16,6 +16,8 @@ import com.example.data.local.db.dao.CreditCardDao
 import com.example.data.local.db.dao.CreditCardStatementDao
 import com.example.domain.model.AuthSessionState
 import com.example.domain.repository.AuthRepository
+import com.example.domain.repository.FinancialTransactionRepository
+import com.example.domain.usecase.CreditCardStatementCalculator
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
@@ -31,6 +33,7 @@ class CreditCardReminderWorker @AssistedInject constructor(
   private val authRepository: AuthRepository,
   private val cardDao: CreditCardDao,
   private val statementDao: CreditCardStatementDao,
+  private val transactionRepository: FinancialTransactionRepository,
   private val scheduler: CreditCardReminderScheduler,
 ) : CoroutineWorker(appContext, workerParams) {
 
@@ -49,6 +52,7 @@ class CreditCardReminderWorker @AssistedInject constructor(
     val windowEnd = (today.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, MAX_LOOKAHEAD_DAYS) }
     val cards = cardDao.observeCards(userId).first().associateBy { it.id }
     val statements = statementDao.observeDueStatements(userId, today.timeInMillis, windowEnd.timeInMillis).first()
+    val transactionsByAccount = mutableMapOf<String, List<com.example.domain.model.FinancialTransaction>>()
 
     statements.forEach { statement ->
       val card = cards[statement.cardId] ?: return@forEach
@@ -59,16 +63,27 @@ class CreditCardReminderWorker @AssistedInject constructor(
       val dueLocal = java.time.Instant.ofEpochMilli(statement.dueDate).atZone(zone).toLocalDate()
       val daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(todayLocal, dueLocal).toInt()
       if (daysRemaining in 0..card.reminderDaysBefore) {
-        postReminder(
-          userId = userId,
-          statementId = statement.id,
-          issuer = card.issuerName,
-          last4 = card.last4,
-          dueDate = statement.dueDate,
-          daysRemaining = daysRemaining,
-          minimumDueMinor = statement.minimumDueMinor,
-          currencyCode = statement.currencyCode,
-        )
+        val transactions = transactionsByAccount.getOrPut(card.accountId) {
+          transactionRepository.getTransactionsByAccount(userId, card.accountId).first()
+        }
+        val summary = CreditCardStatementCalculator.summarize(
+          statements = listOf(statement.toDomain()),
+          card = card.toDomain(),
+          transactions = transactions,
+        ).single()
+        if (summary.remainingDueMinor > 0L) {
+          postReminder(
+            userId = userId,
+            statementId = statement.id,
+            issuer = card.issuerName,
+            last4 = card.last4,
+            dueDate = statement.dueDate,
+            daysRemaining = daysRemaining,
+            minimumDueMinor = statement.minimumDueMinor,
+            remainingDueMinor = summary.remainingDueMinor,
+            currencyCode = statement.currencyCode,
+          )
+        }
       }
     }
 
@@ -84,6 +99,7 @@ class CreditCardReminderWorker @AssistedInject constructor(
     dueDate: Long,
     daysRemaining: Int,
     minimumDueMinor: Long,
+    remainingDueMinor: Long,
     currencyCode: String,
   ) {
     runCatching {
@@ -95,6 +111,7 @@ class CreditCardReminderWorker @AssistedInject constructor(
         else -> "Payment is due in $daysRemaining days"
       }
       val minimumDue = formatMinor(minimumDueMinor, currencyCode)
+      val remainingDue = formatMinor(remainingDueMinor, currencyCode)
       val intent = Intent(applicationContext, MainActivity::class.java).apply {
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         putExtra(MainActivity.EXTRA_OPEN_CREDIT_CARDS, true)
@@ -111,7 +128,7 @@ class CreditCardReminderWorker @AssistedInject constructor(
         .setContentText("$accountLabel — $timing")
         .setStyle(
           NotificationCompat.BigTextStyle().bigText(
-            "$accountLabel\n$timing\nDue: ${SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(dueDate))}\nMinimum due: $minimumDue $currencyCode",
+            "$accountLabel\n$timing\nDue: ${SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(dueDate))}\nMinimum due: $minimumDue $currencyCode\\nRemaining: $remainingDue $currencyCode",
           ),
         )
         .setContentIntent(pendingIntent)
