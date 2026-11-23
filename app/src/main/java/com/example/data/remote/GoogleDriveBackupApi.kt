@@ -191,6 +191,6 @@ class GoogleDriveBackupApi private constructor(
     private const val BINARY_MIME_TYPE = "application/octet-stream"
     private const val JSON_MIME_TYPE = "application/json; charset=UTF-8"
     private const val MAX_BACKUP_BYTES = 100 * 1024 * 1024
-    private const val MAX_METADATA_RESPONSE_BYTES = 64 * 1024
+    private const val MAX_METADATA_RESPONSE_BYTES = 64L * 1024L
   }
 }
