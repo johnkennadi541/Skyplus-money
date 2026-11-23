@@ -427,8 +427,8 @@ fun NotificationAccessSetupScreen(
         Spacer(modifier = Modifier.height(OceanSpacing.sm))
         Text(
           text = "Why SKYPLUS MONEY requests Notification Access:\n" +
-            "• Automatically detects debit, credit, UPI, card, wallet, and refund alerts from your chosen bank/payment apps.\n" +
-            "• Eliminates manual entry while staying 100% compliant with Google Play permissions.",
+            "• Detects eligible bank transaction SMS notifications posted by your phone's current default SMS app.\n" +
+            "• Posts completed, high-confidence entries automatically when the exact account is matched.",
           style = MaterialTheme.typography.bodyMedium,
         )
       }
@@ -441,10 +441,12 @@ fun NotificationAccessSetupScreen(
         }
         Spacer(modifier = Modifier.height(OceanSpacing.xs))
         Text(
-          text = "• On-Device Only: Parsing runs locally on your phone with zero external AI/cloud calls.\n" +
-            "• OTP & PIN Rejection: Notifications containing OTPs, PINs, MPINs, CVVs, or passwords are discarded immediately.\n" +
-            "• App Allowlist: Only notifications from bank/UPI apps you enable are examined.\n" +
-            "• Encrypted Storage: Verified transactions are stored exclusively inside your SQLCipher-encrypted database.",
+          text = "• SMS Only: Only the current default SMS app's posted notifications are inspected.\n" +
+            "• No Email Access: Email/Gmail notifications and every other app package are ignored before their content is read.\n" +
+            "• No Inbox Reading: SKYPLUS MONEY does not request READ_SMS/RECEIVE_SMS or read your SMS inbox.\n" +
+            "• On-Device Only: Parsing runs locally; raw SMS bodies are not stored.\n" +
+            "• OTP & PIN Rejection: OTP, PIN, MPIN, CVV and password notifications are discarded.\n" +
+            "• Encrypted Storage: Normalized transaction data is stored inside your SQLCipher-encrypted database.",
           style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
