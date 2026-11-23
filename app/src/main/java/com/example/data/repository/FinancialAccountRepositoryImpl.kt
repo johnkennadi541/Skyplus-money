@@ -45,7 +45,7 @@ class FinancialAccountRepositoryImpl @Inject constructor(
     account: FinancialAccount,
   ): Result<FinancialAccount> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(account.userId == authenticatedUserId) {
           "Account ownership cannot be assigned across users"
@@ -61,7 +61,7 @@ class FinancialAccountRepositoryImpl @Inject constructor(
     account: FinancialAccount,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(account.userId == authenticatedUserId) {
           "Account ownership cannot be transferred or modified across users"
@@ -105,7 +105,7 @@ class FinancialAccountRepositoryImpl @Inject constructor(
     isActive: Boolean,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(accountId.isNotBlank()) { "Account ID is required" }
         database.withTransaction {
@@ -130,7 +130,7 @@ class FinancialAccountRepositoryImpl @Inject constructor(
     deleteLinkedTransactions: Boolean,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(accountId.isNotBlank()) { "Account ID is required" }
         database.withTransaction {
@@ -165,7 +165,7 @@ class FinancialAccountRepositoryImpl @Inject constructor(
     deltaMinor: Long,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(accountId.isNotBlank()) { "Account ID is required" }
         accountDao.adjustBalance(userId, accountId, deltaMinor, System.currentTimeMillis())
