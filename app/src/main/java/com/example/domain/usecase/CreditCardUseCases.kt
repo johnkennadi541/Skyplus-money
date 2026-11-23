@@ -36,6 +36,7 @@ constructor(private val creditCardRepository: CreditCardRepository) {
     accountId: String,
     issuerName: String,
     network: CreditCardNetwork,
+    isActive: Boolean = true,
     last4: String,
     creditLimitMinor: Long,
     currencyCode: String,
