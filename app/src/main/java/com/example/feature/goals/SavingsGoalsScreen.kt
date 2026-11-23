@@ -552,6 +552,7 @@ private fun ContributionDialog(
         if (showContributionCalculator) {
           SmartCalculatorAmountDialog(
             initialExpression = amount,
+            decimalScale = Money.resolveFractionDigits(summary.goal.currencyCode),
             onApply = { calculatedAmount ->
               amount = calculatedAmount
               showContributionCalculator = false
