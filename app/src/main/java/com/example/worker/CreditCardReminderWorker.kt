@@ -79,7 +79,7 @@ class CreditCardReminderWorker @AssistedInject constructor(
             last4 = card.last4,
             dueDate = statement.dueDate,
             daysRemaining = daysRemaining,
-            minimumDueMinor = statement.minimumDueMinor,
+            minimumDueMinor = summary.remainingMinimumDueMinor,
             remainingDueMinor = summary.remainingDueMinor,
             currencyCode = statement.currencyCode,
           )
