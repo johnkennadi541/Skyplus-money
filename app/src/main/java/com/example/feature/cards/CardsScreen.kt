@@ -1,5 +1,10 @@
 package com.example.feature.cards
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,9 +46,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.content.ContextCompat
 import com.example.core.designsystem.component.BadgeTone
 import com.example.core.designsystem.component.OceanCard
 import com.example.core.designsystem.component.OceanSectionHeader
@@ -473,6 +480,11 @@ private fun CardFormDialog(
   var reminderDays by remember { mutableStateOf((existingCard?.reminderDaysBefore ?: 3).toString()) }
   var notes by remember { mutableStateOf(existingCard?.notes.orEmpty()) }
   var formError by remember { mutableStateOf<String?>(null) }
+  val context = LocalContext.current
+  val notificationPermissionLauncher =
+    rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+      reminderEnabled = granted
+    }
 
   androidx.compose.material3.AlertDialog(
     onDismissRequest = onDismiss,
@@ -578,7 +590,20 @@ private fun CardFormDialog(
             Text("Payment reminders", style = MaterialTheme.typography.labelLarge)
             Text("Notify before the statement due date", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
           }
-          Switch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it })
+          Switch(
+            checked = reminderEnabled,
+            onCheckedChange = { enabled ->
+              if (
+                enabled &&
+                  Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                  ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+              ) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+              } else {
+                reminderEnabled = enabled
+              }
+            },
+          )
         }
         if (reminderEnabled) {
           SkyplusTextField(
@@ -614,6 +639,13 @@ private fun CardFormDialog(
             formError = "Annual fee month must be between 1 and 12"
           } else if (reminderEnabled && (reminderLead == null || reminderLead !in 1..30)) {
             formError = "Reminder lead time must be between 1 and 30 days"
+          } else if (
+            reminderEnabled &&
+              Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+              ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+          ) {
+            formError = "Allow notifications to receive card payment reminders."
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
           } else {
             formError = null
             onSave(
