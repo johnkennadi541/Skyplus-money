@@ -700,6 +700,20 @@ class Phase3InvestmentDatabaseAndRepoTest {
         created.copy(category = InvestmentCategory.STOCKS),
       ).isFailure,
     )
+    assertTrue(
+      "Metadata editing must not change the AMFI scheme code after purchase",
+      repo.updateHoldingMetadata(
+        "uid_quote_guard",
+        created.copy(symbolOrTicker = "119599"),
+      ).isFailure,
+    )
+    assertTrue(
+      "Metadata editing must not change the ISIN after purchase",
+      repo.updateHoldingMetadata(
+        "uid_quote_guard",
+        created.copy(isin = "INE123456789"),
+      ).isFailure,
+    )
 
     repo.setAutoUpdateConsent("uid_quote_guard", true)
     repo.setHoldingAutoPriceUpdate("uid_quote_guard", created.id, true).getOrThrow()
