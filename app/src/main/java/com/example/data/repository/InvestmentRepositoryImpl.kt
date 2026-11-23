@@ -814,7 +814,7 @@ class InvestmentRepositoryImpl @Inject constructor(
 
           when (quoteResult) {
             is MarketQuoteFetchResult.Success -> {
-              val applied =
+              val applyResult =
                 applyAutomaticMarketPrice(
                   authenticatedUserId = authenticatedUserId,
                   holdingId = holding.id,
@@ -823,8 +823,17 @@ class InvestmentRepositoryImpl @Inject constructor(
                   source = quoteResult.source,
                   providerLabel = quoteResult.providerLabel,
                   allowOverwriteManual = allowOverwriteManual,
-                ).getOrDefault(false)
-              if (applied) updatedCount++ else skippedManualCount++
+                )
+              applyResult.fold(
+                onSuccess = { applied ->
+                  if (applied) updatedCount++ else skippedManualCount++
+                },
+                onFailure = {
+                  // A rejected/invalid quote is an error, not a manual-price skip.
+                  // Keep the previous valuation untouched and report the failure count.
+                  errorCount++
+                },
+              )
             }
             is MarketQuoteFetchResult.RateLimited -> {
               rateLimitedCount++
