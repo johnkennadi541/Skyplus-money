@@ -486,4 +486,74 @@ object DatabaseMigrations {
         )
       }
     }
+  /**
+   * Stage 4 — credit card statements, reward history and card-management preferences.
+   *
+   * Additive only. Existing credit card records receive safe defaults; existing accounts,
+   * transactions, balances and earlier statements are never rewritten.
+   */
+  val MIGRATION_9_10: Migration =
+    object : Migration(9, 10) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN annualFeeMinor INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN annualFeeMonth INTEGER NOT NULL DEFAULT 1")
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN rewardProgramName TEXT")
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN isFrozen INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN reminderEnabled INTEGER NOT NULL DEFAULT 1")
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN reminderDaysBefore INTEGER NOT NULL DEFAULT 3")
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN notes TEXT")
+
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS credit_card_statements (
+            id TEXT NOT NULL PRIMARY KEY,
+            userId TEXT NOT NULL,
+            cardId TEXT NOT NULL,
+            currencyCode TEXT NOT NULL,
+            statementDate INTEGER NOT NULL,
+            dueDate INTEGER NOT NULL,
+            statementBalanceMinor INTEGER NOT NULL,
+            minimumDueMinor INTEGER NOT NULL,
+            feesMinor INTEGER NOT NULL,
+            interestMinor INTEGER NOT NULL,
+            notes TEXT,
+            createdAt INTEGER NOT NULL,
+            updatedAt INTEGER NOT NULL,
+            FOREIGN KEY(cardId) REFERENCES credit_cards(id) ON UPDATE NO ACTION ON DELETE CASCADE
+          )
+          """.trimIndent()
+        )
+        db.execSQL(
+          "CREATE UNIQUE INDEX IF NOT EXISTS index_credit_card_statements_userId_cardId_statementDate ON credit_card_statements(userId, cardId, statementDate)"
+        )
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS index_credit_card_statements_userId_dueDate ON credit_card_statements(userId, dueDate)"
+        )
+
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS credit_card_reward_events (
+            id TEXT NOT NULL PRIMARY KEY,
+            userId TEXT NOT NULL,
+            cardId TEXT NOT NULL,
+            eventDate INTEGER NOT NULL,
+            eventType TEXT NOT NULL,
+            pointsDelta INTEGER NOT NULL,
+            cashValueMinor INTEGER NOT NULL,
+            currencyCode TEXT NOT NULL,
+            description TEXT NOT NULL,
+            createdAt INTEGER NOT NULL,
+            FOREIGN KEY(cardId) REFERENCES credit_cards(id) ON UPDATE NO ACTION ON DELETE CASCADE
+          )
+          """.trimIndent()
+        )
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS index_credit_card_reward_events_userId_cardId_eventDate ON credit_card_reward_events(userId, cardId, eventDate)"
+        )
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS index_credit_card_reward_events_userId_cardId ON credit_card_reward_events(userId, cardId)"
+        )
+      }
+    }
+
 }
