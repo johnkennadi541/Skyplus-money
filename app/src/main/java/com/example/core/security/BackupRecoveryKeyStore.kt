@@ -19,7 +19,7 @@ class BackupRecoveryKeyStore internal constructor(
   @Inject
   constructor(context: Context) : this(
     context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
-    AndroidKeyStoreBackend(),
+    BackupRecoveryKeyWrappingBackend(),
   )
 
   @Synchronized
