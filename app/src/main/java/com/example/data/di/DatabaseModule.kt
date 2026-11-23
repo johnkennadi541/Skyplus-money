@@ -188,10 +188,12 @@ object DatabaseModule {
   internal fun isRobolectricTestEnvironment(): Boolean {
     if (!BuildConfig.DEBUG) return false
     if (!"robolectric".equals(Build.FINGERPRINT, ignoreCase = true)) return false
-    return runCatching {
+    return try {
       Class.forName("org.robolectric.Robolectric")
       true
-    }.getOrDefault(false)
+    } catch (_: ClassNotFoundException) {
+      false
+    }
   }
 
   private class RecoverableEncryptedOpenHelperFactory : SupportSQLiteOpenHelper.Factory {
