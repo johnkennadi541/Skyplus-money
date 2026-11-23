@@ -157,7 +157,7 @@ class ReportExportGenerator @Inject constructor() {
             sanitizeFormula("${h.name} (${h.category.displayName})"),
             fmt(h.valuationMinor, currency),
             "Invested ${fmt(h.investedMinor, currency)}",
-            "Unrealized ${fmt(h.unrealizedPnlMinor, currency)} | Realized ${fmt(h.realizedPnlMinor, currency)} | Return ${h.returnPercent.toPlainString()}% | Price as of ${dateFmt.format(Date(h.lastPriceUpdateDate))} | Stale ${h.isStalePrice}",
+            "Unrealized ${fmt(h.unrealizedPnlMinor, currency)} | Realized ${fmt(h.realizedPnlMinor, currency)} | Return ${h.returnPercent.toPlainString()}% | Price as of ${if (h.lastPriceUpdateDate > 0L) dateFmt.format(Date(h.lastPriceUpdateDate)) else "Awaiting first price"} | Stale ${h.isStalePrice}",
           )
         }
       }
