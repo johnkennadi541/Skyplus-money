@@ -288,6 +288,9 @@ fun CardsContent(
 @Composable
 private fun CardTile(
   summary: CreditCardSummary,
+  onOpenDetails: () -> Unit,
+  onEdit: () -> Unit,
+  onToggleFreeze: (Boolean) -> Unit,
   onDelete: () -> Unit,
 ) {
   val extended = OceanTheme.colors
@@ -319,6 +322,10 @@ private fun CardTile(
             Spacer(modifier = Modifier.width(OceanSpacing.xs))
             OceanStatusBadge(text = "Over limit", tone = BadgeTone.NEGATIVE)
           }
+          if (summary.card.isFrozen) {
+            Spacer(modifier = Modifier.width(OceanSpacing.xs))
+            OceanStatusBadge(text = "Marked frozen", tone = BadgeTone.WARNING)
+          }
         }
         Text(
           text = summary.account.name,
@@ -339,17 +346,12 @@ private fun CardTile(
     }
 
     Spacer(modifier = Modifier.height(OceanSpacing.sm))
-
     Row(
       modifier = Modifier.fillMaxWidth(),
       horizontalArrangement = Arrangement.SpaceBetween,
     ) {
       Column {
-        Text(
-          text = "Outstanding",
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Text("Outstanding", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
           text = outstandingText,
           style = MaterialTheme.typography.headlineSmall,
@@ -359,16 +361,8 @@ private fun CardTile(
         )
       }
       Column(horizontalAlignment = Alignment.End) {
-        Text(
-          text = "Limit",
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-          text = limitText,
-          style = MaterialTheme.typography.bodyMedium,
-          fontWeight = FontWeight.SemiBold,
-        )
+        Text("Limit", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text = limitText, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
       }
     }
 
@@ -376,22 +370,44 @@ private fun CardTile(
     LinearProgressIndicator(
       progress = { utilisation },
       modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-      color =
-        when {
-          summary.isOverLimit -> extended.negative
-          utilisation >= 0.75f -> extended.warning
-          else -> extended.positive
-        },
+      color = when {
+        summary.isOverLimit -> extended.negative
+        utilisation >= 0.75f -> extended.warning
+        else -> extended.positive
+      },
       trackColor = MaterialTheme.colorScheme.surfaceVariant,
     )
     Spacer(modifier = Modifier.height(OceanSpacing.xxs))
     Text(
-      text =
-        if (summary.card.creditLimitMinor > 0L) {
-          String.format(Locale.getDefault(), "%.2f%% of limit used", summary.utilisationPercent.toDouble())
-        } else {
-          "No limit set"
-        },
+      text = if (summary.card.creditLimitMinor > 0L) {
+        String.format(Locale.getDefault(), "%.2f%% of limit used", summary.utilisationPercent.toDouble())
+      } else {
+        "No limit set"
+      },
+      style = MaterialTheme.typography.labelSmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(modifier = Modifier.height(OceanSpacing.xs))
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      TextButton(onClick = onOpenDetails, modifier = Modifier.weight(1f).testTag("card_details_${summary.card.id}")) {
+        Text("Details")
+      }
+      TextButton(onClick = onEdit, modifier = Modifier.weight(1f).testTag("edit_card_${summary.card.id}")) {
+        Text("Edit")
+      }
+      TextButton(
+        onClick = { onToggleFreeze(!summary.card.isFrozen) },
+        modifier = Modifier.weight(1f).testTag("freeze_card_${summary.card.id}"),
+      ) {
+        Text(if (summary.card.isFrozen) "Unfreeze" else "Freeze")
+      }
+    }
+    Text(
+      "Freeze is a local tracker status only; contact your card issuer to block the physical card.",
       style = MaterialTheme.typography.labelSmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
