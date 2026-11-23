@@ -67,31 +67,38 @@ fun ShoppingCaptureActions(
     }
   }
 
+  fun processImage(image: InputImage) {
+    message = "Reading text from photo…"
+    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    recognizer.process(image)
+      .addOnSuccessListener { result ->
+        val drafts = ShoppingInputParser.parse(result.text)
+        if (drafts.isEmpty()) message = "No readable list text found. Try a clearer photo."
+        else {
+          message = null
+          onDraftsReady(drafts)
+        }
+      }
+      .addOnFailureListener { message = "Could not read this photo. Try another image or type the items." }
+      .addOnCompleteListener { recognizer.close() }
+  }
+
   val photoLauncher = rememberLauncherForActivityResult(
     ActivityResultContracts.GetContent(),
   ) { uri ->
     if (uri != null) {
-      message = "Reading text from photo…"
       try {
-        val image = InputImage.fromFilePath(context, uri)
-        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-        recognizer.process(image)
-          .addOnSuccessListener { result ->
-            val drafts = ShoppingInputParser.parse(result.text)
-            if (drafts.isEmpty()) message = "No readable list text found. Try a clearer photo."
-            else {
-              message = null
-              onDraftsReady(drafts)
-            }
-          }
-          .addOnFailureListener {
-            message = "Could not read this photo. Try another image or type the items."
-          }
-          .addOnCompleteListener { recognizer.close() }
+        processImage(InputImage.fromFilePath(context, uri))
       } catch (_: Exception) {
         message = "Could not open this photo. Choose another image."
       }
     }
+  }
+
+  val cameraLauncher = rememberLauncherForActivityResult(
+    ActivityResultContracts.TakePicturePreview(),
+  ) { bitmap ->
+    if (bitmap != null) processImage(InputImage.fromBitmap(bitmap, 0))
   }
 
   Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -125,6 +132,13 @@ fun ShoppingCaptureActions(
       ) {
         Icon(Icons.Rounded.CameraAlt, contentDescription = null)
         Text(" Photo")
+      }
+      OutlinedButton(
+        onClick = { message = null; cameraLauncher.launch(null) },
+        modifier = Modifier.weight(1f).testTag("shopping_camera_add_button"),
+      ) {
+        Icon(Icons.Rounded.CameraAlt, contentDescription = null)
+        Text(" Camera")
       }
     }
     message?.let {
