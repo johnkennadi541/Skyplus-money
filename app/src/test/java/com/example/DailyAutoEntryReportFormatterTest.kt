@@ -42,6 +42,15 @@ class DailyAutoEntryReportFormatterTest {
         accountLast4 = "7788",
       ),
       event(
+        id = "reviewed-expense",
+        amount = 2_500L,
+        currency = "INR",
+        type = TransactionType.EXPENSE,
+        status = DetectionEventStatus.APPROVED,
+        merchant = "Reviewed Shop",
+        accountLast4 = "4321",
+      ),
+      event(
         id = "exception",
         amount = 2_000L,
         currency = "INR",
@@ -59,12 +68,15 @@ class DailyAutoEntryReportFormatterTest {
 
     val report = DailyAutoEntryReportFormatter.format(0L, events)
 
-    assertEquals(3, report.autoSavedCount)
+    assertEquals(4, report.postedCount)
+    assertEquals(3, report.automaticCount)
+    assertEquals(1, report.reviewedCount)
     assertEquals(1, report.exceptionCount)
     assertEquals(1, report.duplicateCount)
-    assertTrue(report.body.contains("INR  Income: 100.00 (1)  •  Expense: 15.00 (1)"))
+    assertTrue(report.body.contains("INR  Income: 100.00 (1)  •  Expense: 40.00 (2)"))
     assertTrue(report.body.contains("KWD  Income: 0.000 (0)  •  Expense: 1.250 (1)"))
-    assertTrue(report.body.contains("EXPENSE • Cafe • 15.00 INR • A/c ••4321"))
+    assertTrue(report.body.contains("AUTO EXPENSE • Cafe • 15.00 INR • A/c ••4321"))
+    assertTrue(report.body.contains("REVIEWED EXPENSE • Reviewed Shop • 25.00 INR • A/c ••4321"))
     assertTrue(report.body.contains("INCOME • Salary • 100.00 INR • A/c ••4321"))
     assertTrue(report.body.contains("Needs attention: 1"))
     assertTrue(report.body.contains("Duplicates skipped: 1"))
@@ -86,7 +98,7 @@ class DailyAutoEntryReportFormatterTest {
 
     val report = DailyAutoEntryReportFormatter.format(0L, events)
 
-    assertEquals(0, report.autoSavedCount)
+    assertEquals(0, report.postedCount)
     assertTrue(report.body.contains("No automatic entries were posted."))
     assertTrue(report.body.contains("Needs attention: 1"))
     assertTrue(!report.body.contains("INCOME • Unmapped sender"))
