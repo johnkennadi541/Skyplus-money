@@ -214,7 +214,9 @@ class Phase3InvestmentDatabaseAndRepoTest {
     ).getOrThrow()
     assertEquals(9550_00L, repo.getHoldingById("uid_man", mfHolding.id)?.currentValuationMinor)
 
-    // Default global auto-consent is OFF
+    // Reset persisted DataStore state so this test is isolated from earlier tests.
+    // The preference store is application-scoped and can survive between Robolectric tests.
+    repo.setAutoUpdateConsent(false)
     assertFalse(syncPreferences.syncSettings.first().autoUpdateConsentEnabled)
 
     // Attempting auto-apply without holding opt-in or allowOverwriteManual MUST NOT overwrite manual price
