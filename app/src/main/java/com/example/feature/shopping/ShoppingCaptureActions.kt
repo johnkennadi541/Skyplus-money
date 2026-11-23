@@ -164,7 +164,7 @@ fun ShoppingImportReviewDialog(
         verticalArrangement = Arrangement.spacedBy(8.dp),
       ) {
         Text(
-          "Check the names and quantities before adding. Prices are left blank unless clearly stated.",
+          "Check names and quantities before adding. Prices are never guessed; imported items without a price are marked for price entry and should not be treated as free.",
           style = MaterialTheme.typography.bodySmall,
         )
         drafts.forEachIndexed { index, item ->
