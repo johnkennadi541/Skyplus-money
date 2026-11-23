@@ -685,7 +685,6 @@ class InvestmentRepositoryImpl @Inject constructor(
     priceDate: Long,
     source: PriceSourceType,
     providerLabel: String,
-    allowOverwriteManual: Boolean,
   ): Result<Boolean> =
     withContext(dispatchers.io) {
       runCatchingPreservingCancellation {
@@ -727,22 +726,9 @@ class InvestmentRepositoryImpl @Inject constructor(
             return@withTransaction false
           }
 
-          // Never overwrite manual prices without explicit user consent
-          if (!existing.autoPriceUpdateEnabled && !allowOverwriteManual) {
-            return@withTransaction false
-          }
-          if (
-            existing.lastPriceSource == PriceSourceType.MANUAL &&
-            !existing.autoPriceUpdateEnabled &&
-            !allowOverwriteManual
-          ) {
-            return@withTransaction false
-          }
-          if (
-            existing.lastPriceSource == PriceSourceType.MANUAL &&
-            priceDate < existing.lastPriceUpdateDate &&
-            !allowOverwriteManual
-          ) {
+          // Global consent is necessary but not sufficient: every holding must
+          // also have its own explicit auto-NAV opt-in. There is no override path.
+          if (!existing.autoPriceUpdateEnabled) {
             return@withTransaction false
           }
 
@@ -796,7 +782,6 @@ class InvestmentRepositoryImpl @Inject constructor(
 
   override suspend fun syncEligibleMarketPrices(
     authenticatedUserId: String,
-    allowOverwriteManual: Boolean,
     forceBypassCooldown: Boolean,
   ): Result<MarketSyncSummary> =
     withContext(dispatchers.io) {
@@ -842,7 +827,7 @@ class InvestmentRepositoryImpl @Inject constructor(
           require(qty >= BigDecimal.ZERO) { "Stored investment quantity cannot be negative" }
           if (qty.compareTo(BigDecimal.ZERO) == 0) continue
 
-          if (!holding.autoPriceUpdateEnabled && !allowOverwriteManual) {
+          if (!holding.autoPriceUpdateEnabled) {
             skippedManualCount++
             continue
           }
@@ -890,7 +875,6 @@ class InvestmentRepositoryImpl @Inject constructor(
                   priceDate = quoteResult.asOfMillis,
                   source = quoteResult.source,
                   providerLabel = quoteResult.providerLabel,
-                  allowOverwriteManual = allowOverwriteManual,
                 )
               applyResult.fold(
                 onSuccess = { applied ->
