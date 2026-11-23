@@ -120,7 +120,7 @@ class InvestmentRepositoryImpl @Inject constructor(
     notes: String?,
   ): Result<InvestmentHolding> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(name.isNotBlank()) { "Investment name is required" }
         require(purchaseDate > 0L) { "Purchase date must be valid" }
@@ -687,7 +687,7 @@ class InvestmentRepositoryImpl @Inject constructor(
         val now = System.currentTimeMillis()
         val settings = syncPreferencesDataSource.syncSettings.first()
 
-        if (!settings.autoUpdateConsentEnabled && !allowOverwriteManual) {
+        if (!settings.autoUpdateConsentEnabled) {
           val msg = "Automatic updates are off. Manual price entry remains active."
           syncPreferencesDataSource.recordSyncResult(now, msg)
           return@runCatching MarketSyncSummary(
