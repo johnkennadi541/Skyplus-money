@@ -735,6 +735,7 @@ fun UpdateMarketPriceDialog(
         if (showPriceCalculator) {
           SmartCalculatorAmountDialog(
             initialExpression = priceText,
+            decimalScale = Money.resolveFractionDigits(holding.currencyCode),
             onApply = { calculatedAmount ->
               priceText = calculatedAmount
               showPriceCalculator = false
