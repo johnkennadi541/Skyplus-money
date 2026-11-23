@@ -402,7 +402,6 @@ fun ShoppingListContent(
         smartSuggestions = smartSuggestions,
         activeList = activeList,
         onReceiptReady = { receiptDraft = it },
-        onDraftsReady = { importedDrafts = it },
         formatMoneyUseCase = formatMoneyUseCase,
         onAddPantryClick = { showPantryDialog = true },
         onPlanMealClick = { showMealPlanDialog = true },
@@ -497,6 +496,13 @@ fun ShoppingListContent(
           }
         }
 
+        item(key = "shopping_capture_actions") {
+          ShoppingCaptureActions(
+            onDraftsReady = { importedDrafts = it },
+            modifier = Modifier.fillMaxWidth(),
+          )
+        }
+
         if (filteredItems.isEmpty()) {
           item(key = "items_empty") {
             OceanCard(modifier = Modifier.testTag("shopping_items_empty_state")) {
@@ -552,7 +558,6 @@ fun ShoppingListContent(
             smartSuggestions = smartSuggestions,
             activeList = activeList,
             onReceiptReady = { receiptDraft = it },
-            onDraftsReady = { importedDrafts = it },
             formatMoneyUseCase = formatMoneyUseCase,
             onAddPantryClick = { showPantryDialog = true },
             onPlanMealClick = { showMealPlanDialog = true },
@@ -1212,7 +1217,6 @@ private fun ShoppingExtendedSections(
   smartSuggestions: List<ShoppingSmartSuggestion>,
   activeList: ShoppingList?,
   onReceiptReady: (ShoppingReceiptDraft) -> Unit,
-  onDraftsReady: (List<ShoppingItemDraft>) -> Unit,
   formatMoneyUseCase: FormatMoneyUseCase,
   onAddPantryClick: () -> Unit,
   onPlanMealClick: () -> Unit,
@@ -1226,12 +1230,6 @@ private fun ShoppingExtendedSections(
       onReceiptReady = onReceiptReady,
       modifier = Modifier.fillMaxWidth(),
     )
-    if (activeList != null) {
-      ShoppingCaptureActions(
-        onDraftsReady = onDraftsReady,
-        modifier = Modifier.fillMaxWidth(),
-      )
-    }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       OutlinedButton(onClick = onAddPantryClick, modifier = Modifier.weight(1f)) { Text("Add Pantry Stock") }
       OutlinedButton(onClick = onPlanMealClick, modifier = Modifier.weight(1f)) { Text("Plan a Meal") }
