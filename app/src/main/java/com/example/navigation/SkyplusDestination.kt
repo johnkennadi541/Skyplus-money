@@ -82,6 +82,8 @@ sealed interface SkyplusRoute {
 
   @Serializable data object EmiCalculator : SkyplusRoute
 
+  @Serializable data object SipCalculator : SkyplusRoute
+
   @Serializable data object SmartCalculator : SkyplusRoute
 
   @Serializable data class InvestmentDetail(val holdingId: String) : SkyplusRoute
