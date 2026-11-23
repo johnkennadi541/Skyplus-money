@@ -341,6 +341,7 @@ fun InvestmentFormDialog(
           }
           SmartCalculatorAmountDialog(
             initialExpression = initialExpression,
+            decimalScale = Money.resolveFractionDigits(selectedCurrency),
             onApply = { calculatedAmount ->
               when (target) {
                 "buy" -> purchasePriceText = calculatedAmount
