@@ -60,7 +60,7 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          REPORT=app/build/test-results/testDebugUnitTest/TEST-com.example.SavingsGoalMigration8To9Test.xml
+          REPORT=app/build/test-results/testDebugUnitTest/TEST-com.example.SavingsGoalRoomMigrationIntegrationTest.xml
           if [ ! -f "$REPORT" ]; then
             echo "::error::Room migration integration test report is missing: $REPORT"
             exit 1
@@ -76,7 +76,7 @@ jobs:
           failures = int(suite.attrib.get("failures", "0"))
           errors = int(suite.attrib.get("errors", "0"))
           skipped = int(suite.attrib.get("skipped", "0"))
-          name = suite.attrib.get("name", "SavingsGoalMigration8To9Test")
+          name = suite.attrib.get("name", "SavingsGoalRoomMigrationIntegrationTest")
           line = (
               f"Room migration integration test ({name}): "
               f"tests={tests} failures={failures} errors={errors} skipped={skipped}"
