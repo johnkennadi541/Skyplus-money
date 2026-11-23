@@ -44,9 +44,6 @@ class MainActivity : ComponentActivity() {
     if (intent.getBooleanExtra(EXTRA_OPEN_CREDIT_CARDS, false)) {
       openCardsRequest = System.currentTimeMillis()
     }
-    if (intent.getBooleanExtra(EXTRA_OPEN_CREDIT_CARDS, false)) {
-      openCardsRequest = System.currentTimeMillis()
-    }
     enableEdgeToEdge()
     setContent {
       val authViewModel: AuthViewModel = hiltViewModel()
@@ -105,6 +102,9 @@ class MainActivity : ComponentActivity() {
     setIntent(intent)
     if (intent.getBooleanExtra(EXTRA_OPEN_DAILY_REPORT, false)) {
       openReportsRequest = System.currentTimeMillis()
+    }
+    if (intent.getBooleanExtra(EXTRA_OPEN_CREDIT_CARDS, false)) {
+      openCardsRequest = System.currentTimeMillis()
     }
   }
 
