@@ -124,6 +124,63 @@ class Phase2DeduplicationRemediationTest {
   }
 
   @Test
+  fun `does not guess the only same-currency account when SMS has no account reference`() = runTest {
+    accountRepo.createAccount(
+      uid,
+      FinancialAccount(
+        id = "acc_kwd",
+        userId = uid,
+        name = "KWD Bank",
+        type = AccountType.BANK,
+        currencyCode = "KWD",
+        initialBalanceMinor = 100_000L,
+        currentBalanceMinor = 100_000L,
+        accountNumberLast4 = "5555",
+      ),
+    )
+    val parsed = ParsedFinancialMessage(
+      amountMinor = 1_250L,
+      currencyCode = "KWD",
+      type = TransactionType.EXPENSE,
+      status = TransactionStatus.COMPLETED,
+      merchantOrPayee = "Market",
+      accountLast4Hint = null,
+      referenceId = "KWDREF12345",
+      confidenceScore = 0.95f,
+      confidenceLevel = DetectionConfidence.HIGH,
+      confidenceReasons = listOf("test"),
+      timestamp = 1_700_000_000_000L,
+    )
+
+    val event = detectionRepo.processIncomingEvent(uid, "com.android.messaging", "Bank", parsed).getOrThrow()
+
+    assertEquals(DetectionEventStatus.IN_REVIEW, event.status)
+    assertEquals(100_000L, accountRepo.getAccountById(uid, "acc_kwd")!!.currentBalanceMinor)
+  }
+
+  @Test
+  fun `transfer detections are not posted as one-sided automatic ledger entries`() = runTest {
+    val parsed = ParsedFinancialMessage(
+      amountMinor = 10_000L,
+      currencyCode = "INR",
+      type = TransactionType.TRANSFER,
+      status = TransactionStatus.COMPLETED,
+      merchantOrPayee = "Own Account",
+      accountLast4Hint = "4321",
+      referenceId = "TRF12345678",
+      confidenceScore = 0.99f,
+      confidenceLevel = DetectionConfidence.HIGH,
+      confidenceReasons = listOf("test"),
+      timestamp = 1_700_000_000_000L,
+    )
+
+    val event = detectionRepo.processIncomingEvent(uid, "com.android.messaging", "Bank", parsed).getOrThrow()
+
+    assertEquals(DetectionEventStatus.IN_REVIEW, event.status)
+    assertEquals(500_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
+  }
+
+  @Test
   fun `same merchant and amount with different reference IDs within 10 minutes both auto-save`() = runTest {
     val t1 = SmartTransactionParser.parse("Rs. 150.00 debited from A/c XX4321 paid to Starbucks Ref REF111111", "com.phonepe.app", 1_700_000_000_000L)!!
     val t2 = SmartTransactionParser.parse("Rs. 150.00 debited from A/c XX4321 paid to Starbucks Ref REF222222", "com.phonepe.app", 1_700_000_120_000L)!!
