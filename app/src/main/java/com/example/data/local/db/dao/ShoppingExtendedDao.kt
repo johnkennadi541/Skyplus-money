@@ -33,6 +33,9 @@ interface ShoppingExtendedDao {
   @Query("SELECT * FROM shopping_meal_ingredients WHERE userId = :userId AND mealPlanId = :mealPlanId ORDER BY name COLLATE NOCASE ASC")
   fun observeMealIngredients(userId: String, mealPlanId: String): Flow<List<ShoppingMealIngredientEntity>>
 
+  @Query("SELECT * FROM shopping_meal_ingredients WHERE userId = :userId AND mealPlanId = :mealPlanId ORDER BY name COLLATE NOCASE ASC")
+  suspend fun getMealIngredients(userId: String, mealPlanId: String): List<ShoppingMealIngredientEntity>
+
   @Insert(onConflict = OnConflictStrategy.ABORT)
   suspend fun insertMealPlan(plan: ShoppingMealPlanEntity)
 
