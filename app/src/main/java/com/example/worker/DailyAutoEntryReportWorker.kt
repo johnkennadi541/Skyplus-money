@@ -91,6 +91,7 @@ class DailyAutoEntryReportWorker @AssistedInject constructor(
         .setContentIntent(pendingIntent)
         .setAutoCancel(true)
         .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+        .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
         .build()
       NotificationManagerCompat.from(applicationContext).notify(NOTIFICATION_ID, notification)
     }
