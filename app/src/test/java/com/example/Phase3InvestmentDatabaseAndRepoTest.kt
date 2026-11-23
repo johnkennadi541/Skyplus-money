@@ -384,6 +384,73 @@ class Phase3InvestmentDatabaseAndRepoTest {
   }
 
   @Test
+  fun `complete sale closes holding and a later new buy reopens it without changing old ledger rows`() = runTest {
+    val repo = buildRepo(
+      AmfiMfApiMarketPriceDataSource(fakeCallFactory { throw IOException("offline") }, testDispatchers)
+    )
+    val uid = "uid_complete_exit"
+    val purchaseDate = System.currentTimeMillis() - 5_000L
+    val holding = repo.createHoldingWithInitialBuy(
+      authenticatedUserId = uid,
+      name = "Complete Exit Test",
+      category = InvestmentCategory.STOCKS,
+      symbolOrTicker = "EXIT",
+      isin = null,
+      brokerOrPlatform = null,
+      currencyCode = "INR",
+      purchaseDate = purchaseDate,
+      quantityDecimal = "10",
+      purchasePriceDecimal = "100",
+      chargesMinor = 1_000L,
+      currentMarketPriceDecimal = "105",
+      autoPriceUpdateEnabled = false,
+      notes = null,
+    ).getOrThrow()
+
+    val sellDate = purchaseDate + 1_000L
+    val sale = repo.recordSale(
+      authenticatedUserId = uid,
+      holdingId = holding.id,
+      transactionDate = sellDate,
+      quantityDecimal = "10",
+      unitPriceDecimal = "110",
+      chargesMinor = 500L,
+      notes = "Full exit",
+    ).getOrThrow()
+
+    assertEquals(110_000L, sale.grossAmountMinor)
+    assertEquals(109_500L, sale.netAmountMinor)
+    assertEquals(101_000L, sale.costBasisAllocatedMinor)
+    assertEquals(8_500L, sale.realizedPnlMinor)
+
+    val exited = repo.getHoldingById(uid, holding.id)!!
+    assertEquals("0", exited.quantityDecimal)
+    assertEquals(0L, exited.totalInvestedMinor)
+    assertEquals(0L, exited.currentValuationMinor)
+    assertEquals(8_500L, exited.realizedPnlMinor)
+    assertEquals(101_000L, exited.totalBuyCostMinor)
+
+    assertTrue(
+      "A further sale after complete exit must be rejected",
+      repo.recordSale(uid, holding.id, sellDate, "1", "110", 0L, null).isFailure,
+    )
+
+    // A later BUY is a new position; historical realized P&L and original ledger rows remain.
+    repo.recordAdditionalPurchase(uid, holding.id, sellDate, "1", "120", 0L, "Re-entry").getOrThrow()
+    val reopened = repo.getHoldingById(uid, holding.id)!!
+    assertEquals("1", reopened.quantityDecimal)
+    assertEquals(12_000L, reopened.totalInvestedMinor)
+    assertEquals(113_000L, reopened.totalBuyCostMinor)
+    assertEquals(8_500L, reopened.realizedPnlMinor)
+
+    val ledger = repo.getTransactionsForHolding(uid, holding.id).first()
+    assertEquals(3, ledger.size)
+    assertEquals(InvestmentTransactionType.BUY, ledger.first { it.notes == "Initial purchase" }.type)
+    assertEquals(InvestmentTransactionType.SELL, ledger.first { it.notes == "Full exit" }.type)
+    assertEquals(InvestmentTransactionType.BUY, ledger.first { it.notes == "Re-entry" }.type)
+  }
+
+  @Test
   fun `buy and sell transactions reject dates earlier than latest recorded transaction`() = runTest {
     val repo = buildRepo(AmfiMfApiMarketPriceDataSource(fakeCallFactory { throw IOException("offline") }, testDispatchers))
     val uid = "uid_transaction_order"
