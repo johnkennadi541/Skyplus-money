@@ -350,6 +350,50 @@ class Phase3InvestmentDatabaseAndRepoTest {
   }
 
   @Test
+  fun `rejected automatic quote is counted as an error not a manual skip`() = runTest {
+    val uid = "uid_invalid_quote_source"
+    syncPreferences.setAutoUpdateConsent(uid, true)
+    val repo =
+      buildRepo(
+        object : MarketPriceDataSource {
+          override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult =
+            MarketQuoteFetchResult.Success(
+              unitPriceDecimal = "125.00",
+              asOfMillis = System.currentTimeMillis(),
+              // A provider must never be able to label a quote as a manual price.
+              source = PriceSourceType.MANUAL,
+              providerLabel = "Unapproved source",
+            )
+        }
+      )
+    val now = System.currentTimeMillis()
+    val holding =
+      repo.createHoldingWithInitialBuy(
+        authenticatedUserId = uid,
+        name = "Guarded Mutual Fund",
+        category = InvestmentCategory.MUTUAL_FUNDS,
+        symbolOrTicker = "119598",
+        isin = null,
+        brokerOrPlatform = null,
+        currencyCode = "INR",
+        purchaseDate = now,
+        quantityDecimal = "10",
+        purchasePriceDecimal = "100.00",
+        chargesMinor = 0L,
+        currentMarketPriceDecimal = "100.00",
+        autoPriceUpdateEnabled = true,
+        notes = null,
+      ).getOrThrow()
+
+    val summary = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = true).getOrThrow()
+
+    assertEquals(0, summary.updatedCount)
+    assertEquals(0, summary.skippedManualCount)
+    assertEquals(1, summary.errorCount)
+    assertEquals("100", repo.getHoldingById(uid, holding.id)?.currentMarketPriceDecimal)
+  }
+
+  @Test
   fun `manual price update works offline and never gets overwritten automatically without explicit opt in`() = runTest {
     val repo =
       buildRepo(
