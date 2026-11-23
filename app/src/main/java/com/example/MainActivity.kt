@@ -1,9 +1,22 @@
 package com.example
 
 import android.os.Bundle
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
@@ -37,9 +50,14 @@ class MainActivity : ComponentActivity() {
 
   private var openReportsRequest by mutableStateOf(0L)
   private var openCardsRequest by mutableStateOf(0L)
+  private var isWorkspaceAuthenticated by mutableStateOf(false)
+  private var isBiometricUnlocked by mutableStateOf(false)
+  private var biometricPromptActive by mutableStateOf(false)
+  private var biometricError by mutableStateOf(false)
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
     if (intent.getBooleanExtra(EXTRA_OPEN_DAILY_REPORT, false)) {
       openReportsRequest = System.currentTimeMillis()
     }
@@ -69,14 +87,27 @@ class MainActivity : ComponentActivity() {
       val profileFirstName by settingsViewModel.profileFirstName.collectAsStateWithLifecycle()
       LaunchedEffect(authUiState.sessionState) {
         val authenticated = authUiState.sessionState as? AuthSessionState.Authenticated
+        isWorkspaceAuthenticated = authenticated != null
         if (authenticated != null) {
           settingsViewModel.bindProfile(authenticated.user.uid, authenticated.user.displayName)
+          if (!isBiometricUnlocked) requestBiometricUnlock()
+        } else {
+          isBiometricUnlocked = false
+          biometricError = false
+          biometricPromptActive = false
         }
       }
       val databaseSecurityError by databaseSecurityMonitor.securityIssue.collectAsStateWithLifecycle()
 
       SkyplusOceanTheme(themePreference = themePreference) {
-        SkyplusAuthGateRoot(
+        if (authUiState.sessionState is AuthSessionState.Authenticated && !isBiometricUnlocked) {
+          BiometricLockScreen(
+            isPromptActive = biometricPromptActive,
+            hasError = biometricError,
+            onRetry = ::requestBiometricUnlock,
+          )
+        } else {
+          SkyplusAuthGateRoot(
           authUiState = authUiState,
           openReportsRequest = openReportsRequest,
           openCardsRequest = openCardsRequest,
@@ -109,10 +140,68 @@ class MainActivity : ComponentActivity() {
               settingsViewModel.saveProfileFirstName(authenticated.user.uid, firstName)
             }
           },
-        )
+          )
+        }
       }
     }
   }
+
+  override fun onStart() {
+    super.onStart()
+    if (isWorkspaceAuthenticated && !isBiometricUnlocked) requestBiometricUnlock()
+  }
+
+  override fun onStop() {
+    if (isWorkspaceAuthenticated) {
+      isBiometricUnlocked = false
+      biometricPromptActive = false
+    }
+    super.onStop()
+  }
+
+  private fun requestBiometricUnlock() {
+    if (!isWorkspaceAuthenticated || isBiometricUnlocked || biometricPromptActive) return
+    val authenticators =
+      BiometricManager.Authenticators.BIOMETRIC_STRONG or
+        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+    val availability = BiometricManager.from(this).canAuthenticate(authenticators)
+    if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
+      biometricError = true
+      return
+    }
+
+    biometricError = false
+    biometricPromptActive = true
+    val prompt =
+      BiometricPrompt(
+        this,
+        ContextCompat.getMainExecutor(this),
+        object : BiometricPrompt.AuthenticationCallback() {
+          override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+            biometricPromptActive = false
+            biometricError = false
+            isBiometricUnlocked = true
+          }
+
+          override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+            biometricPromptActive = false
+            biometricError = true
+          }
+
+          override fun onAuthenticationFailed() {
+            biometricError = true
+          }
+        },
+      )
+    val promptInfo =
+      BiometricPrompt.PromptInfo.Builder()
+        .setTitle("Unlock SKYPLUS MONEY")
+        .setSubtitle("Verify your identity to access the entire financial app")
+        .setAllowedAuthenticators(authenticators)
+        .build()
+    prompt.authenticate(promptInfo)
+  }
+
   override fun onNewIntent(intent: android.content.Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
@@ -127,5 +216,38 @@ class MainActivity : ComponentActivity() {
   companion object {
     const val EXTRA_OPEN_DAILY_REPORT = "com.skyplus.money.OPEN_DAILY_AUTO_ENTRY_REPORT"
     const val EXTRA_OPEN_CREDIT_CARDS = "com.skyplus.money.OPEN_CREDIT_CARDS"
+  }
+}
+
+
+@androidx.compose.runtime.Composable
+private fun BiometricLockScreen(
+  isPromptActive: Boolean,
+  hasError: Boolean,
+  onRetry: () -> Unit,
+) {
+  Column(
+    modifier = Modifier.fillMaxSize().padding(24.dp),
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.Center,
+  ) {
+    Text(
+      text = "SKYPLUS MONEY is locked",
+      style = MaterialTheme.typography.headlineSmall,
+      color = MaterialTheme.colorScheme.onBackground,
+    )
+    Text(
+      text = if (hasError) {
+        "Authentication was not completed. Retry with your fingerprint or device screen lock."
+      } else {
+        "Verify your identity to open your financial workspace."
+      },
+      style = MaterialTheme.typography.bodyMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.padding(vertical = 16.dp),
+    )
+    Button(onClick = onRetry, enabled = !isPromptActive) {
+      Text(if (isPromptActive) "Waiting for verification…" else "Unlock App")
+    }
   }
 }
