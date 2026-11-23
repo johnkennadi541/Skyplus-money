@@ -71,7 +71,7 @@ class GoogleDriveBackupApiTest {
   }
 
   @Test(expected = IllegalArgumentException::class)
-  fun `Drive API refuses empty access tokens`() = runBlocking {
+  fun `Drive API refuses empty access tokens`(): Unit = runBlocking {
     GoogleDriveBackupApi(OkHttpClient(), "http://localhost")
       .downloadEncryptedBackup("")
   }
