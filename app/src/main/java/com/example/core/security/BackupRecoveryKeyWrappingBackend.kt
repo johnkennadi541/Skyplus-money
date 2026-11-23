@@ -44,8 +44,14 @@ class BackupRecoveryKeyWrappingBackend : KeyWrappingBackend {
     cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
     cipher.updateAAD(AAD)
     val ciphertext = cipher.doFinal(raw)
-    return Base64.encodeToString(ciphertext, Base64.NO_WRAP) to
-      Base64.encodeToString(cipher.iv, Base64.NO_WRAP)
+    val iv = cipher.iv
+    return try {
+      Base64.encodeToString(ciphertext, Base64.NO_WRAP) to
+        Base64.encodeToString(iv, Base64.NO_WRAP)
+    } finally {
+      ciphertext.fill(0)
+      iv.fill(0)
+    }
   }
 
   override fun decrypt(encryptedBase64: String, ivBase64: String): ByteArray {
@@ -56,15 +62,20 @@ class BackupRecoveryKeyWrappingBackend : KeyWrappingBackend {
     val key = (keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.secretKey
       ?: throw UnrecoverableKeyException("Recovery-key Keystore entry is invalid")
     val iv = Base64.decode(ivBase64, Base64.NO_WRAP)
-    require(iv.size == GCM_IV_BYTES) { "Recovery-key IV is invalid" }
     val ciphertext = Base64.decode(encryptedBase64, Base64.NO_WRAP)
-    require(ciphertext.size == RECOVERY_KEY_BYTES + GCM_TAG_BYTES) {
-      "Wrapped recovery-key ciphertext has an invalid length"
+    try {
+      require(iv.size == GCM_IV_BYTES) { "Recovery-key IV is invalid" }
+      require(ciphertext.size == RECOVERY_KEY_BYTES + GCM_TAG_BYTES) {
+        "Wrapped recovery-key ciphertext has an invalid length"
+      }
+      val cipher = Cipher.getInstance(TRANSFORMATION)
+      cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, iv))
+      cipher.updateAAD(AAD)
+      return cipher.doFinal(ciphertext)
+    } finally {
+      iv.fill(0)
+      ciphertext.fill(0)
     }
-    val cipher = Cipher.getInstance(TRANSFORMATION)
-    cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, iv))
-    cipher.updateAAD(AAD)
-    return cipher.doFinal(ciphertext)
   }
 
   private companion object {
