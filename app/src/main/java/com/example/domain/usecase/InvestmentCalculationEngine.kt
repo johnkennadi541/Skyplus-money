@@ -302,6 +302,8 @@ class InvestmentCalculationEngine @Inject constructor() {
           .toPlainString()
       }
 
+    // A missing first quote is "awaiting price", not a stale observation. Only a
+    // previously recorded quote can become stale after the seven-day threshold.
     val isStale =
       !isExited &&
         holding.category.isMarketTraded &&
