@@ -104,6 +104,36 @@ class Phase3InvestmentDatabaseAndRepoTest {
     }
 
   @Test
+  fun `new investment holdings reject non INR currencies`() = runTest {
+    val repo = buildRepo(
+      object : MarketPriceDataSource {
+        override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult =
+          MarketQuoteFetchResult.UnsupportedCategoryOrIdentifier("manual only")
+      }
+    )
+    val result =
+      repo.createHoldingWithInitialBuy(
+        authenticatedUserId = "uid_india_only",
+        name = "Non-India Asset",
+        category = InvestmentCategory.STOCKS,
+        symbolOrTicker = "ABC",
+        isin = null,
+        brokerOrPlatform = null,
+        currencyCode = "USD",
+        purchaseDate = System.currentTimeMillis(),
+        quantityDecimal = "1",
+        purchasePriceDecimal = "10",
+        chargesMinor = 0L,
+        currentMarketPriceDecimal = null,
+        autoPriceUpdateEnabled = false,
+        notes = null,
+      )
+
+    assertTrue(result.isFailure)
+    assertTrue(db.investmentDao().getAllHoldingsSync("uid_india_only").isEmpty())
+  }
+
+  @Test
   fun `market sync preferences are isolated by authenticated UID`() = runTest {
     syncPreferences.setAutoUpdateConsent("uid_market_a", true)
     syncPreferences.setSyncOnlyOnWifi("uid_market_a", false)
@@ -333,8 +363,8 @@ class Phase3InvestmentDatabaseAndRepoTest {
         source = PriceSourceType.MFAPI_AMFI_EOD,
         providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
         allowOverwriteManual = false,
-      ).getOrThrow()
-    assertFalse(overwrittenWhenDisabled)
+      )
+    assertTrue("Direct quote application must also enforce global opt-in", overwrittenWhenDisabled.isFailure)
     assertEquals("95.5", repo.getHoldingById("uid_man", mfHolding.id)?.currentMarketPriceDecimal)
 
     // Now user explicitly opts in globally AND per holding -> sync succeeds cleanly!
