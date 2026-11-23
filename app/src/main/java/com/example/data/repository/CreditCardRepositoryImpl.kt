@@ -5,10 +5,18 @@ import androidx.room.withTransaction
 import com.example.core.common.DispatcherProvider
 import com.example.data.local.db.AppDatabase
 import com.example.data.local.db.dao.CreditCardDao
+import com.example.data.local.db.dao.CreditCardStatementDao
+import com.example.data.local.db.dao.CreditCardRewardEventDao
 import com.example.data.local.db.dao.FinancialAccountDao
 import com.example.data.local.db.entity.CreditCardEntity
+import com.example.data.local.db.entity.CreditCardStatementEntity
+import com.example.data.local.db.entity.CreditCardRewardEventEntity
 import com.example.domain.model.AccountType
 import com.example.domain.model.CreditCard
+import com.example.domain.model.CreditCardStatement
+import com.example.domain.model.CreditCardRewardEvent
+import com.example.domain.model.CreditCardStatementValidation
+import com.example.domain.model.CreditCardRewardValidation
 import com.example.domain.model.CreditCardNetwork
 import com.example.domain.model.CreditCardValidation
 import com.example.domain.model.DuplicateCreditCardException
@@ -26,6 +34,8 @@ class CreditCardRepositoryImpl
 constructor(
   private val database: AppDatabase,
   private val creditCardDao: CreditCardDao,
+  private val statementDao: CreditCardStatementDao,
+  private val rewardEventDao: CreditCardRewardEventDao,
   private val accountDao: FinancialAccountDao,
   private val dispatchers: DispatcherProvider,
 ) : CreditCardRepository {
@@ -125,11 +135,142 @@ constructor(
               billingCycleDay = card.billingCycleDay,
               paymentDueDayOffset = card.paymentDueDayOffset,
               aprPercent = card.aprPercent,
+              annualFeeMinor = card.annualFeeMinor,
+              annualFeeMonth = card.annualFeeMonth,
+              rewardProgramName = card.rewardProgramName,
               isActive = card.isActive,
+              isFrozen = card.isFrozen,
+              reminderEnabled = card.reminderEnabled,
+              reminderDaysBefore = card.reminderDaysBefore,
+              notes = card.notes,
               updatedAt = System.currentTimeMillis(),
             )
           check(rows == 1) { "Card update rejected for authenticated user" }
         }
+      }
+    }
+
+  override fun observeStatements(userId: String, cardId: String): Flow<List<CreditCardStatement>> =
+    statementDao.observeStatements(userId, cardId)
+      .map { list -> list.map { it.toDomain() } }
+      .flowOn(dispatchers.io)
+
+  override suspend fun createStatement(
+    authenticatedUserId: String,
+    statement: CreditCardStatement,
+  ): Result<CreditCardStatement> =
+    withContext(dispatchers.io) {
+      runCatchingPreservingCancellation {
+        CreditCardStatementValidation.requireValid(statement, authenticatedUserId)
+        database.withTransaction {
+          val card = creditCardDao.getCardById(authenticatedUserId, statement.cardId)
+            ?: throw SecurityException("Statement card does not belong to authenticated user")
+          require(card.currencyCode.equals(statement.currencyCode, ignoreCase = true)) {
+            "Statement currency must match the linked card"
+          }
+          val now = System.currentTimeMillis()
+          val scoped = statement.copy(userId = authenticatedUserId, createdAt = now, updatedAt = now)
+          statementDao.insertStatement(CreditCardStatementEntity.fromDomain(scoped))
+          scoped
+        }
+      }
+    }
+
+  override suspend fun updateStatement(
+    authenticatedUserId: String,
+    statement: CreditCardStatement,
+  ): Result<Unit> =
+    withContext(dispatchers.io) {
+      runCatchingPreservingCancellation {
+        CreditCardStatementValidation.requireValid(statement, authenticatedUserId)
+        database.withTransaction {
+          val existing = statementDao.getStatementById(authenticatedUserId, statement.id)
+            ?: throw SecurityException("Statement does not belong to authenticated user")
+          require(existing.cardId == statement.cardId) { "A statement cannot be moved to another card" }
+          val card = creditCardDao.getCardById(authenticatedUserId, statement.cardId)
+            ?: throw SecurityException("Statement card does not belong to authenticated user")
+          require(card.currencyCode.equals(statement.currencyCode, ignoreCase = true)) {
+            "Statement currency must match the linked card"
+          }
+          val rows = statementDao.updateStatementScoped(
+            id = existing.id,
+            userId = authenticatedUserId,
+            cardId = existing.cardId,
+            statementDate = statement.statementDate,
+            dueDate = statement.dueDate,
+            statementBalanceMinor = statement.statementBalanceMinor,
+            minimumDueMinor = statement.minimumDueMinor,
+            feesMinor = statement.feesMinor,
+            interestMinor = statement.interestMinor,
+            notes = statement.notes,
+            updatedAt = System.currentTimeMillis(),
+          )
+          check(rows == 1) { "Statement update rejected for authenticated user" }
+        }
+      }
+    }
+
+  override suspend fun deleteStatement(userId: String, statementId: String): Result<Unit> =
+    withContext(dispatchers.io) {
+      runCatchingPreservingCancellation {
+        require(userId.isNotBlank()) { "Authenticated user ID is required" }
+        val existing = statementDao.getStatementById(userId, statementId)
+          ?: throw SecurityException("Statement does not belong to authenticated user")
+        require(existing.userId == userId) { "Statement ownership verification failed" }
+        check(statementDao.deleteStatement(userId, statementId) == 1) {
+          "Statement deletion rejected for authenticated user"
+        }
+      }
+    }
+
+  override fun observeRewardEvents(userId: String, cardId: String): Flow<List<CreditCardRewardEvent>> =
+    rewardEventDao.observeEvents(userId, cardId)
+      .map { list -> list.map { it.toDomain() } }
+      .flowOn(dispatchers.io)
+
+  override suspend fun addRewardEvent(
+    authenticatedUserId: String,
+    event: CreditCardRewardEvent,
+  ): Result<CreditCardRewardEvent> =
+    withContext(dispatchers.io) {
+      runCatchingPreservingCancellation {
+        CreditCardRewardValidation.requireValid(event, authenticatedUserId)
+        database.withTransaction {
+          val card = creditCardDao.getCardById(authenticatedUserId, event.cardId)
+            ?: throw SecurityException("Reward card does not belong to authenticated user")
+          require(card.currencyCode.equals(event.currencyCode, ignoreCase = true)) {
+            "Reward currency must match the linked card"
+          }
+          val currentPoints = rewardEventDao.getPointsBalance(authenticatedUserId, event.cardId)
+          val nextPoints = Math.addExact(currentPoints, event.pointsDelta)
+          require(nextPoints >= 0L) { "Reward redemption cannot exceed the available points balance" }
+          val scoped = event.copy(userId = authenticatedUserId, createdAt = System.currentTimeMillis())
+          rewardEventDao.insertEvent(CreditCardRewardEventEntity.fromDomain(scoped))
+          scoped
+        }
+      }
+    }
+
+  override suspend fun getRewardPointsBalance(userId: String, cardId: String): Long =
+    withContext(dispatchers.io) {
+      require(userId.isNotBlank()) { "Authenticated user ID is required" }
+      require(creditCardDao.getCardById(userId, cardId) != null) {
+        "Card does not belong to authenticated user"
+      }
+      rewardEventDao.getPointsBalance(userId, cardId)
+    }
+
+  override suspend fun setCardFrozen(
+    userId: String,
+    cardId: String,
+    isFrozen: Boolean,
+  ): Result<Unit> =
+    withContext(dispatchers.io) {
+      runCatchingPreservingCancellation {
+        require(userId.isNotBlank()) { "Authenticated user ID is required" }
+        val existing = creditCardDao.getCardById(userId, cardId)?.toDomain()
+          ?: throw SecurityException("Card does not belong to authenticated user")
+        updateCard(userId, existing.copy(isFrozen = isFrozen)).getOrThrow()
       }
     }
 
