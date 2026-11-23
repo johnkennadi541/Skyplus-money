@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.core.designsystem.theme.SkyplusOceanTheme
+import com.example.core.security.AppLockState
 import com.example.core.security.DatabaseSecurityMonitor
 import com.example.domain.model.AuthSessionState
 import com.example.feature.accounts.AccountsViewModel
@@ -50,8 +51,7 @@ class MainActivity : ComponentActivity() {
 
   private var openReportsRequest by mutableStateOf(0L)
   private var openCardsRequest by mutableStateOf(0L)
-  private var isWorkspaceAuthenticated by mutableStateOf(false)
-  private var isBiometricUnlocked by mutableStateOf(false)
+  private var appLockState by mutableStateOf(AppLockState())
   private var biometricPromptActive by mutableStateOf(false)
   private var biometricError by mutableStateOf(false)
 
@@ -87,12 +87,11 @@ class MainActivity : ComponentActivity() {
       val profileFirstName by settingsViewModel.profileFirstName.collectAsStateWithLifecycle()
       LaunchedEffect(authUiState.sessionState) {
         val authenticated = authUiState.sessionState as? AuthSessionState.Authenticated
-        isWorkspaceAuthenticated = authenticated != null
+        appLockState = appLockState.onAuthenticationChanged(authenticated != null)
         if (authenticated != null) {
           settingsViewModel.bindProfile(authenticated.user.uid, authenticated.user.displayName)
-          if (!isBiometricUnlocked) requestBiometricUnlock()
+          if (appLockState.requiresUnlock) requestBiometricUnlock()
         } else {
-          isBiometricUnlocked = false
           biometricError = false
           biometricPromptActive = false
         }
@@ -100,7 +99,7 @@ class MainActivity : ComponentActivity() {
       val databaseSecurityError by databaseSecurityMonitor.securityIssue.collectAsStateWithLifecycle()
 
       SkyplusOceanTheme(themePreference = themePreference) {
-        if (authUiState.sessionState is AuthSessionState.Authenticated && !isBiometricUnlocked) {
+        if (appLockState.requiresUnlock) {
           BiometricLockScreen(
             isPromptActive = biometricPromptActive,
             hasError = biometricError,
@@ -148,19 +147,19 @@ class MainActivity : ComponentActivity() {
 
   override fun onStart() {
     super.onStart()
-    if (isWorkspaceAuthenticated && !isBiometricUnlocked) requestBiometricUnlock()
+    if (appLockState.requiresUnlock) requestBiometricUnlock()
   }
 
   override fun onStop() {
-    if (isWorkspaceAuthenticated) {
-      isBiometricUnlocked = false
+    if (appLockState.isAuthenticated) {
+      appLockState = appLockState.onBackground()
       biometricPromptActive = false
     }
     super.onStop()
   }
 
   private fun requestBiometricUnlock() {
-    if (!isWorkspaceAuthenticated || isBiometricUnlocked || biometricPromptActive) return
+    if (!appLockState.requiresUnlock || biometricPromptActive) return
     val authenticators =
       BiometricManager.Authenticators.BIOMETRIC_STRONG or
         BiometricManager.Authenticators.DEVICE_CREDENTIAL
@@ -180,7 +179,7 @@ class MainActivity : ComponentActivity() {
           override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
             biometricPromptActive = false
             biometricError = false
-            isBiometricUnlocked = true
+            appLockState = appLockState.onUnlockSucceeded()
           }
 
           override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
