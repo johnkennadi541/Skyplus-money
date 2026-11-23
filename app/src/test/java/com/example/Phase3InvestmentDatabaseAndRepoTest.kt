@@ -12,6 +12,7 @@ import com.example.data.local.db.DatabaseMigrations
 import com.example.data.remote.AmfiMfApiMarketPriceDataSource
 import com.example.data.repository.InvestmentRepositoryImpl
 import com.example.domain.model.InvestmentCategory
+import com.example.domain.model.InvestmentTransactionType
 import com.example.domain.model.PriceSourceType
 import com.example.domain.repository.MarketPriceDataSource
 import com.example.domain.repository.MarketQuoteFetchResult
