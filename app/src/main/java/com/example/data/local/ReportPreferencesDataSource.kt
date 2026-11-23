@@ -6,9 +6,11 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.domain.model.EmailReportSettings
+import com.example.domain.model.DailyAutoEntryReportSettings
 import com.example.domain.model.ReportFrequency
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -36,6 +38,33 @@ class ReportPreferencesDataSource @Inject constructor(
   private fun recipientKey(userId: String) = stringPreferencesKey("${userId}_email_report_recipient")
 
   private fun lastPreparedKey(userId: String) = longPreferencesKey("${userId}_email_report_last_prepared")
+
+
+  private fun dailyEnabledKey(userId: String) = booleanPreferencesKey("${userId}_daily_auto_entry_report_enabled")
+
+  private fun dailyHourKey(userId: String) = intPreferencesKey("${userId}_daily_auto_entry_report_hour")
+
+  private fun dailyMinuteKey(userId: String) = intPreferencesKey("${userId}_daily_auto_entry_report_minute")
+
+  fun observeDailyAutoEntrySettings(userId: String): Flow<DailyAutoEntryReportSettings> {
+    if (userId.isBlank()) return flowOf(DailyAutoEntryReportSettings())
+    return context.reportPreferencesDataStore.data.map { prefs ->
+      DailyAutoEntryReportSettings(
+        enabled = prefs[dailyEnabledKey(userId)] ?: false,
+        hourOfDay = (prefs[dailyHourKey(userId)] ?: 21).coerceIn(0, 23),
+        minute = (prefs[dailyMinuteKey(userId)] ?: 0).coerceIn(0, 59),
+      )
+    }
+  }
+
+  suspend fun setDailyAutoEntrySettings(userId: String, settings: DailyAutoEntryReportSettings) {
+    if (userId.isBlank()) return
+    context.reportPreferencesDataStore.edit { prefs ->
+      prefs[dailyEnabledKey(userId)] = settings.enabled
+      prefs[dailyHourKey(userId)] = settings.hourOfDay
+      prefs[dailyMinuteKey(userId)] = settings.minute
+    }
+  }
 
   fun observeSettings(userId: String): Flow<EmailReportSettings> {
     if (userId.isBlank()) return flowOf(EmailReportSettings())
