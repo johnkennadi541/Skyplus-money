@@ -379,6 +379,20 @@ class Phase3InvestmentDatabaseAndRepoTest {
     assertEquals(1, fetchCount)
     assertEquals(1, optedIn.updatedCount)
     assertEquals("125", repo.getHoldingById(uid, holding.id)?.currentMarketPriceDecimal)
+
+    // Revoking global consent blocks direct quote application even after per-holding opt-in.
+    repo.setAutoUpdateConsent(uid, false)
+    val blockedAfterGlobalOptOut =
+      repo.applyAutomaticMarketPrice(
+        authenticatedUserId = uid,
+        holdingId = holding.id,
+        newUnitPriceDecimal = "130.00",
+        priceDate = System.currentTimeMillis(),
+        source = PriceSourceType.MFAPI_AMFI_EOD,
+        providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
+      )
+    assertTrue(blockedAfterGlobalOptOut.isFailure)
+    assertEquals("125", repo.getHoldingById(uid, holding.id)?.currentMarketPriceDecimal)
   }
 
   @Test
