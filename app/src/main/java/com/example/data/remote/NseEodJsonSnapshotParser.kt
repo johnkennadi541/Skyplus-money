@@ -32,23 +32,30 @@ internal object NseEodJsonSnapshotParser {
   ): NseEodJsonSnapshot {
     require(rawJson.isNotBlank()) { "EOD snapshot is empty" }
     val root =
-      runCatching { json.parseToJsonElement(rawJson).jsonObject }
-        .getOrElse { throw IllegalArgumentException("EOD snapshot is not valid JSON", it) }
+      try {
+        json.parseToJsonElement(rawJson).jsonObject
+      } catch (error: Exception) {
+        throw IllegalArgumentException("EOD snapshot is not valid JSON", error)
+      }
 
     val asOfText = root["asOf"]?.jsonPrimitive?.content
       ?: throw IllegalArgumentException("EOD snapshot is missing asOf date")
     val asOf =
-      runCatching { LocalDate.parse(asOfText) }
-        .getOrElse { throw IllegalArgumentException("EOD snapshot has an invalid asOf date", it) }
+      try {
+        LocalDate.parse(asOfText)
+      } catch (error: java.time.format.DateTimeParseException) {
+        throw IllegalArgumentException("EOD snapshot has an invalid asOf date", error)
+      }
     require(!asOf.isAfter(today)) { "EOD snapshot date is in the future" }
 
     val generatedAtText = root["generatedAt"]?.jsonPrimitive?.content
       ?: throw IllegalArgumentException("EOD snapshot is missing generatedAt timestamp")
     val generatedAt =
-      runCatching { OffsetDateTime.parse(generatedAtText) }
-        .getOrElse {
-          throw IllegalArgumentException("EOD snapshot has an invalid generatedAt timestamp", it)
-        }
+      try {
+        OffsetDateTime.parse(generatedAtText)
+      } catch (error: java.time.format.DateTimeParseException) {
+        throw IllegalArgumentException("EOD snapshot has an invalid generatedAt timestamp", error)
+      }
     require(!generatedAt.toInstant().isAfter(now.plusSeconds(FUTURE_CLOCK_SKEW_SECONDS))) {
       "EOD snapshot generatedAt timestamp is in the future"
     }
