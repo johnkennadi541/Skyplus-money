@@ -1,6 +1,5 @@
 package com.example.feature.shopping
 
-import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
@@ -45,7 +44,7 @@ fun ShoppingReceiptCaptureAction(
           .addOnSuccessListener { result ->
             val draft = ShoppingReceiptParser.parse(result.text)
             if (draft.totalDecimal == null) error = draft.warnings.joinToString(" ")
-            else onReceiptReady(draft)
+            onReceiptReady(draft)
           }
           .addOnFailureListener { error = "Could not read receipt. Try a clearer photo." }
           .addOnCompleteListener { recognizer.close() }
