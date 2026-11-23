@@ -22,6 +22,7 @@ import com.example.domain.usecase.ObserveCreditCardSpendingAnalyticsUseCase
 import com.example.domain.usecase.DeleteCreditCardUseCase
 import com.example.domain.usecase.ObserveCreditCardsUseCase
 import com.example.domain.usecase.UpdateCreditCardUseCase
+import com.example.worker.CreditCardReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -47,12 +48,22 @@ constructor(
   observeCreditCardsUseCase: ObserveCreditCardsUseCase,
   private val observeStatementSummariesUseCase: ObserveCreditCardStatementSummariesUseCase,
   private val observeSpendingAnalyticsUseCase: ObserveCreditCardSpendingAnalyticsUseCase,
+  private val creditCardReminderScheduler: CreditCardReminderScheduler,
   private val createCreditCardUseCase: CreateCreditCardUseCase,
   private val updateCreditCardUseCase: UpdateCreditCardUseCase,
   private val deleteCreditCardUseCase: DeleteCreditCardUseCase,
 ) : ViewModel() {
 
   private val _selectedCardId = MutableStateFlow<String?>(null)
+
+  init {
+    viewModelScope.launch {
+      authRepository.observeAuthSession().collect { session ->
+        val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+        if (!uid.isNullOrBlank()) creditCardReminderScheduler.updateSchedule(uid)
+      }
+    }
+  }
 
   private val _userMessage = MutableStateFlow<String?>(null)
   val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
