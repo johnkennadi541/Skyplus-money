@@ -74,10 +74,12 @@ import com.example.domain.model.ShoppingItemComparisonSummary
 import com.example.domain.model.ShoppingList
 import com.example.domain.model.ShoppingListItem
 import com.example.domain.model.ShoppingListSummary
+import com.example.domain.model.ShoppingReceipt
 import com.example.domain.usecase.FormatMoneyUseCase
 import com.example.domain.usecase.ShoppingCalculationEngine
 import com.example.domain.usecase.ShoppingWorkspaceSnapshot
 import com.example.domain.usecase.ShoppingInputParser
+import com.example.domain.usecase.ShoppingReceiptDraft
 import com.example.domain.usecase.ShoppingItemDraft
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -131,6 +133,18 @@ fun ShoppingListScreen(
       viewModel.recordStorePrice(itemId, storeName, unitPrice, recordedAt, notes)
     },
     onDeleteStorePrice = { priceId -> viewModel.deleteStorePrice(priceId) },
+    onPostReceiptExpense = { draft, accountId, currencyCode, totalMinor, merchant ->
+      val receipt = ShoppingReceipt(
+        userId = "pending",
+        fingerprint = draft.fingerprint,
+        merchant = merchant,
+        currencyCode = currencyCode,
+        totalMinor = totalMinor,
+      )
+      viewModel.saveReceiptReview(receipt) { saved ->
+        viewModel.postReceiptExpense(saved.id, accountId)
+      }
+    },
     modifier = modifier,
   )
 }
@@ -158,6 +172,7 @@ fun ShoppingListContent(
   onDeleteItem: (String, () -> Unit) -> Unit = { _, _ -> },
   onRecordStorePrice: (String, String, String, Long, String?) -> Unit = { _, _, _, _, _ -> },
   onDeleteStorePrice: (String) -> Unit = {},
+  onPostReceiptExpense: (ShoppingReceiptDraft, String, String, Long, String?) -> Unit = { _, _, _, _, _ -> },
   modifier: Modifier = Modifier,
 ) {
   val formatMoneyUseCase = remember { FormatMoneyUseCase() }
@@ -173,6 +188,7 @@ fun ShoppingListContent(
   var itemToDelete by remember { mutableStateOf<ShoppingListItem?>(null) }
   var compareItemId by remember { mutableStateOf<String?>(null) }
   var importedDrafts by remember { mutableStateOf<List<ShoppingItemDraft>>(emptyList()) }
+  var receiptDraft by remember { mutableStateOf<ShoppingReceiptDraft?>(null) }
 
   val lists = workspace.lists
   val activeList = remember(lists, selectedListId) {
@@ -254,6 +270,10 @@ fun ShoppingListContent(
     }
 
     if (activeList != null) {
+      ShoppingReceiptCaptureAction(
+        onReceiptReady = { receiptDraft = it },
+        modifier = Modifier.fillMaxWidth(),
+      )
       ShoppingCaptureActions(
         onDraftsReady = { drafts -> importedDrafts = drafts },
         modifier = Modifier.fillMaxWidth(),
@@ -529,6 +549,18 @@ fun ShoppingListContent(
             itemToEdit = null
           }
         }
+      },
+    )
+  }
+
+  receiptDraft?.let { draft ->
+    ShoppingReceiptReviewDialog(
+      draft = draft,
+      accounts = accounts,
+      onDismiss = { receiptDraft = null },
+      onConfirm = { accountId, currencyCode, totalMinor, merchant ->
+        onPostReceiptExpense(draft, accountId, currencyCode, totalMinor, merchant)
+        receiptDraft = null
       },
     )
   }
