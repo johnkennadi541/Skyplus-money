@@ -208,6 +208,29 @@ class Phase2SecurityRemediationTest {
   }
 
   @Test
+  fun `round trip verification buffer is zeroed after passphrase comparison`() {
+    val prefs = context.getSharedPreferences("passphrase_zero_${System.nanoTime()}", Context.MODE_PRIVATE)
+    val dbFile = File(context.cacheDir, "zero_key_${System.nanoTime()}.db")
+    var verificationBuffer: ByteArray? = null
+    val observingBackend =
+      object : KeyWrappingBackend {
+        override fun encrypt(raw: ByteArray): Pair<String, String> = simpleBackend.encrypt(raw)
+        override fun decrypt(encryptedBase64: String, ivBase64: String): ByteArray {
+          return simpleBackend.decrypt(encryptedBase64, ivBase64).also { verificationBuffer = it }
+        }
+      }
+
+    val returnedPassphrase =
+      DatabasePassphraseProvider(context, observingBackend, prefs) { dbFile }.getOrCreatePassphrase()
+
+    assertEquals(32, returnedPassphrase.size)
+    assertNotNull(verificationBuffer)
+    assertTrue("Temporary verification copy must be zeroed", verificationBuffer!!.all { it == 0.toByte() })
+    assertTrue("Returned passphrase remains owned by the SQLCipher caller", returnedPassphrase.any { it != 0.toByte() })
+    returnedPassphrase.fill(0)
+  }
+
+  @Test
   fun `temporary Keystore decrypt failure preserves wrapped key and recovers on retry`() {
     val prefs = context.getSharedPreferences("keystore_temp_fail_${System.nanoTime()}", Context.MODE_PRIVATE)
     val dbFile = File(context.cacheDir, "existing_db_${System.nanoTime()}.db")
