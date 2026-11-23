@@ -17,21 +17,21 @@ data class ShoppingItemDraft(
 
 object ShoppingInputParser {
   private val quantityFirst = Regex(
-    """^(\\d+(?:[.,]\\d+)?)\\s*(kg|kgs|kilo(?:gram)?s?|g|grams?|l|lit(?:re|er)s?|ml|millilit(?:re|er)s?|pieces?|pcs|packets?|packs?|boxes|box|dozen|bottles?)?\\s+(.+?)(?:\\s+(?:@|at|price)\\s*(\\d+(?:[.,]\\d{1,3})?))?$""",
+    """^(\d+(?:[.,]\d+)?)\s*(kg|kgs|kilo(?:gram)?s?|g|grams?|l|lit(?:re|er)s?|ml|millilit(?:re|er)s?|pieces?|pcs|packets?|packs?|boxes|box|dozen|bottles?)?\s+(.+?)(?:\s+(?:@|at|price)\s*(\d+(?:[.,]\d{1,3})?))?$""",
     RegexOption.IGNORE_CASE,
   )
   private val nameFirst = Regex(
-    """^(.+?)\\s+(\\d+(?:[.,]\\d+)?)\\s*(kg|kgs|kilo(?:gram)?s?|g|grams?|l|lit(?:re|er)s?|ml|millilit(?:re|er)s?|pieces?|pcs|packets?|packs?|boxes|box|dozen|bottles?)(?:\\s+(?:@|at|price)\\s*(\\d+(?:[.,]\\d{1,3})?))?$""",
+    """^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(kg|kgs|kilo(?:gram)?s?|g|grams?|l|lit(?:re|er)s?|ml|millilit(?:re|er)s?|pieces?|pcs|packets?|packs?|boxes|box|dozen|bottles?)(?:\s+(?:@|at|price)\s*(\d+(?:[.,]\d{1,3})?))?$""",
     RegexOption.IGNORE_CASE,
   )
-  private val explicitPrice = Regex("""^(.*?)\\s+(?:@|at|price)\\s*(\\d+(?:[.,]\\d{1,3})?)$""", RegexOption.IGNORE_CASE)
+  private val explicitPrice = Regex("""^(.*?)\s+(?:@|at|price)\s*(\d+(?:[.,]\d{1,3})?)$""", RegexOption.IGNORE_CASE)
 
   fun parse(text: String): List<ShoppingItemDraft> {
     if (text.isBlank()) return emptyList()
     val segments = text
-      .replace('•', '\\n')
-      .replace('\\r', '\\n')
-      .split(Regex("[\\n;,]+|\\s+(?:and|&)\\s+|\\s+மற்றும்\\s+", RegexOption.IGNORE_CASE))
+      .replace('•', '\n')
+      .replace('\r', '\n')
+      .split(Regex("[\n;,]+|\s+(?:and|&)\s+|\s+மற்றும்\s+", RegexOption.IGNORE_CASE))
       .map { it.trim().trimStart('-', '*', '•', ' ').trimEnd('.', ' ') }
       .filter { it.isNotBlank() }
 
