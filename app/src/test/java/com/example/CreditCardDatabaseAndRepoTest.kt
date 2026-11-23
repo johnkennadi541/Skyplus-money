@@ -67,6 +67,8 @@ class CreditCardDatabaseAndRepoTest {
       CreditCardRepositoryImpl(
         database = database,
         creditCardDao = database.creditCardDao(),
+        statementDao = database.creditCardStatementDao(),
+        rewardEventDao = database.creditCardRewardEventDao(),
         accountDao = database.financialAccountDao(),
         dispatchers = dispatchers,
       )
