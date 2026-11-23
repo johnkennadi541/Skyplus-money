@@ -169,7 +169,7 @@ object SmartTransactionParser {
     val lowerText = text.lowercase()
     val confidenceReasons = mutableListOf<String>()
     var confidenceScore = 0.35f // Rule 1: Valid amount + currency parsed
-    confidenceReasons.add("Valid amount ($cleanedAmount $currencyCode) parsed")
+    confidenceReasons.add("Valid amount and currency parsed")
 
     // Status detection
     val isFailed = FAILED_KEYWORDS.any { lowerText.contains(it) }
@@ -249,7 +249,7 @@ object SmartTransactionParser {
     val accountLast4Hint =
       if (accountMatcher.find()) {
         confidenceScore += 0.15f
-        confidenceReasons.add("Account hint last 4 detected: ${accountMatcher.group(1)}")
+        confidenceReasons.add("Account hint detected")
         accountMatcher.group(1)
       } else null
 
@@ -258,7 +258,7 @@ object SmartTransactionParser {
     val referenceId =
       if (refMatcher.find()) {
         confidenceScore += 0.10f
-        confidenceReasons.add("Reference ID detected: ${refMatcher.group(1)}")
+        confidenceReasons.add("Reference ID detected")
         refMatcher.group(1)
       } else null
 
@@ -276,7 +276,7 @@ object SmartTransactionParser {
         ) {
           merchantOrPayee = candidate
           confidenceScore += 0.10f
-          confidenceReasons.add("Merchant/Payee identified: $candidate")
+          confidenceReasons.add("Merchant/Payee identified")
           break
         }
       }
