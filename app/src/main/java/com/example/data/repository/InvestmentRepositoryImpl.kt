@@ -586,10 +586,6 @@ class InvestmentRepositoryImpl @Inject constructor(
               lastPriceUpdateDate = priceDate,
               lastPriceSource = PriceSourceType.MANUAL,
               lastPriceProviderLabel = "Manual",
-              // A deliberate manual override pauses NAV automation until the user opts in again.
-              autoPriceUpdateEnabled =
-                if (existing.category == InvestmentCategory.MUTUAL_FUNDS) false
-                else existing.autoPriceUpdateEnabled,
               updatedAt = now,
             )
 
