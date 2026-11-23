@@ -75,11 +75,15 @@ import com.example.domain.model.ShoppingList
 import com.example.domain.model.ShoppingListItem
 import com.example.domain.model.ShoppingListSummary
 import com.example.domain.model.ShoppingReceipt
+import com.example.domain.model.ShoppingPantryItem
+import com.example.domain.model.ShoppingMealPlan
 import com.example.domain.usecase.FormatMoneyUseCase
 import com.example.domain.usecase.ShoppingCalculationEngine
 import com.example.domain.usecase.ShoppingWorkspaceSnapshot
 import com.example.domain.usecase.ShoppingInputParser
 import com.example.domain.usecase.ShoppingReceiptDraft
+import com.example.domain.usecase.ShoppingInsightsEngine
+import com.example.domain.usecase.ShoppingPantryEngine
 import com.example.domain.usecase.ShoppingItemDraft
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -98,10 +102,16 @@ fun ShoppingListScreen(
   val selectedFilter by viewModel.selectedFilter.collectAsStateWithLifecycle()
   val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
   val isErrorMessage by viewModel.isErrorMessage.collectAsStateWithLifecycle()
+  val pantry by viewModel.pantry.collectAsStateWithLifecycle()
+  val mealPlans by viewModel.mealPlans.collectAsStateWithLifecycle()
+  val receipts by viewModel.receipts.collectAsStateWithLifecycle()
 
   ShoppingListContent(
     workspace = workspace,
     accounts = accounts,
+    pantry = pantry,
+    mealPlans = mealPlans,
+    receipts = receipts,
     selectedListId = selectedListId,
     searchQuery = searchQuery,
     selectedFilter = selectedFilter,
@@ -153,6 +163,9 @@ fun ShoppingListScreen(
 fun ShoppingListContent(
   workspace: ShoppingWorkspaceSnapshot,
   accounts: List<FinancialAccount> = emptyList(),
+  pantry: List<ShoppingPantryItem> = emptyList(),
+  mealPlans: List<ShoppingMealPlan> = emptyList(),
+  receipts: List<ShoppingReceipt> = emptyList(),
   selectedListId: String? = null,
   searchQuery: String = "",
   selectedFilter: ShoppingItemFilter = ShoppingItemFilter.ALL,
@@ -221,6 +234,16 @@ fun ShoppingListContent(
     }
   }
 
+  val analytics = remember(workspace.items, lists) {
+    ShoppingInsightsEngine.analyze(workspace.items, lists.associate { it.id to it.currencyCode })
+  }
+  val smartSuggestions = remember(workspace.items, pantry) {
+    ShoppingInsightsEngine.suggestRestocks(workspace.items, pantry)
+  }
+  val pantryAlerts = remember(pantry) {
+    ShoppingPantryEngine.alerts(pantry, System.currentTimeMillis())
+  }
+
   val defaultCurrency = accounts.firstOrNull()?.currencyCode ?: activeList?.currencyCode ?: "USD"
   val availableCurrencies = remember(accounts, lists) {
     (accounts.map { it.currencyCode } + lists.map { it.currencyCode }).distinct().ifEmpty { listOf("USD") }
@@ -278,6 +301,90 @@ fun ShoppingListContent(
         onDraftsReady = { drafts -> importedDrafts = drafts },
         modifier = Modifier.fillMaxWidth(),
       )
+    }
+
+    if (analytics.totalsByCurrency.isNotEmpty()) {
+      OceanCard(modifier = Modifier.fillMaxWidth().testTag("shopping_analytics_card")) {
+        Column(
+          modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
+          verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
+        ) {
+          Text("Shopping Analytics", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+          analytics.totalsByCurrency.forEach { total ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+              Text("Actual spend · ${total.currencyCode}")
+              Text(Money.fromMinorUnits(total.actualSpentMinor, total.currencyCode).toString(), fontWeight = FontWeight.SemiBold)
+            }
+          }
+          analytics.categories.take(4).forEach { category ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+              Text(category.category, style = MaterialTheme.typography.bodySmall)
+              Text(Money.fromMinorUnits(category.actualSpentMinor, category.currencyCode).toString(), style = MaterialTheme.typography.bodySmall)
+            }
+          }
+        }
+      }
+    }
+
+    OceanCard(modifier = Modifier.fillMaxWidth().testTag("shopping_pantry_card")) {
+      Column(
+        modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
+      ) {
+        Text("Pantry & Expiry", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        if (pantry.isEmpty()) Text("No pantry stock tracked yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        pantry.take(5).forEach { item ->
+          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(item.name)
+            Text(item.quantityDecimal + " " + item.unit, style = MaterialTheme.typography.bodySmall)
+          }
+        }
+        pantryAlerts.take(5).forEach { alert ->
+          Text(
+            alert.item.name + " · " + when (alert.type) {
+              com.example.domain.usecase.PantryAlertType.LOW_STOCK -> "Low stock"
+              com.example.domain.usecase.PantryAlertType.EXPIRING_SOON -> "Expiring soon"
+              com.example.domain.usecase.PantryAlertType.EXPIRED -> "Expired"
+            },
+            color = if (alert.type == com.example.domain.usecase.PantryAlertType.EXPIRED) OceanTheme.colors.negative else MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+          )
+        }
+      }
+    }
+
+    OceanCard(modifier = Modifier.fillMaxWidth().testTag("shopping_meal_planner_card")) {
+      Column(
+        modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
+      ) {
+        Text("Meal Planner", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        if (mealPlans.isEmpty()) Text("No meals planned yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        mealPlans.take(4).forEach { plan ->
+          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(plan.title)
+            Text(plan.mealType.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall)
+          }
+        }
+      }
+    }
+
+    if (smartSuggestions.isNotEmpty()) {
+      OceanCard(modifier = Modifier.fillMaxWidth().testTag("shopping_smart_suggestions_card")) {
+        Column(
+          modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
+          verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
+        ) {
+          Text("Smart Suggestions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+          smartSuggestions.take(5).forEach { suggestion ->
+            Text(
+              suggestion.itemName + " · " + suggestion.suggestedQuantityDecimal + " " + suggestion.unit,
+              style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(suggestion.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          }
+        }
+      }
     }
 
     // Feedback Banner
