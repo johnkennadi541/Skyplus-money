@@ -109,7 +109,7 @@ class GoogleDriveBackupApi private constructor(
 
   private fun findBackupFileBlocking(accessToken: String): DriveBackupFile? {
     val query = "name = '$BACKUP_FILE_NAME' and trashed = false"
-    val url = FILES_URL.toHttpUrl().newBuilder()
+    val url = filesUrl.toHttpUrl().newBuilder()
       .addQueryParameter("q", query)
       .addQueryParameter("pageSize", "10")
       .addQueryParameter("orderBy", "modifiedTime desc")
