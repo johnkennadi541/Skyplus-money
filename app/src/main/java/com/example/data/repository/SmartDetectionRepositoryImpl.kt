@@ -555,7 +555,9 @@ class SmartDetectionRepositoryImpl @Inject constructor(
           "Mapping rule ownership cannot be assigned across users"
         }
         val normalizedPattern = rule.matchPattern.trim()
-        require(normalizedPattern.isNotBlank()) { "Account mapping pattern is required" }
+        require(normalizedPattern.matches(Regex("^[0-9]{4}$"))) {
+          "Account mapping rules may contain only the last four account digits"
+        }
         database.withTransaction {
           require(mappingDao.findRulesForPattern(authenticatedUserId, normalizedPattern).isEmpty()) {
             "A mapping rule already exists for this account reference; edit or remove it first"
