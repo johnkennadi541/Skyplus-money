@@ -291,7 +291,7 @@ fun InvestmentDetailContent(
                   fontWeight = FontWeight.Bold,
                 )
                 Text(
-                  text = "Uses public MFapi.in / AMFI India EOD feed for scheme code '${holding.symbolOrTicker ?: "not set"}'. Never overwrites manual NAV when disabled.",
+                  text = "Uses the third-party MFapi.in API for AMFI-sourced EOD NAV for scheme code '${holding.symbolOrTicker ?: "not set"}'. Never overwrites manual NAV when disabled.",
                   style = MaterialTheme.typography.bodySmall,
                   color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
