@@ -249,8 +249,17 @@ class InvestmentRepositoryImpl @Inject constructor(
           }
 
           val existingDomain = existing.toDomain()
+          require(holding.category == existingDomain.category) {
+            "Investment category is part of the recorded instrument identity and cannot be changed after purchase"
+          }
+          require(holding.currencyCode.equals(existingDomain.currencyCode, ignoreCase = true)) {
+            "Investment currency cannot be changed after purchase"
+          }
+          require(holding.purchaseDate == existingDomain.purchaseDate) {
+            "Original purchase date is immutable; record a new BUY transaction for later purchases"
+          }
           val allowAuto =
-            holding.autoPriceUpdateEnabled && holding.category == InvestmentCategory.MUTUAL_FUNDS
+            holding.autoPriceUpdateEnabled && existingDomain.category == InvestmentCategory.MUTUAL_FUNDS
           val now = System.currentTimeMillis()
           val updated =
             existingDomain.copy(
@@ -580,6 +589,12 @@ class InvestmentRepositoryImpl @Inject constructor(
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holdingId.isNotBlank()) { "Holding ID is required" }
         require(priceDate > 0L) { "Price date must be valid" }
+        require(source != PriceSourceType.MANUAL) {
+          "Automatic market-price updates must identify a non-manual provider source"
+        }
+        require(priceDate <= System.currentTimeMillis() + 5L * 60L * 1000L) {
+          "Market quote timestamp cannot be in the future"
+        }
 
         val parsedPrice = calculationEngine.parsePositiveDecimal(newUnitPriceDecimal, "Market price")
         val normalizedPriceText = parsedPrice.stripTrailingZeros().toPlainString()
@@ -588,6 +603,11 @@ class InvestmentRepositoryImpl @Inject constructor(
           val existing =
             investmentDao.getHoldingById(authenticatedUserId, holdingId)?.toDomain()
               ?: throw SecurityException("Investment holding does not belong to authenticated user")
+
+          // Never roll the stored market valuation back to an older provider observation.
+          if (priceDate < existing.lastPriceUpdateDate) {
+            return@withTransaction false
+          }
 
           // Never overwrite manual prices without explicit user consent
           if (!existing.autoPriceUpdateEnabled && !allowOverwriteManual) {
