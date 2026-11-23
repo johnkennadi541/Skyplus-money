@@ -126,6 +126,84 @@ class InvestmentCalculationEngineTest {
   }
 
   @Test
+  fun `repeated fractional partial sales conserve every minor unit of cost basis`() {
+    // 100 minor units across 3 units: rounded allocations must still sum exactly to 100.
+    val first = engine.applyWeightedAverageSell(
+      currentQuantityDecimal = "3",
+      currentOpenCostBasisMinor = 100L,
+      currentRealizedPnlMinor = 0L,
+      currentTotalChargesMinor = 0L,
+      sellQuantityDecimal = "1",
+      sellUnitPriceDecimal = "1",
+      chargesMinor = 0L,
+      currentMarketPriceDecimal = "1",
+      currencyCode = "INR",
+    )
+    assertEquals(33L, first.costBasisSoldMinor)
+    assertEquals(67L, first.remainingOpenCostBasisMinor)
+
+    val second = engine.applyWeightedAverageSell(
+      currentQuantityDecimal = first.remainingQuantityDecimal,
+      currentOpenCostBasisMinor = first.remainingOpenCostBasisMinor,
+      currentRealizedPnlMinor = first.newCumulativeRealizedPnlMinor,
+      currentTotalChargesMinor = first.newTotalChargesMinor,
+      sellQuantityDecimal = "1",
+      sellUnitPriceDecimal = "1",
+      chargesMinor = 0L,
+      currentMarketPriceDecimal = "1",
+      currencyCode = "INR",
+    )
+    assertEquals(34L, second.costBasisSoldMinor)
+    assertEquals(33L, second.remainingOpenCostBasisMinor)
+
+    val finalExit = engine.applyWeightedAverageSell(
+      currentQuantityDecimal = second.remainingQuantityDecimal,
+      currentOpenCostBasisMinor = second.remainingOpenCostBasisMinor,
+      currentRealizedPnlMinor = second.newCumulativeRealizedPnlMinor,
+      currentTotalChargesMinor = second.newTotalChargesMinor,
+      sellQuantityDecimal = "1",
+      sellUnitPriceDecimal = "1",
+      chargesMinor = 0L,
+      currentMarketPriceDecimal = "1",
+      currencyCode = "INR",
+    )
+    assertTrue(finalExit.isCompleteExit)
+    assertEquals(33L, finalExit.costBasisSoldMinor)
+    assertEquals(0L, finalExit.remainingOpenCostBasisMinor)
+    assertEquals(100L, first.costBasisSoldMinor + second.costBasisSoldMinor + finalExit.costBasisSoldMinor)
+  }
+
+  @Test(expected = IllegalArgumentException::class)
+  fun `buy rejects negative persisted cost basis invariants`() {
+    engine.applyBuy(
+      currentQuantityDecimal = "1",
+      currentOpenCostBasisMinor = -1L,
+      currentTotalBuyCostMinor = 100L,
+      currentTotalChargesMinor = 0L,
+      buyQuantityDecimal = "1",
+      buyUnitPriceDecimal = "1",
+      chargesMinor = 0L,
+      currentMarketPriceDecimal = "1",
+      currencyCode = "INR",
+    )
+  }
+
+  @Test(expected = IllegalArgumentException::class)
+  fun `buy rejects open cost basis greater than cumulative buy cost`() {
+    engine.applyBuy(
+      currentQuantityDecimal = "1",
+      currentOpenCostBasisMinor = 101L,
+      currentTotalBuyCostMinor = 100L,
+      currentTotalChargesMinor = 0L,
+      buyQuantityDecimal = "1",
+      buyUnitPriceDecimal = "1",
+      chargesMinor = 0L,
+      currentMarketPriceDecimal = "1",
+      currencyCode = "INR",
+    )
+  }
+
+  @Test
   fun `multi currency portfolio summaries remain strictly separated and never mix currencies`() {
     val now = 1_750_000_000_000L
     val holdings =
