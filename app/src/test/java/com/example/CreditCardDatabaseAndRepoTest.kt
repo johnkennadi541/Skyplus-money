@@ -159,6 +159,15 @@ class CreditCardDatabaseAndRepoTest {
   }
 
   @Test
+  fun `inactive card status is persisted and preserved on reload`() = runTest {
+    val account = createAccount(userA, "acc_card_inactive")
+    val created = cardRepository.createCard(userA, card(userA, account.id).copy(isActive = false)).getOrThrow()
+
+    assertFalse(created.isActive)
+    assertFalse(cardRepository.getCard(userA, created.id)!!.isActive)
+  }
+
+  @Test
   fun `a second card for the same account is rejected`() = runTest {
     val account = createAccount(userA, "acc_card_2")
     cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
