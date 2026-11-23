@@ -44,8 +44,11 @@ data class InvestmentTransactionEntity(
       holdingId = holdingId,
       userId = userId,
       type =
-        runCatching { InvestmentTransactionType.valueOf(type) }
-          .getOrDefault(InvestmentTransactionType.BUY),
+        try {
+          InvestmentTransactionType.valueOf(type)
+        } catch (_: IllegalArgumentException) {
+          InvestmentTransactionType.BUY
+        },
       transactionDate = transactionDate,
       quantityDecimal = quantityDecimal,
       unitPriceDecimal = unitPriceDecimal,
