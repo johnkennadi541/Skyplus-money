@@ -143,6 +143,7 @@ fun CardsContent(
     billingCycleDay: Int,
     paymentDueDayOffset: Int,
     aprPercent: String,
+    joiningFeeDecimal: String,
     annualFeeDecimal: String,
     annualFeeMonth: Int,
     rewardProgramName: String?,
@@ -151,7 +152,7 @@ fun CardsContent(
     notes: String?,
     onSuccess: () -> Unit
   ) -> Unit,
-  onUpdateCard: (card: com.example.domain.model.CreditCard, limitDecimal: String, annualFeeDecimal: String, onSuccess: () -> Unit) -> Unit,
+  onUpdateCard: (card: com.example.domain.model.CreditCard, limitDecimal: String, joiningFeeDecimal: String, annualFeeDecimal: String, onSuccess: () -> Unit) -> Unit,
   onToggleCardFrozen: (cardId: String, frozen: Boolean) -> Unit,
   onSelectCardDetails: (cardId: String) -> Unit,
   onClearCardDetails: () -> Unit,
@@ -241,10 +242,10 @@ fun CardsContent(
     CardFormDialog(
       linkableAccounts = linkableAccounts,
       onDismiss = { showCreateDialog = false },
-      onSave = { accountId, issuer, network, last4, limit, cycleDay, dueOffset, apr, annualFee, annualMonth, rewardProgram, reminderEnabled, reminderDays, notes, onDone ->
+      onSave = { accountId, issuer, network, last4, limit, cycleDay, dueOffset, apr, joiningFee, annualFee, annualMonth, rewardProgram, reminderEnabled, reminderDays, notes, onDone ->
         onCreateCard(
           accountId, issuer, network, last4, limit, cycleDay, dueOffset, apr,
-          annualFee, annualMonth, rewardProgram, reminderEnabled, reminderDays, notes, onDone,
+          joiningFee, annualFee, annualMonth, rewardProgram, reminderEnabled, reminderDays, notes, onDone,
         )
       },
     )
@@ -256,7 +257,7 @@ fun CardsContent(
       existingCard = summary.card,
       existingAccountName = summary.account.name,
       onDismiss = { cardToEdit = null },
-      onSave = { _, issuer, network, last4, limit, cycleDay, dueOffset, apr, annualFee, annualMonth, rewardProgram, reminderEnabled, reminderDays, notes, onDone ->
+      onSave = { _, issuer, network, last4, limit, cycleDay, dueOffset, apr, joiningFee, annualFee, annualMonth, rewardProgram, reminderEnabled, reminderDays, notes, onDone ->
         val updated = summary.card.copy(
           issuerName = issuer,
           network = network,
@@ -270,7 +271,7 @@ fun CardsContent(
           reminderDaysBefore = reminderDays,
           notes = notes,
         )
-        onUpdateCard(updated, limit, annualFee, onDone)
+        onUpdateCard(updated, limit, joiningFee, annualFee, onDone)
       },
     )
   }
@@ -452,6 +453,7 @@ private fun CardFormDialog(
     billingCycleDay: Int,
     paymentDueDayOffset: Int,
     aprPercent: String,
+    joiningFeeDecimal: String,
     annualFeeDecimal: String,
     annualFeeMonth: Int,
     rewardProgramName: String?,
@@ -471,6 +473,9 @@ private fun CardFormDialog(
   var aprText by remember { mutableStateOf(existingCard?.aprPercent ?: "0") }
   var billingCycleDay by remember { mutableStateOf((existingCard?.billingCycleDay ?: 1).toString()) }
   var dueOffset by remember { mutableStateOf((existingCard?.paymentDueDayOffset ?: 20).toString()) }
+  var joiningFeeText by remember {
+    mutableStateOf(existingCard?.let { minorToDecimal(it.joiningFeeMinor, it.currencyCode) } ?: "0")
+  }
   var annualFeeText by remember {
     mutableStateOf(existingCard?.let { minorToDecimal(it.annualFeeMinor, it.currencyCode) } ?: "0")
   }
@@ -553,6 +558,7 @@ private fun CardFormDialog(
           label = "Payment due days after closing (0–45)",
           placeholder = "20",
         )
+        SkyplusTextField(value = joiningFeeText, onValueChange = { joiningFeeText = it }, label = "Joining fee", placeholder = "0")
         SkyplusTextField(value = annualFeeText, onValueChange = { annualFeeText = it }, label = "Annual fee", placeholder = "0")
         SkyplusTextField(
           value = annualFeeMonth,
@@ -657,6 +663,7 @@ private fun CardFormDialog(
               cycle!!,
               due!!,
               aprText.ifBlank { "0" },
+              joiningFeeText.ifBlank { "0" },
               annualFeeText.ifBlank { "0" },
               feeMonth!!,
               rewardProgram.ifBlank { null },
@@ -844,6 +851,7 @@ private fun CardDetailsDialog(
         OceanCard {
           Text("Card charges & settings", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
           Text("APR: ${summary.card.aprPercent}% • Annual fee month: ${summary.card.annualFeeMonth}", style = MaterialTheme.typography.bodySmall)
+          Text("Joining fee: ${formatter.format(Money.fromMinorUnits(summary.card.joiningFeeMinor, summary.card.currencyCode))}", style = MaterialTheme.typography.bodySmall)
           Text("Annual fee: ${formatter.format(summary.card.annualFee)}", style = MaterialTheme.typography.bodySmall)
           Text(
             if (summary.card.reminderEnabled) "Payment reminder: ${summary.card.reminderDaysBefore} days before due date"
