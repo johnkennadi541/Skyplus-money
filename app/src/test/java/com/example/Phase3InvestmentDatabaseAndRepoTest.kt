@@ -904,6 +904,16 @@ class Phase3InvestmentDatabaseAndRepoTest {
       """{"status":"SUCCESS","data":[]}"""
     )
     assertTrue(emptyData is MarketQuoteFetchResult.InvalidResponse)
+
+    val exponentNav = provider.parseMfApiResponse(
+      """{"status":"SUCCESS","data":[{"date":"18-11-2026","nav":"1e999999999"}]}"""
+    )
+    assertTrue(exponentNav is MarketQuoteFetchResult.InvalidResponse)
+
+    val excessivePrecisionNav = provider.parseMfApiResponse(
+      """{"status":"SUCCESS","data":[{"date":"18-11-2026","nav":"1234567890123.12345678901"}]}"""
+    )
+    assertTrue(excessivePrecisionNav is MarketQuoteFetchResult.InvalidResponse)
   }
 
   @Test
