@@ -20,14 +20,14 @@ class InvestmentMarketSyncWorker @AssistedInject constructor(
 ) : CoroutineWorker(appContext, workerParams) {
 
   override suspend fun doWork(): Result {
-    val settings = investmentRepository.observeSyncSettings().first()
-    if (!settings.autoUpdateConsentEnabled) {
-      return Result.success()
-    }
-
     val session = authRepository.observeAuthSession().first()
     val authenticatedUid = (session as? AuthSessionState.Authenticated)?.user?.uid
     if (authenticatedUid.isNullOrBlank()) {
+      return Result.success()
+    }
+
+    val settings = investmentRepository.observeSyncSettings(authenticatedUid).first()
+    if (!settings.autoUpdateConsentEnabled) {
       return Result.success()
     }
 
