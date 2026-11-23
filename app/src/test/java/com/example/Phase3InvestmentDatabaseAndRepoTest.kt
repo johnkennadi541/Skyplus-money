@@ -140,7 +140,6 @@ class Phase3InvestmentDatabaseAndRepoTest {
       priceDate = now - 86_400_000L,
       source = PriceSourceType.MFAPI_AMFI_EOD,
       providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
-      allowOverwriteManual = false,
     ).getOrThrow()
 
     assertTrue(applied)
@@ -311,8 +310,9 @@ class Phase3InvestmentDatabaseAndRepoTest {
   }
 
   @Test
-  fun `manual overwrite flag cannot bypass global market update opt in`() = runTest {
-    syncPreferences.setAutoUpdateConsent("uid_opt_in_guard", false)
+  fun `automatic NAV requires both global and per holding opt in`() = runTest {
+    val uid = "uid_opt_in_guard"
+    syncPreferences.setAutoUpdateConsent(uid, false)
     // A different Google account's consent must not authorize this user's requests.
     syncPreferences.setAutoUpdateConsent("uid_other_account", true)
     var fetchCount = 0
@@ -332,7 +332,7 @@ class Phase3InvestmentDatabaseAndRepoTest {
     val repo = buildRepo(dataSource)
     val holding =
       repo.createHoldingWithInitialBuy(
-        authenticatedUserId = "uid_opt_in_guard",
+        authenticatedUserId = uid,
         name = "Test Mutual Fund",
         category = InvestmentCategory.MUTUAL_FUNDS,
         symbolOrTicker = "12345",
@@ -344,23 +344,41 @@ class Phase3InvestmentDatabaseAndRepoTest {
         purchasePriceDecimal = "100.00",
         chargesMinor = 0L,
         currentMarketPriceDecimal = "110.00",
-        autoPriceUpdateEnabled = true,
+        autoPriceUpdateEnabled = false,
         notes = null,
       ).getOrThrow()
 
-    val result =
-      repo.syncEligibleMarketPrices(
-        authenticatedUserId = "uid_opt_in_guard",
-        allowOverwriteManual = true,
-        forceBypassCooldown = true,
-      ).getOrThrow()
+    // Global consent OFF blocks all requests, even if another account opted in.
+    val globalOff = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = true).getOrThrow()
+    assertEquals(0, fetchCount)
+    assertEquals(0, globalOff.updatedCount)
 
-    assertEquals("Global opt-in must block all provider requests", 0, fetchCount)
-    assertEquals(0, result.updatedCount)
-    assertEquals(
-      "110",
-      repo.getHoldingById("uid_opt_in_guard", holding.id)?.currentMarketPriceDecimal,
-    )
+    // Global consent alone is not enough: this holding has not been opted in.
+    repo.setAutoUpdateConsent(uid, true)
+    val holdingOff = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = true).getOrThrow()
+    assertEquals(0, fetchCount)
+    assertEquals(0, holdingOff.updatedCount)
+    assertEquals("110", repo.getHoldingById(uid, holding.id)?.currentMarketPriceDecimal)
+
+    // Direct repository calls cannot bypass the per-holding consent either.
+    val directApplyWithoutHoldingConsent =
+      repo.applyAutomaticMarketPrice(
+        authenticatedUserId = uid,
+        holdingId = holding.id,
+        newUnitPriceDecimal = "125.00",
+        priceDate = System.currentTimeMillis(),
+        source = PriceSourceType.MFAPI_AMFI_EOD,
+        providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
+      ).getOrThrow()
+    assertFalse(directApplyWithoutHoldingConsent)
+    assertEquals("110", repo.getHoldingById(uid, holding.id)?.currentMarketPriceDecimal)
+
+    // Only after the user explicitly opts in this holding may the quote update it.
+    repo.setHoldingAutoPriceUpdate(uid, holding.id, true).getOrThrow()
+    val optedIn = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = true).getOrThrow()
+    assertEquals(1, fetchCount)
+    assertEquals(1, optedIn.updatedCount)
+    assertEquals("125", repo.getHoldingById(uid, holding.id)?.currentMarketPriceDecimal)
   }
 
   @Test
@@ -631,8 +649,7 @@ class Phase3InvestmentDatabaseAndRepoTest {
         priceDate = 1_755_000_000_000L,
         source = PriceSourceType.MFAPI_AMFI_EOD,
         providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
-        allowOverwriteManual = false,
-      )
+        )
     assertTrue("Direct quote application must also enforce global opt-in", overwrittenWhenDisabled.isFailure)
     assertEquals("95.5", repo.getHoldingById("uid_man", mfHolding.id)?.currentMarketPriceDecimal)
 
@@ -732,8 +749,7 @@ class Phase3InvestmentDatabaseAndRepoTest {
         priceDate = currentQuoteDate - 86_400_000L,
         source = PriceSourceType.MFAPI_AMFI_EOD,
         providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
-        allowOverwriteManual = false,
-      ).getOrThrow()
+        ).getOrThrow()
     assertFalse("Older quote must not roll back the current valuation", rejectedOlderQuote)
 
     val futureQuote =
@@ -744,8 +760,7 @@ class Phase3InvestmentDatabaseAndRepoTest {
         priceDate = System.currentTimeMillis() + 86_400_000L,
         source = PriceSourceType.MFAPI_AMFI_EOD,
         providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
-        allowOverwriteManual = false,
-      )
+        )
     assertTrue("Future-dated provider quote must be rejected", futureQuote.isFailure)
 
     val beforeOfflineSync = repo.getHoldingById("uid_quote_guard", created.id)!!
