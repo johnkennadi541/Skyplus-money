@@ -510,10 +510,28 @@ fun InvestmentsReportSection(
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-              text = "Unrealized ${fmtMoney(row.unrealizedPnlMinor, currencyCode)} (${row.returnPercent.toPlainString()}%)",
+              text = "Unrealized ${fmtMoney(row.unrealizedPnlMinor, currencyCode)}",
               style = MaterialTheme.typography.labelSmall,
               color = if (row.unrealizedPnlMinor >= 0L) extended.positive else extended.negative,
             )
+          }
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+          ) {
+            Text(
+              text = "Realized: ${fmtMoney(row.realizedPnlMinor, currencyCode)}",
+              style = MaterialTheme.typography.labelSmall,
+              color = if (row.realizedPnlMinor >= 0L) extended.positive else extended.negative,
+            )
+            Text(
+              text = "Total return: ${row.returnPercent.toPlainString()}%",
+              style = MaterialTheme.typography.labelSmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+          if (row.isStalePrice) {
+            OceanStatusBadge(text = "Price older than 7 days", tone = BadgeTone.WARNING)
           }
         }
         HorizontalDivider(color = extended.cardBorder)
