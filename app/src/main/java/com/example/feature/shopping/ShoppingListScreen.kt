@@ -349,6 +349,12 @@ fun ShoppingListContent(
               Text(formatMoneyUseCase.format(Money.fromMinorUnits(category.actualSpentMinor, category.currencyCode)), style = MaterialTheme.typography.bodySmall)
             }
           }
+          analytics.monthly.takeLast(4).forEach { month ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+              Text(month.yearMonthUtc + " · " + month.currencyCode, style = MaterialTheme.typography.bodySmall)
+              Text(formatMoneyUseCase.format(Money.fromMinorUnits(month.actualSpentMinor, month.currencyCode)), style = MaterialTheme.typography.bodySmall)
+            }
+          }
         }
       }
     }
@@ -381,6 +387,26 @@ fun ShoppingListContent(
             color = if (alert.type == com.example.domain.usecase.PantryAlertType.EXPIRED) OceanTheme.colors.negative else MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
           )
+        }
+      }
+    }
+
+    if (receipts.isNotEmpty()) {
+      OceanCard(modifier = Modifier.fillMaxWidth().testTag("shopping_receipt_history_card")) {
+        Column(
+          modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
+          verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
+        ) {
+          Text("Receipt History", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+          receipts.take(5).forEach { receipt ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+              Column(modifier = Modifier.weight(1f)) {
+                Text(receipt.merchant ?: "Shopping receipt")
+                Text(receipt.status.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall)
+              }
+              Text(formatMoneyUseCase.format(Money.fromMinorUnits(receipt.totalMinor, receipt.currencyCode)))
+            }
+          }
         }
       }
     }
