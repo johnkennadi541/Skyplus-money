@@ -63,9 +63,10 @@ class CreditCardReminderWorker @AssistedInject constructor(
       val dueLocal = java.time.Instant.ofEpochMilli(statement.dueDate).atZone(zone).toLocalDate()
       val daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(todayLocal, dueLocal).toInt()
       if (daysRemaining in 0..card.reminderDaysBefore) {
-        val transactions = transactionsByAccount.getOrPut(card.accountId) {
-          transactionRepository.getTransactionsByAccount(userId, card.accountId).first()
-        }
+        val transactions = transactionsByAccount[card.accountId]
+          ?: transactionRepository.getTransactionsByAccount(userId, card.accountId).first().also {
+            transactionsByAccount[card.accountId] = it
+          }
         val summary = CreditCardStatementCalculator.summarize(
           statements = listOf(statement.toDomain()),
           card = card.toDomain(),
@@ -73,7 +74,6 @@ class CreditCardReminderWorker @AssistedInject constructor(
         ).single()
         if (summary.remainingDueMinor > 0L) {
           postReminder(
-            userId = userId,
             statementId = statement.id,
             issuer = card.issuerName,
             last4 = card.last4,
@@ -92,7 +92,6 @@ class CreditCardReminderWorker @AssistedInject constructor(
   }
 
   private fun postReminder(
-    userId: String,
     statementId: String,
     issuer: String,
     last4: String,
@@ -128,7 +127,7 @@ class CreditCardReminderWorker @AssistedInject constructor(
         .setContentText("$accountLabel — $timing")
         .setStyle(
           NotificationCompat.BigTextStyle().bigText(
-            "$accountLabel\n$timing\nDue: ${SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(dueDate))}\nMinimum due: $minimumDue $currencyCode\\nRemaining: $remainingDue $currencyCode",
+            "$accountLabel\n$timing\nDue: ${SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(dueDate))}\nMinimum due: $minimumDue $currencyCode\nRemaining: $remainingDue $currencyCode",
           ),
         )
         .setContentIntent(pendingIntent)
