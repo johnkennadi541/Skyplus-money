@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.core.designsystem.theme.SkyplusOceanTheme
@@ -31,8 +33,13 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
   @Inject lateinit var databaseSecurityMonitor: DatabaseSecurityMonitor
 
+  private var openReportsRequest by mutableStateOf(0L)
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    if (intent.getBooleanExtra(EXTRA_OPEN_DAILY_REPORT, false)) {
+      openReportsRequest = System.currentTimeMillis()
+    }
     enableEdgeToEdge()
     setContent {
       val authViewModel: AuthViewModel = hiltViewModel()
@@ -58,6 +65,7 @@ class MainActivity : ComponentActivity() {
       SkyplusOceanTheme(themePreference = themePreference) {
         SkyplusAuthGateRoot(
           authUiState = authUiState,
+          openReportsRequest = openReportsRequest,
           homeUiState = homeUiState,
           themePreference = themePreference,
           onContinueWithGoogle = authViewModel::onContinueWithGoogle,
@@ -83,5 +91,16 @@ class MainActivity : ComponentActivity() {
         )
       }
     }
+  }
+  override fun onNewIntent(intent: android.content.Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    if (intent.getBooleanExtra(EXTRA_OPEN_DAILY_REPORT, false)) {
+      openReportsRequest = System.currentTimeMillis()
+    }
+  }
+
+  companion object {
+    const val EXTRA_OPEN_DAILY_REPORT = "com.skyplus.money.OPEN_DAILY_AUTO_ENTRY_REPORT"
   }
 }
