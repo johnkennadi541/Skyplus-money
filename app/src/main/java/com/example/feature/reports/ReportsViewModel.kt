@@ -90,7 +90,7 @@ class ReportsViewModel @Inject constructor(
     viewModelScope.launch {
       authRepository.observeAuthSession()
         .distinctUntilChangedBy { (it as? AuthSessionState.Authenticated)?.user?.uid }
-        .collect {
+        .collect { session ->
           _selectedPeriod.value = ReportPeriodType.MONTHLY
           _customStartMillis.value = null
           _customEndMillis.value = null
@@ -100,6 +100,12 @@ class ReportsViewModel @Inject constructor(
           _isErrorMessage.value = false
           _emailPreview.value = null
           _pendingSafExport.value = null
+
+          val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+          if (!uid.isNullOrBlank()) {
+            val dailySettings = reportPreferencesDataSource.observeDailyAutoEntrySettings(uid).first()
+            dailyAutoEntryReportScheduler.updateSchedule(uid, dailySettings)
+          }
         }
     }
   }
