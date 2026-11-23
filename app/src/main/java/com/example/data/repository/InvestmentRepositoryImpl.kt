@@ -232,7 +232,7 @@ class InvestmentRepositoryImpl @Inject constructor(
     holding: InvestmentHolding,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holding.userId == authenticatedUserId) {
           "Investment ownership cannot be modified or transferred across users"
@@ -290,7 +290,7 @@ class InvestmentRepositoryImpl @Inject constructor(
     enabled: Boolean,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holdingId.isNotBlank()) { "Holding ID is required" }
 
@@ -328,7 +328,7 @@ class InvestmentRepositoryImpl @Inject constructor(
     notes: String?,
   ): Result<InvestmentTransaction> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holdingId.isNotBlank()) { "Holding ID is required" }
         require(transactionDate > 0L) { "Transaction date must be valid" }
@@ -423,7 +423,7 @@ class InvestmentRepositoryImpl @Inject constructor(
     notes: String?,
   ): Result<InvestmentTransaction> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holdingId.isNotBlank()) { "Holding ID is required" }
         require(transactionDate > 0L) { "Transaction date must be valid" }
@@ -515,7 +515,7 @@ class InvestmentRepositoryImpl @Inject constructor(
     priceDate: Long,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holdingId.isNotBlank()) { "Holding ID is required" }
         require(priceDate > 0L) { "Price update date must be valid" }
@@ -585,7 +585,7 @@ class InvestmentRepositoryImpl @Inject constructor(
     allowOverwriteManual: Boolean,
   ): Result<Boolean> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holdingId.isNotBlank()) { "Holding ID is required" }
         require(priceDate > 0L) { "Price date must be valid" }
@@ -682,7 +682,7 @@ class InvestmentRepositoryImpl @Inject constructor(
     forceBypassCooldown: Boolean,
   ): Result<MarketSyncSummary> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         val now = System.currentTimeMillis()
         val settings = syncPreferencesDataSource.syncSettings.first()
@@ -709,7 +709,7 @@ class InvestmentRepositoryImpl @Inject constructor(
         var requestsSent = 0
 
         for (holding in holdings) {
-          val qty = runCatching { BigDecimal(holding.quantityDecimal.trim()) }.getOrDefault(BigDecimal.ZERO)
+          val qty = runCatchingPreservingCancellation { BigDecimal(holding.quantityDecimal.trim()) }.getOrDefault(BigDecimal.ZERO)
           if (qty <= BigDecimal.ZERO) continue
 
           if (!holding.autoPriceUpdateEnabled && !allowOverwriteManual) {
@@ -801,7 +801,7 @@ class InvestmentRepositoryImpl @Inject constructor(
     holdingId: String,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holdingId.isNotBlank()) { "Holding ID is required" }
 
