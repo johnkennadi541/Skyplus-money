@@ -176,7 +176,14 @@ class DatabasePassphraseProvider(
 
     // Refuse to generate a replacement key if an existing database file already exists on disk.
     val dbFile = databaseFileProvider()
-    if (dbFile.exists() && dbFile.length() > 0L) {
+    val databaseArtifacts =
+      listOf(
+        dbFile,
+        File("${dbFile.path}-wal"),
+        File("${dbFile.path}-shm"),
+        File("${dbFile.path}-journal"),
+      )
+    if (databaseArtifacts.any { it.exists() && it.length() > 0L }) {
       throw DatabaseSecurityException(
         reason = PassphraseFailureReason.MISSING_KEY_FOR_EXISTING_DATABASE,
         isRecoverable = false,
