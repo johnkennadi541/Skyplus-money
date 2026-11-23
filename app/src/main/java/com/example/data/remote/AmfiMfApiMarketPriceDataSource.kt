@@ -12,11 +12,16 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.Call
 import okhttp3.Request
+import kotlinx.coroutines.CancellationException
 import java.io.IOException
 import java.math.BigDecimal
-import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
+import java.time.format.ResolverStyle
 import java.util.Locale
-import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -57,6 +62,12 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
         return@withContext MarketQuoteFetchResult.UnsupportedCategoryOrIdentifier(
           message =
             "Automatic public feed currently supports AMFI India Mutual Funds only. Use manual entry for ${request.category.displayName}."
+        )
+      }
+
+      if (!request.currencyCode.trim().equals(INDIAN_CURRENCY_CODE, ignoreCase = true)) {
+        return@withContext MarketQuoteFetchResult.UnsupportedCategoryOrIdentifier(
+          message = "AMFI mutual fund NAVs are denominated in INR; refusing to apply an INR quote to a non-INR holding."
         )
       }
 
@@ -102,6 +113,8 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
 
           parseMfApiResponse(rawBody)
         }
+      } catch (cancelled: CancellationException) {
+        throw cancelled
       } catch (_: IOException) {
         MarketQuoteFetchResult.NetworkError(
           message = "Market feed unavailable while offline or unreachable. Manual entry remains active."
@@ -143,7 +156,11 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
       return MarketQuoteFetchResult.InvalidResponse("Market feed returned non-positive NAV.")
     }
 
-    val asOfMillis = parseAmfiDateMillis(latestPoint.date)
+    val asOfMillis =
+      parseAmfiDateMillis(latestPoint.date)
+        ?: return MarketQuoteFetchResult.InvalidResponse(
+          "Market feed returned a missing, malformed, or future NAV date; existing price was preserved."
+        )
 
     return MarketQuoteFetchResult.Success(
       unitPriceDecimal = navDecimal.stripTrailingZeros().toPlainString(),
@@ -154,18 +171,19 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
     )
   }
 
-  private fun parseAmfiDateMillis(dateText: String?): Long {
-    if (dateText.isNullOrBlank()) return System.currentTimeMillis()
-    val parser =
-      SimpleDateFormat("dd-MM-yyyy", Locale.US).apply {
-        isLenient = false
-        timeZone = TimeZone.getTimeZone("Asia/Kolkata")
+  private fun parseAmfiDateMillis(dateText: String?): Long? {
+    val normalizedDate = dateText?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    val publishedDate =
+      try {
+        LocalDate.parse(normalizedDate, AMFI_DATE_FORMATTER)
+      } catch (_: DateTimeParseException) {
+        return null
       }
-    return runCatching {
-      val date = parser.parse(dateText.trim())
-      // Anchor EOD NAV at 18:00 IST (~12:30 UTC) on the published trading day
-      (date?.time ?: System.currentTimeMillis()) + (18L * 60L * 60L * 1000L)
-    }.getOrElse { System.currentTimeMillis() }
+    // AMFI publishes end-of-day NAVs; anchor the timestamp at 18:00 India Standard Time.
+    val asOfMillis =
+      publishedDate.atTime(LocalTime.of(18, 0)).atZone(INDIA_ZONE_ID).toInstant().toEpochMilli()
+    if (asOfMillis > System.currentTimeMillis() + MAX_FUTURE_CLOCK_SKEW_MILLIS) return null
+    return asOfMillis
   }
 
   @Serializable
@@ -190,6 +208,11 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
   companion object {
     const val DEFAULT_BASE_URL = "https://api.mfapi.in"
     const val PROVIDER_LABEL = "MFapi.in / AMFI India (EOD)"
+    private const val INDIAN_CURRENCY_CODE = "INR"
+    private const val MAX_FUTURE_CLOCK_SKEW_MILLIS = 5L * 60L * 1000L
+    private val INDIA_ZONE_ID: ZoneId = ZoneId.of("Asia/Kolkata")
+    private val AMFI_DATE_FORMATTER: DateTimeFormatter =
+      DateTimeFormatter.ofPattern("dd-MM-uuuu", Locale.US).withResolverStyle(ResolverStyle.STRICT)
     private val AMFI_SCHEME_CODE_REGEX = Regex("^\\d{5,7}$")
   }
 }
