@@ -139,7 +139,7 @@ class CreditCardMigration9To10Test {
   }
 
   @Test
-  fun `migration is additive and idempotent when run twice`() {
+  fun `migration rejects duplicate application without changing existing card data`() {
     DatabaseMigrations.MIGRATION_9_10.migrate(db)
     val second = runCatching { DatabaseMigrations.MIGRATION_9_10.migrate(db) }
     assertTrue(second.isFailure)
