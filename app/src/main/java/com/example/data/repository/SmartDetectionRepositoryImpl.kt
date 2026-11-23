@@ -123,13 +123,9 @@ class SmartDetectionRepositoryImpl @Inject constructor(
             }
           }
 
-          if (resolvedAccountId == null) {
-            val currencyMatches = accounts.filter { it.currencyCode.equals(parsed.currencyCode, ignoreCase = true) }
-            if (currencyMatches.size == 1) {
-              resolvedAccountId = currencyMatches.first().id
-              resolvedAccountName = currencyMatches.first().name
-            }
-          }
+          // Never guess an account from currency alone. A single same-currency
+          // account is not proof that the bank SMS belongs to that account.
+          // Unmatched account references remain in the exception/review queue.
 
           val fingerprint = DeduplicationEngine.generateFingerprint(userId, parsed)
 
@@ -273,14 +269,19 @@ class SmartDetectionRepositoryImpl @Inject constructor(
               parsed.confidenceReasons
             }
 
+          val isSupportedAutomaticLedgerType =
+            parsed.type == TransactionType.EXPENSE ||
+              parsed.type == TransactionType.INCOME ||
+              parsed.type == TransactionType.REFUND ||
+              parsed.type == TransactionType.REVERSAL
+
           val shouldAutoSave =
             !isAmbiguousRepeat &&
               settings.isAutoSaveHighConfidenceEnabled &&
               parsed.confidenceLevel == DetectionConfidence.HIGH &&
               parsed.status == TransactionStatus.COMPLETED &&
               currencyMatchesAccount &&
-              parsed.type != TransactionType.PENDING &&
-              parsed.type != TransactionType.FAILED
+              isSupportedAutomaticLedgerType
 
           val eventId = UUID.randomUUID().toString()
           var createdTxnId: String? = null
