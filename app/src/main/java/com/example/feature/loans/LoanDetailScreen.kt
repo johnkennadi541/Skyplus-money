@@ -67,6 +67,7 @@ import com.example.domain.model.LoanStatus
 import com.example.domain.model.Money
 import com.example.domain.usecase.EmiCalculationEngine
 import com.example.domain.usecase.FormatMoneyUseCase
+import com.example.feature.calculator.SmartCalculatorAmountDialog
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.text.SimpleDateFormat
@@ -454,6 +455,7 @@ fun LoanDetailContent(
       Money.fromMinorUnits(loan.monthlyEmiMinor, loan.currencyCode).toBigDecimal().toPlainString()
     }
     var amountText by remember { mutableStateOf(defaultPaymentText) }
+    var showPaymentCalculator by remember { mutableStateOf(false) }
     var notesText by remember { mutableStateOf("") }
     var paymentDate by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var dialogError by remember { mutableStateOf<String?>(null) }
@@ -489,8 +491,26 @@ fun LoanDetailContent(
             label = { Text("Payment Amount (${loan.currencyCode})") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
+            trailingIcon = {
+              IconButton(
+                onClick = { showPaymentCalculator = true },
+                modifier = Modifier.testTag("payment_amount_calculator_button"),
+              ) {
+                Icon(Icons.Rounded.Calculate, contentDescription = "Calculate payment amount")
+              }
+            },
             modifier = Modifier.fillMaxWidth().testTag("payment_amount_input"),
           )
+          if (showPaymentCalculator) {
+            SmartCalculatorAmountDialog(
+              initialExpression = amountText,
+              onApply = { calculatedAmount ->
+                amountText = calculatedAmount
+                showPaymentCalculator = false
+              },
+              onDismiss = { showPaymentCalculator = false },
+            )
+          }
           Text(
             text = "Payment Date: ${dateFormatter.format(Date(paymentDate))}",
             style = MaterialTheme.typography.bodySmall,
