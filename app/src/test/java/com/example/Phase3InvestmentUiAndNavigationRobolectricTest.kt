@@ -171,7 +171,7 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
     composeTestRule.onNodeWithTag("open_market_sync_settings_button").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("auto_sync_consent_switch").assertIsOff()
-    composeTestRule.onNodeWithText("MFapi.in / AMFI India Official Feed (EOD)").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithText("MFapi.in third-party API • AMFI-sourced EOD NAV").performScrollTo().assertIsDisplayed()
   }
 
   @Test
