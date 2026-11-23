@@ -15,10 +15,10 @@ data class ShoppingReceiptDraft(
 
 /** Extracts only explicit total labels; ambiguous totals remain a review-only draft. */
 object ShoppingReceiptParser {
+  private val totalLine = Regex(
     """(?i)^\s*(grand\s+total|total\s+due|amount\s+due|total)\s*[:\-]?\s*(?:(USD|INR|KWD|EUR|GBP|AED|SAR)\s*)?([0-9][0-9,]*(?:\.[0-9]{1,3})?)\s*$"""
-    """(?i)^\\s*(grand\\s+total|total\\s+due|amount\\s+due|total)\\s*[:\\-]?\\s*(?:(USD|INR|KWD|EUR|GBP|AED|SAR)\\s*)?([0-9][0-9,]*(?:\\.[0-9]{1,3})?)\\s*$"""
-  private val currencySymbol = Regex("""(₹|\$|€|£|د\.ك)""")
-  private val currencySymbol = Regex("""(₹|\\$|€|£|د\\.ك)""")
+  )
+
 
   fun parse(ocrText: String): ShoppingReceiptDraft {
     val normalized = ocrText.lines().map { it.trim() }.filter { it.isNotBlank() }
