@@ -278,7 +278,7 @@ fun ShoppingItemFormDialog(
       val unitMinor = calculationEngine.parseNonNegativeMoneyMinor(estUnitPriceText.ifBlank { "0" }, currencyCode, "Price")
       val totalMinor = calculationEngine.computeLineTotalMinor(qty, unitMinor, currencyCode)
       formatMoneyUseCase.format(Money.fromMinorUnits(totalMinor, currencyCode))
-    } catch (_: Throwable) {
+    } catch (_: Exception) {
       "--"
     }
   }
@@ -444,7 +444,7 @@ fun ShoppingItemFormDialog(
               currencyCode,
               "Estimated unit price",
             )
-          } catch (e: Throwable) {
+          } catch (e: Exception) {
             validationError = e.message ?: "Invalid quantity or price"
             return@Button
           }
@@ -516,7 +516,7 @@ fun RecordPurchaseDialog(
         formatMoneyUseCase.format(Money.fromMinorUnits(actualTotalMinor, currencyCode)),
         diff,
       )
-    } catch (_: Throwable) {
+    } catch (_: Exception) {
       null
     }
   }
@@ -649,7 +649,7 @@ fun RecordPurchaseDialog(
                 "Actual total",
               )
             }
-          } catch (e: Throwable) {
+          } catch (e: Exception) {
             validationError = e.message ?: "Invalid actual price"
             return@Button
           }
@@ -767,7 +767,7 @@ fun StorePriceComparisonDialog(
             }
             try {
               calculationEngine.parseNonNegativeMoneyMinor(unitPrice, currencyCode, "Unit price")
-            } catch (e: Throwable) {
+            } catch (e: Exception) {
               validationError = e.message ?: "Enter valid unit price"
               return@Button
             }
