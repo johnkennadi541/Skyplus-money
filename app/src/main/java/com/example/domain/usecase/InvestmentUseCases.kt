@@ -231,11 +231,14 @@ class SetHoldingAutoPriceUseCase @Inject constructor(
 class SyncMarketPricesUseCase @Inject constructor(
   private val repository: InvestmentRepository,
 ) {
-  fun observeSettings(): Flow<MarketSyncSettings> = repository.observeSyncSettings()
+  fun observeSettings(authenticatedUserId: String): Flow<MarketSyncSettings> =
+    repository.observeSyncSettings(authenticatedUserId)
 
-  suspend fun setAutoUpdateConsent(enabled: Boolean) = repository.setAutoUpdateConsent(enabled)
+  suspend fun setAutoUpdateConsent(authenticatedUserId: String, enabled: Boolean) =
+    repository.setAutoUpdateConsent(authenticatedUserId, enabled)
 
-  suspend fun setSyncOnlyOnWifi(wifiOnly: Boolean) = repository.setSyncOnlyOnWifi(wifiOnly)
+  suspend fun setSyncOnlyOnWifi(authenticatedUserId: String, wifiOnly: Boolean) =
+    repository.setSyncOnlyOnWifi(authenticatedUserId, wifiOnly)
 
   suspend fun syncNow(
     authenticatedUserId: String,
