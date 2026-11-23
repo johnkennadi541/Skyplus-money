@@ -154,6 +154,17 @@ class Phase2SmartDetectionParserTest {
   }
 
   @Test
+  fun `amount-only or debit-request notifications are not treated as completed transactions`() {
+    val unconfirmed = SmartTransactionParser.parse(
+      "Debit request for INR 250.00 from A/c XX4321 at Store Ref REQ123456",
+    )!!
+
+    assertEquals(TransactionStatus.PENDING, unconfirmed.status)
+    assertEquals(TransactionType.PENDING, unconfirmed.type)
+    assertNotEquals(DetectionConfidence.HIGH, unconfirmed.confidenceLevel)
+  }
+
+  @Test
   fun `deduplication fingerprint is deterministic inside 10 minute bucket and distinct across users`() {
     val parsed =
       ParsedFinancialMessage(
