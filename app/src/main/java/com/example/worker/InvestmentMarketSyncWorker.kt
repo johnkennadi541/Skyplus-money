@@ -34,7 +34,6 @@ class InvestmentMarketSyncWorker @AssistedInject constructor(
     val outcome =
       investmentRepository.syncEligibleMarketPrices(
         authenticatedUserId = authenticatedUid,
-        allowOverwriteManual = false,
         forceBypassCooldown = false,
       )
 
