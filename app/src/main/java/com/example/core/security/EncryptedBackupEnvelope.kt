@@ -51,7 +51,7 @@ class EncryptedBackupEnvelope(
   fun decrypt(envelope: ByteArray, recoverySecret: CharArray, uid: String): ByteArray {
     require(uid.isNotBlank()) { "Authenticated user is required" }
     require(recoverySecret.size >= MIN_SECRET_LENGTH) { "Invalid backup recovery secret" }
-    require(envelope.size >= HEADER_BYTES + SALT_BYTES + IV_BYTES + TAG_BYTES / 8) {
+    require(envelope.size >= HEADER_BYTES + SALT_BYTES + IV_BYTES + TAG_BYTES) {
       "Backup envelope is incomplete"
     }
 
