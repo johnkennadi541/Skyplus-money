@@ -108,8 +108,12 @@ class SmartDetectionRepositoryImpl @Inject constructor(
           var resolvedAccountName: String? = null
 
           if (!parsed.accountLast4Hint.isNullOrBlank()) {
-            val rule = mappingDao.findRuleForPattern(userId, parsed.accountLast4Hint)
-            val matchedAcc = rule?.let { r -> accounts.firstOrNull { it.id == r.accountId } }
+            val matchingRules = mappingDao.findRulesForPattern(userId, parsed.accountLast4Hint)
+            // Legacy duplicate rules are ambiguous too; never select an arbitrary LIMIT 1 row.
+            val matchedAcc =
+              matchingRules.singleOrNull()?.let { rule ->
+                accounts.firstOrNull { it.id == rule.accountId }
+              }
             if (matchedAcc != null) {
               resolvedAccountId = matchedAcc.id
               resolvedAccountName = matchedAcc.name
@@ -550,12 +554,21 @@ class SmartDetectionRepositoryImpl @Inject constructor(
         require(rule.userId == authenticatedUserId) {
           "Mapping rule ownership cannot be assigned across users"
         }
+        val normalizedPattern = rule.matchPattern.trim()
+        require(normalizedPattern.isNotBlank()) { "Account mapping pattern is required" }
         database.withTransaction {
+          require(mappingDao.findRulesForPattern(authenticatedUserId, normalizedPattern).isEmpty()) {
+            "A mapping rule already exists for this account reference; edit or remove it first"
+          }
           val ownerAccount =
             accountDao.getAccountById(authenticatedUserId, rule.accountId)
               ?: throw SecurityException("Mapping rule target account does not belong to user")
           require(ownerAccount.userId == authenticatedUserId) { "Mapping rule ownership verification failed" }
-          mappingDao.insertRule(AccountMappingRuleEntity.fromDomain(rule.copy(userId = authenticatedUserId)))
+          mappingDao.insertRule(
+            AccountMappingRuleEntity.fromDomain(
+              rule.copy(userId = authenticatedUserId, matchPattern = normalizedPattern)
+            )
+          )
         }
       }
     }
