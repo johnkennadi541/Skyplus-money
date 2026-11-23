@@ -55,6 +55,11 @@ class BackupRecoveryKeyWrappingBackend : KeyWrappingBackend {
   }
 
   override fun decrypt(encryptedBase64: String, ivBase64: String): ByteArray {
+    // Bound locally persisted metadata before Base64 decoding allocates arrays.
+    require(encryptedBase64.length == RECOVERY_CIPHERTEXT_BASE64_LENGTH) {
+      "Wrapped recovery-key ciphertext has an invalid encoded length"
+    }
+    require(ivBase64.length == RECOVERY_IV_BASE64_LENGTH) { "Recovery-key IV has an invalid encoded length" }
     val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
     if (!keyStore.containsAlias(KEY_ALIAS)) {
       throw UnrecoverableKeyException("Recovery-key Keystore master key is missing")
@@ -84,6 +89,8 @@ class BackupRecoveryKeyWrappingBackend : KeyWrappingBackend {
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
     private const val RECOVERY_KEY_BYTES = 32
     private const val GCM_IV_BYTES = 12
+    private const val RECOVERY_IV_BASE64_LENGTH = 16
+    private const val RECOVERY_CIPHERTEXT_BASE64_LENGTH = 64
     private const val GCM_TAG_BYTES = 16
     private const val GCM_TAG_BITS = 128
     private val AAD = "SKYPLUS_MONEY|BACKUP_RECOVERY_KEY|v1".toByteArray(Charsets.US_ASCII)
