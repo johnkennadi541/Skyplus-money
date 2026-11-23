@@ -1,10 +1,11 @@
 package com.example
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import com.example.core.designsystem.theme.SkyplusOceanTheme
 import com.example.domain.model.ThemePreference
 import com.example.feature.dashboard.HomeFoundationUiState
@@ -36,7 +37,8 @@ class SipCalculatorNavigationRobolectricTest {
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("nav_tab_tools").performClick()
     composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("tools_sip_item").performScrollTo().performClick()
+    composeTestRule.onNodeWithTag("tools_screen").performScrollToNode(hasTestTag("tools_sip_item"))
+    composeTestRule.onNodeWithTag("tools_sip_item").assertIsDisplayed().performClick()
     composeTestRule.waitForIdle()
 
     composeTestRule.onNodeWithTag("sip_calculator_screen").assertIsDisplayed()
