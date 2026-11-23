@@ -231,6 +231,36 @@ class Phase2SecurityRemediationTest {
   }
 
   @Test
+  fun `invalid decrypted passphrase buffer is zeroed before failure`() {
+    val prefs = context.getSharedPreferences("invalid_key_length_${System.nanoTime()}", Context.MODE_PRIVATE)
+    prefs.edit()
+      .putString(DatabasePassphraseProvider.KEY_ENCRYPTED_PASSPHRASE, "wrapped")
+      .putString(DatabasePassphraseProvider.KEY_IV, "iv")
+      .commit()
+    val invalidPlaintext = ByteArray(16) { 7 }
+    val invalidLengthBackend =
+      object : KeyWrappingBackend {
+        override fun encrypt(raw: ByteArray): Pair<String, String> = simpleBackend.encrypt(raw)
+        override fun decrypt(encryptedBase64: String, ivBase64: String): ByteArray = invalidPlaintext
+      }
+    val provider = DatabasePassphraseProvider(
+      context,
+      invalidLengthBackend,
+      prefs,
+    ) { File(context.cacheDir, "unused_${System.nanoTime()}.db") }
+
+    var caught: DatabaseSecurityException? = null
+    try {
+      provider.getOrCreatePassphrase()
+    } catch (error: DatabaseSecurityException) {
+      caught = error
+    }
+
+    assertEquals(PassphraseFailureReason.KEY_CORRUPTED, caught?.reason)
+    assertTrue("Rejected decrypted passphrase must be zeroed", invalidPlaintext.all { it == 0.toByte() })
+  }
+
+  @Test
   fun `temporary Keystore decrypt failure preserves wrapped key and recovers on retry`() {
     val prefs = context.getSharedPreferences("keystore_temp_fail_${System.nanoTime()}", Context.MODE_PRIVATE)
     val dbFile = File(context.cacheDir, "existing_db_${System.nanoTime()}.db")
