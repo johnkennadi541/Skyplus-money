@@ -432,21 +432,7 @@ class InvestmentRepositoryImpl @Inject constructor(
               updatedAt = now,
             )
 
-          val snapshot =
-            InvestmentPriceHistory(
-              id = UUID.randomUUID().toString(),
-              holdingId = holdingId,
-              userId = authenticatedUserId,
-              priceDate = now,
-              unitPriceDecimal = existing.currentMarketPriceDecimal,
-              valuationMinor = mutation.newValuationMinor,
-              totalInvestedMinor = mutation.newOpenCostBasisMinor,
-              realizedPnlMinor = existing.realizedPnlMinor,
-              currencyCode = existing.currencyCode,
-              source = PriceSourceType.MANUAL,
-              providerLabel = "Additional Purchase",
-              createdAt = now,
-            )
+          // Trades belong in the transaction ledger; they are not market-price observations.
 
           investmentDao.insertTransaction(InvestmentTransactionEntity.fromDomain(tx))
           val rows =
@@ -455,7 +441,6 @@ class InvestmentRepositoryImpl @Inject constructor(
               authenticatedUserId,
             )
           check(rows == 1) { "Failed to update holding after purchase" }
-          investmentDao.insertPriceHistory(InvestmentPriceHistoryEntity.fromDomain(snapshot))
           tx
         }
       }
@@ -541,21 +526,7 @@ class InvestmentRepositoryImpl @Inject constructor(
               updatedAt = now,
             )
 
-          val snapshot =
-            InvestmentPriceHistory(
-              id = UUID.randomUUID().toString(),
-              holdingId = holdingId,
-              userId = authenticatedUserId,
-              priceDate = transactionDate,
-              unitPriceDecimal = existing.currentMarketPriceDecimal,
-              valuationMinor = mutation.newValuationMinor,
-              totalInvestedMinor = mutation.remainingOpenCostBasisMinor,
-              realizedPnlMinor = mutation.newCumulativeRealizedPnlMinor,
-              currencyCode = existing.currencyCode,
-              source = PriceSourceType.MANUAL,
-              providerLabel = if (mutation.isCompleteExit) "Complete Sale" else "Partial Sale",
-              createdAt = now,
-            )
+          // Do not synthesize a price-history point from a trade and a potentially stale quote.
 
           investmentDao.insertTransaction(InvestmentTransactionEntity.fromDomain(tx))
           val rows =
