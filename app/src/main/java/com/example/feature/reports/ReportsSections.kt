@@ -530,7 +530,9 @@ fun InvestmentsReportSection(
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
           }
-          if (row.isStalePrice) {
+          if (row.lastPriceUpdateDate <= 0L) {
+            OceanStatusBadge(text = "Awaiting first price", tone = BadgeTone.WARNING)
+          } else if (row.isStalePrice) {
             OceanStatusBadge(text = "Price older than 7 days", tone = BadgeTone.WARNING)
           }
         }
