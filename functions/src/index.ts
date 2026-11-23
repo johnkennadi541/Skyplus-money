@@ -33,7 +33,11 @@ export const sendWelcomeEmail = onCall(
     const uid = request.auth?.uid;
     const email = request.auth?.token.email;
     const emailVerified = request.auth?.token.email_verified === true;
+    const signInProvider = request.auth?.token.firebase?.sign_in_provider;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in is required.");
+    if (signInProvider !== "google.com") {
+      throw new HttpsError("permission-denied", "A Google-authenticated session is required.");
+    }
     if (typeof email !== "string" || !emailVerified) {
       throw new HttpsError("failed-precondition", "A verified Google email address is required.");
     }
