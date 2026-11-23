@@ -138,6 +138,7 @@ fun CardsContent(
     accountId: String,
     issuerName: String,
     network: CreditCardNetwork,
+    isActive: Boolean,
     last4: String,
     limitDecimal: String,
     billingCycleDay: Int,
@@ -242,9 +243,9 @@ fun CardsContent(
     CardFormDialog(
       linkableAccounts = linkableAccounts,
       onDismiss = { showCreateDialog = false },
-      onSave = { accountId, issuer, network, last4, limit, cycleDay, dueOffset, apr, joiningFee, annualFee, annualMonth, rewardProgram, reminderEnabled, reminderDays, notes, onDone ->
+      onSave = { accountId, issuer, network, isActive, last4, limit, cycleDay, dueOffset, apr, joiningFee, annualFee, annualMonth, rewardProgram, reminderEnabled, reminderDays, notes, onDone ->
         onCreateCard(
-          accountId, issuer, network, last4, limit, cycleDay, dueOffset, apr,
+          accountId, issuer, network, isActive, last4, limit, cycleDay, dueOffset, apr,
           joiningFee, annualFee, annualMonth, rewardProgram, reminderEnabled, reminderDays, notes, onDone,
         )
       },
@@ -257,10 +258,11 @@ fun CardsContent(
       existingCard = summary.card,
       existingAccountName = summary.account.name,
       onDismiss = { cardToEdit = null },
-      onSave = { _, issuer, network, last4, limit, cycleDay, dueOffset, apr, joiningFee, annualFee, annualMonth, rewardProgram, reminderEnabled, reminderDays, notes, onDone ->
+      onSave = { _, issuer, network, isActive, last4, limit, cycleDay, dueOffset, apr, joiningFee, annualFee, annualMonth, rewardProgram, reminderEnabled, reminderDays, notes, onDone ->
         val updated = summary.card.copy(
           issuerName = issuer,
           network = network,
+          isActive = isActive,
           last4 = last4,
           billingCycleDay = cycleDay,
           paymentDueDayOffset = dueOffset,
@@ -345,6 +347,10 @@ private fun CardTile(
           if (summary.isOverLimit) {
             Spacer(modifier = Modifier.width(OceanSpacing.xs))
             OceanStatusBadge(text = "Over limit", tone = BadgeTone.NEGATIVE)
+          }
+          if (!summary.card.isActive) {
+            Spacer(modifier = Modifier.width(OceanSpacing.xs))
+            OceanStatusBadge(text = "Inactive", tone = BadgeTone.WARNING)
           }
           if (summary.card.isFrozen) {
             Spacer(modifier = Modifier.width(OceanSpacing.xs))
@@ -448,6 +454,7 @@ private fun CardFormDialog(
     accountId: String,
     issuerName: String,
     network: CreditCardNetwork,
+    isActive: Boolean,
     last4: String,
     limitDecimal: String,
     billingCycleDay: Int,
@@ -466,6 +473,7 @@ private fun CardFormDialog(
   var selectedAccountId by remember { mutableStateOf(existingCard?.accountId ?: linkableAccounts.firstOrNull()?.id.orEmpty()) }
   var issuer by remember { mutableStateOf(existingCard?.issuerName.orEmpty()) }
   var network by remember { mutableStateOf(existingCard?.network ?: CreditCardNetwork.VISA) }
+  var isActive by remember { mutableStateOf(existingCard?.isActive ?: true) }
   var last4 by remember { mutableStateOf(existingCard?.last4.orEmpty()) }
   var limitText by remember {
     mutableStateOf(existingCard?.let { minorToDecimal(it.creditLimitMinor, it.currencyCode) }.orEmpty())
@@ -572,6 +580,13 @@ private fun CardFormDialog(
           label = "Rewards programme",
           placeholder = "Cashback / Reward points",
         )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+          Column(modifier = Modifier.weight(1f)) {
+            Text("Card status", style = MaterialTheme.typography.labelLarge)
+            Text("Inactive cards remain in history but won't trigger reminders.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          }
+          Switch(checked = isActive, onCheckedChange = { isActive = it })
+        }
         Text("Card network", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         CreditCardNetwork.entries.chunked(3).forEach { rowNetworks ->
           Row(horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs)) {
@@ -658,6 +673,7 @@ private fun CardFormDialog(
               selectedAccountId,
               issuer,
               network,
+              isActive,
               last4,
               limitText,
               cycle!!,
