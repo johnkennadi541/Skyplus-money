@@ -53,6 +53,13 @@ class CreditCardManagementValidationTest {
         card.userId,
       )
     }
+    assertThrows(IllegalArgumentException::class.java) {
+      CreditCardStatementValidation.requireValid(
+        statement(statementDate = 1_000L, dueDate = 2_000L, balance = 10_000L, minimum = 1_000L)
+          .copy(lateFeeMinor = -1L),
+        card.userId,
+      )
+    }
   }
 
   @Test
