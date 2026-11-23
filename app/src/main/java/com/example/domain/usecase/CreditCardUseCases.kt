@@ -57,6 +57,7 @@ constructor(private val creditCardRepository: CreditCardRepository) {
         accountId = accountId,
         issuerName = issuerName.trim(),
         network = network,
+        isActive = isActive,
         last4 = last4.trim(),
         creditLimitMinor = creditLimitMinor,
         currencyCode = currencyCode.uppercase().trim(),
