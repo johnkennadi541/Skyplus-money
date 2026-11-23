@@ -15,6 +15,8 @@ import com.example.data.local.db.DatabaseMigrations
 import com.example.data.local.db.dao.AccountMappingRuleDao
 import com.example.data.local.db.dao.BudgetDao
 import com.example.data.local.db.dao.CreditCardDao
+import com.example.data.local.db.dao.CreditCardStatementDao
+import com.example.data.local.db.dao.CreditCardRewardEventDao
 import com.example.data.local.db.dao.FinancialAccountDao
 import com.example.data.local.db.dao.FinancialTransactionDao
 import com.example.data.local.db.dao.InvestmentDao
@@ -82,6 +84,7 @@ object DatabaseModule {
           DatabaseMigrations.MIGRATION_6_7,
           DatabaseMigrations.MIGRATION_7_8,
           DatabaseMigrations.MIGRATION_8_9,
+          DatabaseMigrations.MIGRATION_9_10,
         )
 
     if (factoryHolder.delegate != null || factoryHolder.lastError != null) {
@@ -211,6 +214,14 @@ object DatabaseModule {
   @Provides
   fun provideCreditCardDao(database: AppDatabase): CreditCardDao =
     database.creditCardDao()
+
+  @Provides
+  fun provideCreditCardStatementDao(database: AppDatabase): CreditCardStatementDao =
+    database.creditCardStatementDao()
+
+  @Provides
+  fun provideCreditCardRewardEventDao(database: AppDatabase): CreditCardRewardEventDao =
+    database.creditCardRewardEventDao()
 
   @Provides
   fun provideSavingsGoalDao(database: AppDatabase): SavingsGoalDao =
