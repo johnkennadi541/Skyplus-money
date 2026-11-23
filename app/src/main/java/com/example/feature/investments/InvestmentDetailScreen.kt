@@ -232,7 +232,13 @@ fun InvestmentDetailContent(
           Spacer(modifier = Modifier.height(OceanSpacing.sm))
 
           DetailMetricRow("Held Units", holding.quantityDecimal)
-          DetailMetricRow("Current Unit Price", "${holding.currentMarketPriceDecimal} $curr (as of ${dateFormatter.format(Date(holding.lastPriceUpdateDate))})")
+          val priceDateLabel =
+            if (holding.lastPriceUpdateDate > 0L) {
+              "as of ${dateFormatter.format(Date(holding.lastPriceUpdateDate))}"
+            } else {
+              "awaiting first NAV"
+            }
+          DetailMetricRow("Current Unit Price", "${holding.currentMarketPriceDecimal} $curr ($priceDateLabel)")
           DetailMetricRow("Avg Cost / Unit", "${performance.averageCostPerUnitDisplay} $curr")
           DetailMetricRow("Open Invested Cost", FormatMoneyUseCase().format(Money.fromMinorUnits(holding.totalInvestedMinor, curr)))
           DetailMetricRow("Total Buy Capital", FormatMoneyUseCase().format(Money.fromMinorUnits(holding.totalBuyCostMinor, curr)))
