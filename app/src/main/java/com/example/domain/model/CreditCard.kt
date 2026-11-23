@@ -105,6 +105,7 @@ data class CreditCardStatementSummary(
   val currencyCode: String,
   val paidAmountMinor: Long,
   val remainingDueMinor: Long,
+  val remainingMinimumDueMinor: Long,
   val status: CreditCardStatementStatus,
 ) {
   val statementBalance: Money
@@ -115,6 +116,9 @@ data class CreditCardStatementSummary(
 
   val remainingDue: Money
     get() = Money.fromMinorUnits(remainingDueMinor, currencyCode)
+
+  val remainingMinimumDue: Money
+    get() = Money.fromMinorUnits(remainingMinimumDueMinor, currencyCode)
 }
 
 /** Immutable reward ledger event. Positive pointsDelta earns points; negative redeems/adjusts them. */
