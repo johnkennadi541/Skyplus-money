@@ -470,6 +470,7 @@ fun RecordTradeDialog(
   var chargesText by remember { mutableStateOf("0") }
   var notes by remember { mutableStateOf("") }
   var validationError by remember { mutableStateOf<String?>(null) }
+  var calculatorTarget by remember { mutableStateOf<String?>(null) }
 
   val livePreview =
     remember(tradeType, quantityText, unitPriceText, chargesText) {
@@ -569,6 +570,11 @@ fun RecordTradeDialog(
             label = { Text("Unit Price *") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
+            trailingIcon = {
+              IconButton(onClick = { calculatorTarget = "price" }, modifier = Modifier.testTag("trade_price_calculator_button")) {
+                Icon(Icons.Rounded.Calculate, contentDescription = "Calculate unit price")
+              }
+            },
             modifier = Modifier.weight(1f).testTag("trade_price_input"),
           )
         }
@@ -579,6 +585,11 @@ fun RecordTradeDialog(
           label = { Text("Transaction Charges (${holding.currencyCode})") },
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
           singleLine = true,
+          trailingIcon = {
+            IconButton(onClick = { calculatorTarget = "charges" }, modifier = Modifier.testTag("trade_charges_calculator_button")) {
+              Icon(Icons.Rounded.Calculate, contentDescription = "Calculate trade charges")
+            }
+          },
           modifier = Modifier.fillMaxWidth().testTag("trade_charges_input"),
         )
 
@@ -589,6 +600,16 @@ fun RecordTradeDialog(
           singleLine = true,
           modifier = Modifier.fillMaxWidth().testTag("trade_notes_input"),
         )
+        if (calculatorTarget != null) {
+          SmartCalculatorAmountDialog(
+            initialExpression = if (calculatorTarget == "price") unitPriceText else chargesText,
+            onApply = { calculatedAmount ->
+              if (calculatorTarget == "price") unitPriceText = calculatedAmount else chargesText = calculatedAmount
+              calculatorTarget = null
+            },
+            onDismiss = { calculatorTarget = null },
+          )
+        }
 
         if (livePreview != null) {
           Surface(
@@ -683,6 +704,7 @@ fun UpdateMarketPriceDialog(
   var priceText by remember(holding) { mutableStateOf(holding.currentMarketPriceDecimal) }
   var dateText by remember { mutableStateOf(formatDateIso(System.currentTimeMillis())) }
   var errorText by remember { mutableStateOf<String?>(null) }
+  var showPriceCalculator by remember { mutableStateOf(false) }
 
   AlertDialog(
     onDismissRequest = onDismiss,
@@ -701,8 +723,23 @@ fun UpdateMarketPriceDialog(
           label = { Text("Current Price per Unit (${holding.currencyCode}) *") },
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
           singleLine = true,
+          trailingIcon = {
+            IconButton(onClick = { showPriceCalculator = true }, modifier = Modifier.testTag("manual_price_calculator_button")) {
+              Icon(Icons.Rounded.Calculate, contentDescription = "Calculate manual market price")
+            }
+          },
           modifier = Modifier.fillMaxWidth().testTag("manual_price_input"),
         )
+        if (showPriceCalculator) {
+          SmartCalculatorAmountDialog(
+            initialExpression = priceText,
+            onApply = { calculatedAmount ->
+              priceText = calculatedAmount
+              showPriceCalculator = false
+            },
+            onDismiss = { showPriceCalculator = false },
+          )
+        }
         Row(
           modifier = Modifier.fillMaxWidth(),
           verticalAlignment = Alignment.CenterVertically,
