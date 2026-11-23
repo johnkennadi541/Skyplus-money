@@ -42,6 +42,12 @@ constructor(private val creditCardRepository: CreditCardRepository) {
     billingCycleDay: Int = 1,
     paymentDueDayOffset: Int = 20,
     aprPercent: String = "0",
+    annualFeeMinor: Long = 0L,
+    annualFeeMonth: Int = 1,
+    rewardProgramName: String? = null,
+    reminderEnabled: Boolean = true,
+    reminderDaysBefore: Int = 3,
+    notes: String? = null,
   ): Result<CreditCard> {
     val card =
       CreditCard(
@@ -55,6 +61,12 @@ constructor(private val creditCardRepository: CreditCardRepository) {
         billingCycleDay = billingCycleDay,
         paymentDueDayOffset = paymentDueDayOffset,
         aprPercent = aprPercent.trim(),
+        annualFeeMinor = annualFeeMinor,
+        annualFeeMonth = annualFeeMonth,
+        rewardProgramName = rewardProgramName?.trim()?.takeIf { it.isNotBlank() },
+        reminderEnabled = reminderEnabled,
+        reminderDaysBefore = reminderDaysBefore,
+        notes = notes?.trim()?.takeIf { it.isNotBlank() },
       )
     return creditCardRepository.createCard(authenticatedUserId, card)
   }
