@@ -247,7 +247,7 @@ fun ShoppingListContent(
           ) {
             Icon(imageVector = Icons.Rounded.Add, contentDescription = null)
             Spacer(modifier = Modifier.width(4.dp))
-            Text("Add Item")
+            Text("Keyboard")
           }
         }
       }
