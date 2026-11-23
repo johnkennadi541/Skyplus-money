@@ -206,6 +206,7 @@ constructor(
             statementBalanceMinor = statement.statementBalanceMinor,
             minimumDueMinor = statement.minimumDueMinor,
             feesMinor = statement.feesMinor,
+            lateFeeMinor = statement.lateFeeMinor,
             interestMinor = statement.interestMinor,
             notes = statement.notes,
             updatedAt = System.currentTimeMillis(),
