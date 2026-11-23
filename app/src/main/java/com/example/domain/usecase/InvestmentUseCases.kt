@@ -249,12 +249,10 @@ class SyncMarketPricesUseCase @Inject constructor(
 
   suspend fun syncNow(
     authenticatedUserId: String,
-    allowOverwriteManual: Boolean = false,
     forceBypassCooldown: Boolean = true,
   ): Result<MarketSyncSummary> =
     repository.syncEligibleMarketPrices(
       authenticatedUserId = authenticatedUserId,
-      allowOverwriteManual = allowOverwriteManual,
       forceBypassCooldown = forceBypassCooldown,
     )
 }
