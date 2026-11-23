@@ -93,12 +93,10 @@ interface InvestmentRepository {
     priceDate: Long,
     source: PriceSourceType,
     providerLabel: String,
-    allowOverwriteManual: Boolean = false,
   ): Result<Boolean>
 
   suspend fun syncEligibleMarketPrices(
     authenticatedUserId: String,
-    allowOverwriteManual: Boolean = false,
     forceBypassCooldown: Boolean = false,
   ): Result<MarketSyncSummary>
 
