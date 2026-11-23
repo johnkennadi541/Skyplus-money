@@ -68,16 +68,32 @@ fun CardsScreen(
 ) {
   val cards by viewModel.cards.collectAsStateWithLifecycle()
   val linkableAccounts by viewModel.linkableAccounts.collectAsStateWithLifecycle()
+  val accounts by viewModel.accounts.collectAsStateWithLifecycle()
+  val selectedCardStatements by viewModel.selectedCardStatements.collectAsStateWithLifecycle()
+  val selectedCardRewardEvents by viewModel.selectedCardRewardEvents.collectAsStateWithLifecycle()
+  val selectedCardTransactions by viewModel.selectedCardTransactions.collectAsStateWithLifecycle()
+  val selectedCardAnalytics by viewModel.selectedCardAnalytics.collectAsStateWithLifecycle()
   val message by viewModel.userMessage.collectAsStateWithLifecycle()
   val isError by viewModel.isErrorMessage.collectAsStateWithLifecycle()
 
   CardsContent(
     cards = cards,
     linkableAccounts = linkableAccounts,
+    accounts = accounts,
+    selectedCardStatements = selectedCardStatements,
+    selectedCardRewardEvents = selectedCardRewardEvents,
+    selectedCardTransactions = selectedCardTransactions,
+    selectedCardAnalytics = selectedCardAnalytics,
     message = message,
     isErrorMessage = isError,
     onDismissMessage = viewModel::dismissMessage,
     onCreateCard = viewModel::createCard,
+    onUpdateCard = viewModel::updateCard,
+    onToggleCardFrozen = viewModel::setCardFrozen,
+    onSelectCardDetails = viewModel::selectCardDetails,
+    onClearCardDetails = viewModel::clearCardDetails,
+    onCreateStatement = viewModel::createStatement,
+    onAddRewardEvent = viewModel::addRewardEvent,
     onDeleteCard = viewModel::deleteCard,
     modifier = modifier,
   )
