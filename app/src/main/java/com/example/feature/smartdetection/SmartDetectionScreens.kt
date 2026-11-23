@@ -39,7 +39,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -86,27 +85,6 @@ import com.example.domain.usecase.FormatMoneyUseCase
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
-private val SUPPORTED_FINANCIAL_APPS =
-  listOf(
-    "com.google.android.apps.nbu.paisa.user" to "Google Pay",
-    "com.phonepe.app" to "PhonePe",
-    "net.one97.paytm" to "Paytm",
-    "in.org.npci.upiapp" to "BHIM UPI",
-    "com.amazon.mShop.android.shopping" to "Amazon Pay",
-    "com.whatsapp" to "WhatsApp Pay",
-    "com.snapwork.hdfc" to "HDFC Bank",
-    "com.sbi.lotusintouch" to "YONO SBI",
-    "com.icicibank.mobile" to "iMobile ICICI",
-    "com.axis.mobile" to "Axis Mobile",
-    "com.msf.kbank.mobile" to "Kotak 811",
-    "com.chase.sig.android" to "Chase Bank",
-    "com.wf.wellsfargomobile" to "Wells Fargo",
-    "com.bofa.mobilebanking" to "Bank of America",
-    "com.citi.citimobile" to "Citi Mobile",
-    "com.alrajhibank" to "Al Rajhi Bank",
-    "com.nbk.mobile" to "National Bank of Kuwait",
-  )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -229,7 +207,7 @@ fun SmartDetectionSettingsScreen(
                 fontWeight = FontWeight.SemiBold,
               )
               Text(
-                text = "Pause or resume on-device bank & UPI notification parsing anytime.",
+                text = "Pause or resume SMS notification parsing from your current default SMS app.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
               )
@@ -258,7 +236,7 @@ fun SmartDetectionSettingsScreen(
                 fontWeight = FontWeight.SemiBold,
               )
               Text(
-                text = "Verified completed transactions with >=80% confidence and mapped accounts auto-save offline.",
+                text = "Completed high-confidence transactions with an exact account match are posted automatically. Ambiguous items remain in Review Queue.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
               )
@@ -288,7 +266,7 @@ fun SmartDetectionSettingsScreen(
               Spacer(modifier = Modifier.width(OceanSpacing.sm))
               Column {
                 Text("Review Queue", style = MaterialTheme.typography.titleMedium)
-                Text("Uncertain or unmapped detections awaiting review", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("SMS detections that could not be safely matched to an account or transaction type", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
               }
             }
             OceanStatusBadge(
@@ -369,34 +347,24 @@ fun SmartDetectionSettingsScreen(
         }
       }
 
-      // Permitted Source Financial Apps Section
+      // Strict SMS-only source boundary; no email or bank-app notification access.
       item {
-        OceanSectionHeader(
-          title = "Permitted Financial Apps",
-          subtitle = "Notifications from unselected apps are ignored immediately",
-          modifier = Modifier.widthIn(max = 760.dp),
-        )
-      }
-
-      items(SUPPORTED_FINANCIAL_APPS, key = { it.first }) { (pkg, label) ->
-        val isAllowed = settings.permittedPackages.contains(pkg)
         OceanCard(
-          modifier = Modifier.widthIn(max = 760.dp).testTag("permitted_app_$pkg"),
-          onClick = { viewModel.togglePermittedPackage(pkg, !isAllowed) },
+          modifier = Modifier.widthIn(max = 760.dp).testTag("sms_only_source_policy_card"),
         ) {
           Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(OceanSpacing.sm),
           ) {
+            Icon(Icons.Rounded.Sms, contentDescription = null, tint = OceanTheme.colors.positive)
             Column(modifier = Modifier.weight(1f)) {
-              Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
-              Text(pkg, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+              Text("SMS Notifications Only", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+              Text(
+                "Only notifications posted by your phone's current default SMS app are inspected. Email apps and bank/UPI app notifications are ignored before their content is read. SKYPLUS MONEY does not read your SMS inbox.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
             }
-            Checkbox(
-              checked = isAllowed,
-              onCheckedChange = { checked -> viewModel.togglePermittedPackage(pkg, checked) },
-            )
           }
         }
       }
