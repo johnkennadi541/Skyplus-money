@@ -27,7 +27,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Public, zero-API-key Mutual Fund NAV provider backed by MFapi.in / AMFI India Official Daily Feed.
+ * Public, zero-API-key Mutual Fund NAV provider using the third-party MFapi.in API,
+ * which republishes AMFI-sourced daily NAV data. MFapi.in is not operated by AMFI.
+ * Free/no-key access is not itself a commercial redistribution licence; verify terms
+ * before any commercial release.
  *
  * Terms & Safety Guardrails:
  * - Supports ONLY [InvestmentCategory.MUTUAL_FUNDS] identified by 5-7 digit AMFI scheme code.
@@ -240,7 +243,7 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
 
   companion object {
     const val DEFAULT_BASE_URL = "https://api.mfapi.in"
-    const val PROVIDER_LABEL = "MFapi.in / AMFI India (EOD)"
+    const val PROVIDER_LABEL = "MFapi.in (third-party API; AMFI-sourced EOD NAV)"
     private const val MAX_RESPONSE_BYTES = 64 * 1024
     private const val INDIAN_CURRENCY_CODE = "INR"
     private const val MAX_FUTURE_CLOCK_SKEW_MILLIS = 5L * 60L * 1000L
