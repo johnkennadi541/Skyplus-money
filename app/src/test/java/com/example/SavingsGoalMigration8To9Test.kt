@@ -304,13 +304,13 @@ class SavingsGoalRoomMigrationIntegrationTest {
         com.example.data.local.db.AppDatabase::class.java,
         dbName,
       )
-        .addMigrations(DatabaseMigrations.MIGRATION_8_9, DatabaseMigrations.MIGRATION_9_10)
+        .addMigrations(DatabaseMigrations.MIGRATION_8_9, DatabaseMigrations.MIGRATION_9_10, DatabaseMigrations.MIGRATION_10_11)
         .build()
 
     try {
       val database = migrated.openHelper.writableDatabase
 
-      assertEquals(10, database.version)
+      assertEquals(11, database.version)
       assertEquals(1, database.query("SELECT COUNT(*) FROM financial_accounts").use { cursor ->
         cursor.moveToFirst()
         cursor.getInt(0)
