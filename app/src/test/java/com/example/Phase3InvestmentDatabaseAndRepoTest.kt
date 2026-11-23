@@ -140,7 +140,7 @@ class Phase3InvestmentDatabaseAndRepoTest {
 
   @Test
   fun `manual overwrite flag cannot bypass global market update opt in`() = runTest {
-    syncPreferences.setAutoUpdateConsent(false)
+    syncPreferences.setAutoUpdateConsent("uid_opt_in_guard", false)
     var fetchCount = 0
     val dataSource =
       object : MarketPriceDataSource {
