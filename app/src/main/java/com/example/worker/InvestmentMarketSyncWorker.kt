@@ -38,6 +38,13 @@ class InvestmentMarketSyncWorker @AssistedInject constructor(
         forceBypassCooldown = false,
       )
 
-    return if (outcome.isSuccess) Result.success() else Result.retry()
+    return outcome.fold(
+      onSuccess = { summary ->
+        // Per-holding network/response failures are summarized inside a successful
+        // repository result; ask WorkManager to retry those rather than waiting a day.
+        if (summary.errorCount > 0) Result.retry() else Result.success()
+      },
+      onFailure = { Result.retry() },
+    )
   }
 }
