@@ -250,6 +250,8 @@ class Phase3ReportsIntegrationAndUiTest {
     composeTestRule.onNodeWithTag("open_reports_from_transactions_btn").assertIsDisplayed().performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("reports_screen").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("daily_auto_entry_report_card").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("daily_auto_entry_report_time_button").assertIsDisplayed()
 
     // Back to Transactions
     composeTestRule.onNodeWithTag("reports_back_button").performClick()
