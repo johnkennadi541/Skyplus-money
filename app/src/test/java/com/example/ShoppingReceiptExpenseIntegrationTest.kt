@@ -7,6 +7,9 @@ import com.example.data.local.db.AppDatabase
 import com.example.data.local.db.entity.FinancialAccountEntity
 import com.example.data.repository.ShoppingExtendedRepositoryImpl
 import com.example.domain.model.ShoppingReceipt
+import com.example.domain.model.ShoppingPantryItem
+import com.example.domain.model.ShoppingMealPlan
+import com.example.domain.model.ShoppingMealIngredient
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -76,6 +79,38 @@ class ShoppingReceiptExpenseIntegrationTest {
     assertEquals(1, transactions.size)
     assertEquals("EXPENSE", transactions.single().type)
     assertEquals(1_250L, transactions.single().amountMinor)
+  }
+
+  @Test fun pantryUpsertAndMealPlanIngredientsStayUserScopedAndPersist() = runTest {
+    repository.savePantryItem(
+      "user-1",
+      ShoppingPantryItem(userId = "user-1", name = "Rice", quantityDecimal = "2", unit = "kg", lowStockThresholdDecimal = "0.5"),
+    ).getOrThrow()
+    repository.savePantryItem(
+      "user-1",
+      ShoppingPantryItem(userId = "user-1", name = "rice", quantityDecimal = "3", unit = "KG", lowStockThresholdDecimal = "1"),
+    ).getOrThrow()
+    val pantry = repository.observePantry("user-1").first()
+    assertEquals(1, pantry.size)
+    assertEquals("3", pantry.single().quantityDecimal)
+
+    val planId = "meal-plan-1"
+    repository.createMealPlan(
+      "user-1",
+      ShoppingMealPlan(
+        id = planId, userId = "user-1", title = "Dinner", plannedDate = 1_800_000_000_000L,
+        mealType = "DINNER",
+        ingredients = listOf(
+          ShoppingMealIngredient(userId = "user-1", mealPlanId = planId, name = "Rice", quantityDecimal = "1", unit = "kg"),
+        ),
+      ),
+    ).getOrThrow()
+    val plan = repository.observeMealPlans("user-1").first().single()
+    assertEquals("Dinner", plan.title)
+    assertEquals("Rice", plan.ingredients.single().name)
+    assertTrue(repository.observeMealPlans("another-user").first().isEmpty())
+    repository.deleteMealPlan("user-1", planId).getOrThrow()
+    assertTrue(repository.observeMealPlans("user-1").first().isEmpty())
   }
 
   @Test fun crossUserCannotPostAnotherUsersReceipt() = runTest {
