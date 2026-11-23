@@ -458,8 +458,8 @@ class SmartDetectionRepositoryImpl @Inject constructor(
           check(updatedRows == 1) { "Detection event approval rejected for authenticated user" }
 
           if (!event.detectedAccountLast4.isNullOrBlank()) {
-            val existingRule = mappingDao.findRuleForPattern(userId, event.detectedAccountLast4)
-            if (existingRule == null) {
+            val existingRules = mappingDao.findRulesForPattern(userId, event.detectedAccountLast4)
+            if (existingRules.isEmpty()) {
               mappingDao.insertRule(
                 AccountMappingRuleEntity(
                   id = UUID.randomUUID().toString(),
