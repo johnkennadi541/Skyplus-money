@@ -96,8 +96,14 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
         callFactory.newCall(httpRequest).execute().use { response ->
           if (response.code == 429) {
             val retryAfterSeconds = response.header("Retry-After")?.toLongOrNull()
+            val retryAfterMillis =
+              retryAfterSeconds
+                ?.takeIf { it > 0L }
+                ?.coerceAtMost(MAX_RETRY_AFTER_SECONDS)
+                ?.times(1000L)
+                ?: DEFAULT_RETRY_AFTER_MILLIS
             return@withContext MarketQuoteFetchResult.RateLimited(
-              retryAfterMillis = (retryAfterSeconds ?: 60L) * 1000L,
+              retryAfterMillis = retryAfterMillis,
               message = "MFapi.in rate limit reached (HTTP 429). Retry later or update NAV manually.",
             )
           }
@@ -181,6 +187,11 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
         ?: return MarketQuoteFetchResult.InvalidResponse("Market feed contained no NAV entries.")
 
     val navText = latestPoint.nav?.trim().orEmpty()
+    // Reject exponent notation and unbounded precision before BigDecimal.toPlainString().
+    // A tiny payload such as 1e999999999 must never trigger a huge allocation.
+    if (!NAV_DECIMAL_REGEX.matches(navText)) {
+      return MarketQuoteFetchResult.InvalidResponse("NAV decimal is outside the permitted precision.")
+    }
     val navDecimal =
       try {
         BigDecimal(navText)
@@ -247,6 +258,9 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
     private const val MAX_RESPONSE_BYTES = 64 * 1024
     private const val INDIAN_CURRENCY_CODE = "INR"
     private const val MAX_FUTURE_CLOCK_SKEW_MILLIS = 5L * 60L * 1000L
+    private const val DEFAULT_RETRY_AFTER_MILLIS = 60_000L
+    private const val MAX_RETRY_AFTER_SECONDS = 24L * 60L * 60L
+    private val NAV_DECIMAL_REGEX = Regex("^\\d{1,12}(\\.\\d{1,10})?$")
     private val INDIA_ZONE_ID: ZoneId = ZoneId.of("Asia/Kolkata")
     private val AMFI_DATE_FORMATTER: DateTimeFormatter =
       DateTimeFormatter.ofPattern("dd-MM-uuuu", Locale.US).withResolverStyle(ResolverStyle.STRICT)
