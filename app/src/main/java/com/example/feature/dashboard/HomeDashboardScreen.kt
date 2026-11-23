@@ -220,6 +220,7 @@ fun HomeDashboardScreen(
           onOpenPortfolio = onOpenPortfolio,
           onOpenReports = onOpenReports,
           onOpenEmiCalculator = onOpenEmiCalculator,
+          onOpenSmartCalculator = onOpenSmartCalculator,
           onOpenLoans = onOpenLoans,
           onOpenSmartDetection = onOpenSmartDetection,
           onOpenReviewQueue = onOpenReviewQueue,
