@@ -54,7 +54,7 @@ class ShoppingExtendedRepositoryImpl @Inject constructor(
 
   override suspend fun savePantryItem(authenticatedUserId: String, item: ShoppingPantryItem): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank() && item.userId == authenticatedUserId) {
           "Pantry item ownership verification failed"
         }
@@ -88,7 +88,7 @@ class ShoppingExtendedRepositoryImpl @Inject constructor(
 
   override suspend fun deletePantryItem(authenticatedUserId: String, itemId: String): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank() && itemId.isNotBlank())
         val rows = shoppingDao.deletePantryItem(authenticatedUserId, itemId)
         check(rows == 1) { "Pantry item not found for authenticated user" }
@@ -97,7 +97,7 @@ class ShoppingExtendedRepositoryImpl @Inject constructor(
 
   override suspend fun createMealPlan(authenticatedUserId: String, plan: ShoppingMealPlan): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank() && plan.userId == authenticatedUserId) {
           "Meal plan ownership verification failed"
         }
@@ -134,7 +134,7 @@ class ShoppingExtendedRepositoryImpl @Inject constructor(
 
   override suspend fun deleteMealPlan(authenticatedUserId: String, planId: String): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank() && planId.isNotBlank())
         database.withTransaction {
           val rows = shoppingDao.deleteMealPlan(authenticatedUserId, planId)
@@ -145,7 +145,7 @@ class ShoppingExtendedRepositoryImpl @Inject constructor(
 
   override suspend fun saveReceiptReview(authenticatedUserId: String, receipt: ShoppingReceipt): Result<ShoppingReceipt> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank() && receipt.userId == authenticatedUserId) {
           "Receipt ownership verification failed"
         }
@@ -173,7 +173,7 @@ class ShoppingExtendedRepositoryImpl @Inject constructor(
     receiptId: String,
     accountId: String,
   ): Result<ShoppingReceipt> = withContext(dispatchers.io) {
-    runCatching {
+    runCatchingPreservingCancellation {
       require(authenticatedUserId.isNotBlank() && receiptId.isNotBlank() && accountId.isNotBlank())
       database.withTransaction {
         val receipt = shoppingDao.getReceipt(authenticatedUserId, receiptId)
