@@ -56,7 +56,9 @@ class DailyAutoEntryReportWorker @AssistedInject constructor(
 
     // Schedule the next local-time report even if Android currently suppresses notifications.
     val latestSettings = reportPreferences.observeDailyAutoEntrySettings(userId).first()
-    if (latestSettings.enabled) scheduler.updateSchedule(userId, latestSettings, appendAfterCurrent = true)
+    if (!isStopped && latestSettings.enabled) {
+      scheduler.updateSchedule(userId, latestSettings, appendAfterCurrent = true)
+    }
     return Result.success()
   }
 
