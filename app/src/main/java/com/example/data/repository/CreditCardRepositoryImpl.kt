@@ -123,6 +123,10 @@ constructor(
             creditCardDao.getCardById(authenticatedUserId, card.id)
               ?: throw SecurityException("Card does not belong to authenticated user")
           require(existing.userId == authenticatedUserId) { "Card ownership verification failed" }
+          require(existing.accountId == card.accountId) { "A card cannot be moved to another ledger account" }
+          require(existing.currencyCode.equals(card.currencyCode, ignoreCase = true)) {
+            "A card's currency cannot be changed after it is linked to an account"
+          }
 
           val rows =
             creditCardDao.updateCardScoped(
