@@ -214,6 +214,30 @@ class SavingsGoalMigration8To9Test {
  * Exercises the migration through Room itself: a complete v8 entity schema is created by Room,
  * then the production v9 AppDatabase opens the same file and validates its complete schema.
  */
+@androidx.room.Entity(
+  tableName = "credit_cards",
+  indices = [
+    androidx.room.Index(value = ["accountId"], unique = true),
+    androidx.room.Index(value = ["userId"]),
+  ],
+)
+data class CreditCardVersion8Entity(
+  @androidx.room.PrimaryKey val id: String,
+  val userId: String,
+  val accountId: String,
+  val issuerName: String,
+  val network: String,
+  val last4: String,
+  val creditLimitMinor: Long,
+  val currencyCode: String,
+  val billingCycleDay: Int,
+  val paymentDueDayOffset: Int,
+  val aprPercent: String,
+  val isActive: Boolean,
+  val createdAt: Long,
+  val updatedAt: Long,
+)
+
 @androidx.room.Database(
   entities = [
     com.example.data.local.db.entity.FinancialAccountEntity::class,
@@ -222,7 +246,7 @@ class SavingsGoalMigration8To9Test {
     com.example.data.local.db.entity.AccountMappingRuleEntity::class,
     com.example.data.local.db.entity.BudgetEntity::class,
     com.example.data.local.db.entity.BudgetPeriodEntity::class,
-    com.example.data.local.db.entity.CreditCardEntity::class,
+    CreditCardVersion8Entity::class,
     com.example.data.local.db.entity.LoanEntity::class,
     com.example.data.local.db.entity.LoanPaymentEntity::class,
     com.example.data.local.db.entity.InvestmentHoldingEntity::class,
