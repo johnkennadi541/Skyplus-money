@@ -253,6 +253,14 @@ class Phase3InvestmentDatabaseAndRepoTest {
         "status": "SUCCESS"
       }
       """.trimIndent()
+    val invalidDateJson =
+      """
+      {
+        "meta": {"scheme_name": "Parag Parikh Flexi Cap Fund"},
+        "data": [{"date": "31-02-2026", "nav": "84.5678"}],
+        "status": "SUCCESS"
+      }
+      """.trimIndent()
 
     var mode = "SUCCESS"
     val callFactory =
@@ -284,6 +292,14 @@ class Phase3InvestmentDatabaseAndRepoTest {
               .message("OK")
               .body("{bad_json".toResponseBody("application/json".toMediaType()))
               .build()
+          "INVALID_DATE" ->
+            Response.Builder()
+              .request(req)
+              .protocol(Protocol.HTTP_1_1)
+              .code(200)
+              .message("OK")
+              .body(invalidDateJson.toResponseBody("application/json".toMediaType()))
+              .build()
           else ->
             Response.Builder()
               .request(req)
@@ -312,12 +328,24 @@ class Phase3InvestmentDatabaseAndRepoTest {
     assertTrue(badCodeRes is MarketQuoteFetchResult.UnsupportedCategoryOrIdentifier)
 
     val validReq = MarketQuoteRequest("h_mf", InvestmentCategory.MUTUAL_FUNDS, "122639", null, "INR")
+    val wrongCurrencyReq = MarketQuoteRequest("h_mf_usd", InvestmentCategory.MUTUAL_FUNDS, "122639", null, "USD")
+    assertTrue(
+      "An INR NAV must never be applied to a non-INR holding",
+      provider.fetchLatestQuote(wrongCurrencyReq) is MarketQuoteFetchResult.UnsupportedCategoryOrIdentifier,
+    )
 
     mode = "SUCCESS"
     val success = provider.fetchLatestQuote(validReq) as MarketQuoteFetchResult.Success
     assertEquals("84.5678", success.unitPriceDecimal)
     assertEquals(PriceSourceType.MFAPI_AMFI_EOD, success.source)
     assertEquals("Parag Parikh Flexi Cap Fund", success.instrumentName)
+    assertTrue("AMFI EOD quote timestamp must not be future-dated", success.asOfMillis <= System.currentTimeMillis())
+
+    mode = "INVALID_DATE"
+    assertTrue(
+      "An invalid NAV date must not be stamped with the current time",
+      provider.fetchLatestQuote(validReq) is MarketQuoteFetchResult.InvalidResponse,
+    )
 
     mode = "RATE_LIMIT"
     val rateLimited = provider.fetchLatestQuote(validReq) as MarketQuoteFetchResult.RateLimited
