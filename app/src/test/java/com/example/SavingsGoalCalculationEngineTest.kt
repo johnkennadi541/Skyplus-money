@@ -80,6 +80,17 @@ class SavingsGoalCalculationEngineTest {
   }
 
   @Test
+  fun `zero and negative persisted contributions are rejected`() {
+    for (invalidAmount in listOf(0L, -1L)) {
+      val error =
+        expectIllegalArgument {
+          engine.savedMinor(goal(), listOf(contribution(invalidAmount)))
+        }
+      assertTrue(error.message.orEmpty().contains("greater than zero"))
+    }
+  }
+
+  @Test
   fun `remaining is the target minus saved`() {
     assertEquals(40_000L, engine.remainingMinor(goal(), 60_000L))
   }

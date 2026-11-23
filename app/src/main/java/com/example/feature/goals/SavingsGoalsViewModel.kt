@@ -19,11 +19,14 @@ import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -60,13 +63,43 @@ constructor(
   /** True until the first database result arrives, so the empty state is never shown too early. */
   val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+  private val _hasLoadError = MutableStateFlow(false)
+  val hasLoadError: StateFlow<Boolean> = _hasLoadError.asStateFlow()
+
+  // Incrementing this value re-subscribes to the current user's database Flow after a failure.
+  private val retryLoadRequests = MutableStateFlow(0)
+
   @OptIn(ExperimentalCoroutinesApi::class)
   val goals: StateFlow<List<SavingsGoalSummary>> =
-    sessionFlow
-      .map { session -> (session as? AuthSessionState.Authenticated)?.user?.uid }
-      .flatMapLatest { uid -> observeSavingsGoalsUseCase(uid) }
-      .onEach { _isLoading.value = false }
+    combine(sessionFlow, retryLoadRequests) { session, _ ->
+      (session as? AuthSessionState.Authenticated)?.user?.uid
+    }
+      .flatMapLatest { uid ->
+        observeSavingsGoalsUseCase(uid)
+          .onStart {
+            _isLoading.value = true
+            _hasLoadError.value = false
+          }
+          .onEach { _isLoading.value = false }
+          .catch {
+            // Do not expose exception details: they may contain implementation or storage data.
+            _isLoading.value = false
+            _hasLoadError.value = true
+            _userMessage.value = "Couldn't load savings goals. Please try again."
+            _isErrorMessage.value = true
+            emit(emptyList())
+          }
+      }
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+  /** Retry the current user's goals query after a recoverable database observation failure. */
+  fun retryGoalsLoad() {
+    _userMessage.value = null
+    _isErrorMessage.value = false
+    _hasLoadError.value = false
+    _isLoading.value = true
+    retryLoadRequests.value += 1
+  }
 
   fun dismissMessage() {
     _userMessage.value = null

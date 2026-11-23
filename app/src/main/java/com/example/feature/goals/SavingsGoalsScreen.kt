@@ -62,12 +62,15 @@ fun SavingsGoalsScreen(
 ) {
   val goals by viewModel.goals.collectAsStateWithLifecycle()
   val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+  val hasLoadError by viewModel.hasLoadError.collectAsStateWithLifecycle()
   val message by viewModel.userMessage.collectAsStateWithLifecycle()
   val isError by viewModel.isErrorMessage.collectAsStateWithLifecycle()
 
   SavingsGoalsContent(
     goals = goals,
     isLoading = isLoading,
+    hasLoadError = hasLoadError,
+    onRetryLoadGoals = viewModel::retryGoalsLoad,
     message = message,
     isErrorMessage = isError,
     onDismissMessage = viewModel::dismissMessage,
@@ -90,6 +93,8 @@ fun SavingsGoalsContent(
   onAddContribution: (summary: SavingsGoalSummary, amountDecimal: String, note: String?, onSuccess: () -> Unit) -> Unit,
   onDeleteGoal: (goalId: String, onSuccess: () -> Unit) -> Unit,
   onEditGoal: (goal: SavingsGoal, name: String, currencyCode: String, targetDecimal: String, note: String?, deadlineText: String, onSuccess: () -> Unit) -> Unit = { _, _, _, _, _, _, _ -> },
+  hasLoadError: Boolean = false,
+  onRetryLoadGoals: () -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
   var showCreateDialog by remember { mutableStateOf(false) }
@@ -131,7 +136,7 @@ fun SavingsGoalsContent(
         }
       }
 
-      if (message != null) {
+      if (message != null && !hasLoadError) {
         item {
           SkyplusInlineMessage(
             text = message,
@@ -147,6 +152,22 @@ fun SavingsGoalsContent(
         }
         item {
           SkyplusSkeletonCard(modifier = Modifier.fillMaxWidth().testTag("goals_loading_second"))
+        }
+      } else if (hasLoadError) {
+        item {
+          SkyplusEmptyState(
+            title = "Couldn't load savings goals",
+            message = "Your saved goals couldn't be loaded. Check your connection or storage, then try again.",
+            icon = Icons.Rounded.Savings,
+            modifier = Modifier.testTag("goals_load_error"),
+          )
+        }
+        item {
+          SkyplusTertiaryButton(
+            text = "Retry",
+            onClick = onRetryLoadGoals,
+            modifier = Modifier.testTag("retry_goals_load"),
+          )
         }
       } else if (goals.isEmpty()) {
         item {

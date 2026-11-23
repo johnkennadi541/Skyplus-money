@@ -34,6 +34,9 @@ class SavingsGoalCalculationEngine @Inject constructor() {
       require(contribution.currencyCode.equals(goal.currencyCode, ignoreCase = true)) {
         "Contribution currency must match the goal currency"
       }
+      require(contribution.amountMinor > 0L) {
+        "Contribution amount must be greater than zero"
+      }
       total = Math.addExact(total, contribution.amountMinor)
     }
     return total

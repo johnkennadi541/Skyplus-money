@@ -208,3 +208,111 @@ class SavingsGoalMigration8To9Test {
     assertEquals(1, countOf("savings_contributions"))
   }
 }
+
+
+/**
+ * Exercises the migration through Room itself: a complete v8 entity schema is created by Room,
+ * then the production v9 AppDatabase opens the same file and validates its complete schema.
+ */
+@androidx.room.Database(
+  entities = [
+    com.example.data.local.db.entity.FinancialAccountEntity::class,
+    com.example.data.local.db.entity.FinancialTransactionEntity::class,
+    com.example.data.local.db.entity.TransactionDetectionEventEntity::class,
+    com.example.data.local.db.entity.AccountMappingRuleEntity::class,
+    com.example.data.local.db.entity.BudgetEntity::class,
+    com.example.data.local.db.entity.BudgetPeriodEntity::class,
+    com.example.data.local.db.entity.CreditCardEntity::class,
+    com.example.data.local.db.entity.LoanEntity::class,
+    com.example.data.local.db.entity.LoanPaymentEntity::class,
+    com.example.data.local.db.entity.InvestmentHoldingEntity::class,
+    com.example.data.local.db.entity.InvestmentTransactionEntity::class,
+    com.example.data.local.db.entity.InvestmentPriceHistoryEntity::class,
+    com.example.data.local.db.entity.ShoppingListEntity::class,
+    com.example.data.local.db.entity.ShoppingItemEntity::class,
+    com.example.data.local.db.entity.ShoppingStorePriceEntity::class,
+  ],
+  version = 8,
+  exportSchema = false,
+)
+abstract class SavingsGoalVersion8Database : androidx.room.RoomDatabase()
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
+class SavingsGoalRoomMigrationIntegrationTest {
+
+  @Test
+  fun `Room opens a complete version 8 database through the production 8 to 9 migration`() {
+    val context = RuntimeEnvironment.getApplication()
+    val dbName = "savings-room-migration-integration.db"
+    context.deleteDatabase(dbName)
+
+    val version8 =
+      androidx.room.Room.databaseBuilder(
+        context,
+        SavingsGoalVersion8Database::class.java,
+        dbName,
+      ).build()
+
+    version8.openHelper.writableDatabase.execSQL(
+      """
+      INSERT INTO financial_accounts
+        (id, userId, name, accountType, currencyCode, initialBalanceMinor, currentBalanceMinor,
+         institutionName, accountNumberLast4, colorHex, isActive, createdAt, updatedAt)
+      VALUES ('room_acc_1', 'uid_room_test', 'Salary', 'BANK', 'INR', 0, 250000,
+              'SBI', '9999', '#0A2540', 1, 111, 222)
+      """.trimIndent()
+    )
+    version8.close()
+
+    val migrated =
+      androidx.room.Room.databaseBuilder(
+        context,
+        com.example.data.local.db.AppDatabase::class.java,
+        dbName,
+      )
+        .addMigrations(DatabaseMigrations.MIGRATION_8_9)
+        .build()
+
+    try {
+      val database = migrated.openHelper.writableDatabase
+
+      assertEquals(9, database.version)
+      assertEquals(1, database.query("SELECT COUNT(*) FROM financial_accounts").use { cursor ->
+        cursor.moveToFirst()
+        cursor.getInt(0)
+      })
+      database.query(
+        "SELECT name, currentBalanceMinor, createdAt, updatedAt FROM financial_accounts WHERE id = 'room_acc_1'"
+      ).use { cursor ->
+        assertTrue(cursor.moveToFirst())
+        assertEquals("Salary", cursor.getString(0))
+        assertEquals(250_000L, cursor.getLong(1))
+        assertEquals(111L, cursor.getLong(2))
+        assertEquals(222L, cursor.getLong(3))
+      }
+
+      for (table in listOf("savings_goals", "savings_contributions")) {
+        database.query(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+          arrayOf<Any>(table),
+        ).use { cursor -> assertTrue("Missing migrated table: $table", cursor.moveToFirst()) }
+      }
+      for (index in listOf(
+        "index_savings_goals_userId",
+        "index_savings_goals_userId_currencyCode",
+        "index_savings_contributions_userId",
+        "index_savings_contributions_userId_goalId",
+        "index_savings_contributions_userId_goalId_contributedAt",
+      )) {
+        database.query(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?",
+          arrayOf<Any>(index),
+        ).use { cursor -> assertTrue("Missing migrated index: $index", cursor.moveToFirst()) }
+      }
+    } finally {
+      migrated.close()
+      context.deleteDatabase(dbName)
+    }
+  }
+}

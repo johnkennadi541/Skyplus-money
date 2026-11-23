@@ -85,12 +85,16 @@ class SavingsGoalsScreenTest {
   private fun render(
     summaries: List<SavingsGoalSummary>,
     isLoading: Boolean = false,
+    hasLoadError: Boolean = false,
+    onRetryLoadGoals: () -> Unit = {},
   ) {
     composeTestRule.setContent {
       SkyplusOceanTheme(themePreference = ThemePreference.DARK) {
         SavingsGoalsContent(
           goals = summaries,
           isLoading = isLoading,
+          hasLoadError = hasLoadError,
+          onRetryLoadGoals = onRetryLoadGoals,
           message = null,
           isErrorMessage = false,
           onDismissMessage = {},
@@ -160,6 +164,19 @@ class SavingsGoalsScreenTest {
 
     composeTestRule.onNodeWithTag("goals_loading").assertIsDisplayed()
     composeTestRule.onNodeWithTag("goals_empty_state").assertDoesNotExist()
+  }
+
+  @Test
+  fun `a database load error shows a retry action instead of the empty state`() {
+    var retryCount = 0
+    render(emptyList(), hasLoadError = true, onRetryLoadGoals = { retryCount += 1 })
+
+    composeTestRule.onNodeWithTag("goals_load_error").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("retry_goals_load").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("goals_empty_state").assertDoesNotExist()
+
+    composeTestRule.onNodeWithTag("retry_goals_load").performClick()
+    assertEquals(1, retryCount)
   }
 
   @Test
