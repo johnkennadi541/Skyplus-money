@@ -91,6 +91,7 @@ fun SmartCalculatorScreen(
                   error = failure.message ?: "Invalid calculation"
                 }
                 "−" -> expression += "-"
+                "±" -> expression = if (expression.isBlank()) "-" else "-($expression)"
                 else -> expression += key
               }
             }
