@@ -640,7 +640,7 @@ class Phase3InvestmentDatabaseAndRepoTest {
     repo.setAutoUpdateConsent("uid_man", false)
     assertFalse(syncPreferences.syncSettings("uid_man").first().autoUpdateConsentEnabled)
 
-    // Attempting auto-apply without holding opt-in or allowOverwriteManual MUST NOT overwrite manual price
+    // Attempting auto-apply without holding opt-in must not overwrite manual price
     val overwrittenWhenDisabled =
       repo.applyAutomaticMarketPrice(
         authenticatedUserId = "uid_man",
