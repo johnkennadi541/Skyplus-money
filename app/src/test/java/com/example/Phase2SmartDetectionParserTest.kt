@@ -111,6 +111,19 @@ class Phase2SmartDetectionParserTest {
   }
 
   @Test
+  fun `parses additional ISO currencies and rejects excess fractional precision`() {
+    val cad = SmartTransactionParser.parse("CAD 15.25 debited from A/c XX4321 paid to Store Ref CAD123456")!!
+    assertEquals("CAD", cad.currencyCode)
+    assertEquals(1_525L, cad.amountMinor)
+
+    val jpy = SmartTransactionParser.parse("JPY 1,500 debited from A/c XX4321 paid to Store Ref JPY123456")!!
+    assertEquals("JPY", jpy.currencyCode)
+    assertEquals(1_500L, jpy.amountMinor)
+
+    assertNull(SmartTransactionParser.parse("JPY 100.50 debited from A/c XX4321 paid to Store Ref JPY654321"))
+  }
+
+  @Test
   fun `strictly rejects OTP PIN MPIN TPIN CVV password and security notifications`() {
     val sensitiveAlerts =
       listOf(
