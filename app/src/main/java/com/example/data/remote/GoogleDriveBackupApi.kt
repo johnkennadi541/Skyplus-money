@@ -129,15 +129,17 @@ class GoogleDriveBackupApi private constructor(
     }
   }
 
-  private fun parseBackupFile(json: String): DriveBackupFile? = runCatching {
-    val item = JSONObject(json)
-    val id = item.getString("id").takeIf(String::isNotBlank) ?: return null
-    DriveBackupFile(
-      id = id,
-      name = item.optString("name", BACKUP_FILE_NAME),
-      modifiedTime = item.optString("modifiedTime").takeIf(String::isNotBlank),
-    )
-  }.getOrNull()
+  private fun parseBackupFile(json: String): DriveBackupFile? =
+    runCatching {
+      val item = JSONObject(json)
+      val id = item.getString("id").takeIf(String::isNotBlank)
+        ?: throw IllegalArgumentException("Drive file ID is missing")
+      DriveBackupFile(
+        id = id,
+        name = item.optString("name", BACKUP_FILE_NAME),
+        modifiedTime = item.optString("modifiedTime").takeIf(String::isNotBlank),
+      )
+    }.getOrNull()
 
   private companion object {
     private const val FILES_URL = "https://www.googleapis.com/drive/v3/files"
