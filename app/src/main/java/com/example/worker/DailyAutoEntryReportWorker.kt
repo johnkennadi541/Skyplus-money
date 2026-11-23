@@ -22,11 +22,7 @@ import com.example.domain.repository.AuthRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
-import java.math.BigDecimal
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 
 @HiltWorker
 class DailyAutoEntryReportWorker @AssistedInject constructor(
@@ -69,54 +65,9 @@ class DailyAutoEntryReportWorker @AssistedInject constructor(
     reportDayStart: Long,
     events: List<TransactionDetectionEvent>,
   ) {
-    val autoSaved = events.filter { it.status == DetectionEventStatus.AUTO_SAVED && it.createdTransactionId != null }
-    val exceptions = events.count { it.status == DetectionEventStatus.IN_REVIEW }
-    val duplicates = events.count { it.status == DetectionEventStatus.DUPLICATE }
-
-    val currencies = autoSaved.groupBy { it.detectedCurrency }.toSortedMap()
-    val totals = currencies.map { (currency, currencyEvents) ->
-      val income = sumMinor(currencyEvents.filter { it.detectedType in setOf(TransactionType.INCOME, TransactionType.REFUND, TransactionType.REVERSAL) })
-      val expense = sumMinor(currencyEvents.filter { it.detectedType == TransactionType.EXPENSE })
-      val incomeCount = currencyEvents.count { it.detectedType in setOf(TransactionType.INCOME, TransactionType.REFUND, TransactionType.REVERSAL) }
-      val expenseCount = currencyEvents.count { it.detectedType == TransactionType.EXPENSE }
-      "$currency  Income: ${formatMinor(income, currency)} ($incomeCount)  •  Expense: ${formatMinor(expense, currency)} ($expenseCount)"
-    }
-
-    val date = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(reportDayStart))
-    val entryLines = autoSaved
-      .sortedBy { it.receivedAt }
-      .take(8)
-      .map { event ->
-        val direction = when (event.detectedType) {
-          TransactionType.INCOME, TransactionType.REFUND, TransactionType.REVERSAL -> "INCOME"
-          TransactionType.EXPENSE -> "EXPENSE"
-          else -> event.detectedType.name
-        }
-        val title = event.detectedMerchant ?: event.senderOrTitle
-        val accountHint = event.detectedAccountLast4?.let { " • A/c ••$it" }.orEmpty()
-        "$direction • $title • ${formatMinor(event.detectedAmountMinor, event.detectedCurrency)} ${event.detectedCurrency}$accountHint"
-      }
-
-    val body = buildString {
-      append("Automatically posted: ${autoSaved.size}")
-      if (totals.isNotEmpty()) {
-        append("\n")
-        append(totals.joinToString("\n"))
-      } else {
-        append("\nNo automatic entries were posted.")
-      }
-      if (entryLines.isNotEmpty()) {
-        append("\n\nEntries:")
-        append("\n")
-        append(entryLines.joinToString("\n"))
-        if (autoSaved.size > entryLines.size) {
-          append("\n+ ${autoSaved.size - entryLines.size} more entries")
-        }
-      }
-      append("\n\nNeeds attention: $exceptions")
-      append("\nDuplicates skipped: $duplicates")
-      append("\nSource: SMS notifications only")
-    }
+    val report = DailyAutoEntryReportFormatter.format(reportDayStart, events)
+    val body = report.body
+    val date = report.dateLabel
 
     runCatching {
       ensureNotificationChannel()
@@ -132,7 +83,7 @@ class DailyAutoEntryReportWorker @AssistedInject constructor(
       val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
         .setSmallIcon(android.R.drawable.ic_menu_report_image)
         .setContentTitle("SKYPLUS MONEY • Daily Auto-Entry Report")
-        .setContentText("$date — ${autoSaved.size} entries • $exceptions need attention")
+        .setContentText("$date — ${report.autoSavedCount} entries • ${report.exceptionCount} need attention")
         .setStyle(NotificationCompat.BigTextStyle().bigText("$date\n$body"))
         .setContentIntent(pendingIntent)
         .setAutoCancel(true)
@@ -155,16 +106,6 @@ class DailyAutoEntryReportWorker @AssistedInject constructor(
         },
       )
     }
-  }
-
-  private fun sumMinor(events: List<TransactionDetectionEvent>): Long =
-    events.fold(0L) { total, event -> Math.addExact(total, event.detectedAmountMinor) }
-
-  private fun formatMinor(amountMinor: Long, currencyCode: String): String {
-    val digits = runCatching { java.util.Currency.getInstance(currencyCode).defaultFractionDigits }
-      .getOrDefault(2)
-      .coerceAtLeast(0)
-    return BigDecimal.valueOf(amountMinor, digits).toPlainString()
   }
 
   private fun startOfToday(): Long =
