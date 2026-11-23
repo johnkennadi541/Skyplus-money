@@ -104,7 +104,30 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
             )
           }
 
-          val rawBody = response.body?.string()?.trim().orEmpty()
+          val body = response.body
+            ?: return@withContext MarketQuoteFetchResult.InvalidResponse(
+              message = "Market feed returned an empty response."
+            )
+          if (body.contentLength() > MAX_RESPONSE_BYTES) {
+            return@withContext MarketQuoteFetchResult.InvalidResponse(
+              message = "Market feed response exceeded the permitted size; existing price was preserved."
+            )
+          }
+
+          // Read at most one byte beyond the limit so chunked/unknown-length responses
+          // cannot force an unbounded allocation.
+          val responseBytes = body.source().readByteArray(MAX_RESPONSE_BYTES + 1L)
+          if (responseBytes.size > MAX_RESPONSE_BYTES) {
+            responseBytes.fill(0)
+            return@withContext MarketQuoteFetchResult.InvalidResponse(
+              message = "Market feed response exceeded the permitted size; existing price was preserved."
+            )
+          }
+          val rawBody = try {
+            responseBytes.toString(Charsets.UTF_8).trim()
+          } finally {
+            responseBytes.fill(0)
+          }
           if (rawBody.isEmpty()) {
             return@withContext MarketQuoteFetchResult.InvalidResponse(
               message = "Market feed returned an empty response."
@@ -119,9 +142,9 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
         MarketQuoteFetchResult.NetworkError(
           message = "Market feed unavailable while offline or unreachable. Manual entry remains active."
         )
-      } catch (t: Throwable) {
+      } catch (_: Exception) {
         MarketQuoteFetchResult.InvalidResponse(
-          message = t.message ?: "Unexpected error parsing market feed response."
+          message = "Unexpected error processing market feed response."
         )
       }
     }
@@ -208,6 +231,7 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
   companion object {
     const val DEFAULT_BASE_URL = "https://api.mfapi.in"
     const val PROVIDER_LABEL = "MFapi.in / AMFI India (EOD)"
+    private const val MAX_RESPONSE_BYTES = 64 * 1024
     private const val INDIAN_CURRENCY_CODE = "INR"
     private const val MAX_FUTURE_CLOCK_SKEW_MILLIS = 5L * 60L * 1000L
     private val INDIA_ZONE_ID: ZoneId = ZoneId.of("Asia/Kolkata")
