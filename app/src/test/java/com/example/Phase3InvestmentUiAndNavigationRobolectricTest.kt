@@ -1,6 +1,7 @@
 package com.example
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -207,6 +208,44 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("investments_list").performScrollToNode(hasTestTag("portfolio_growth_empty_state"))
     composeTestRule.onNodeWithTag("portfolio_growth_empty_state").assertIsDisplayed()
+  }
+
+  @Test
+  fun `manual only holding shows awaiting current price and does not prefill trade price`() {
+    val now = 1_755_000_000_000L
+    val stock = InvestmentHolding(
+      id = "stock_waiting",
+      userId = "u1",
+      name = "Manual-only Stock",
+      category = InvestmentCategory.STOCKS,
+      symbolOrTicker = "TEST",
+      currencyCode = "INR",
+      purchaseDate = now,
+      quantityDecimal = "1",
+      totalInvestedMinor = 100_00L,
+      totalBuyCostMinor = 100_00L,
+      currentMarketPriceDecimal = "100",
+      currentValuationMinor = 100_00L,
+      lastPriceUpdateDate = 0L,
+      lastPriceProviderLabel = "Awaiting current price",
+    )
+
+    composeTestRule.setContent {
+      SkyplusOceanTheme(themePreference = ThemePreference.LIGHT) {
+        InvestmentDetailContent(
+          holding = stock,
+          performance = engine.evaluateHoldingPerformance(stock, now),
+          transactions = emptyList(),
+          priceHistory = emptyList(),
+        )
+      }
+    }
+
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithText("Awaiting current price").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("detail_buy_more_button").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("trade_price_input").assertTextEquals("")
   }
 
   @Test
