@@ -495,6 +495,7 @@ object DatabaseMigrations {
   val MIGRATION_9_10: Migration =
     object : Migration(9, 10) {
       override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN joiningFeeMinor INTEGER NOT NULL DEFAULT 0")
         db.execSQL("ALTER TABLE credit_cards ADD COLUMN annualFeeMinor INTEGER NOT NULL DEFAULT 0")
         db.execSQL("ALTER TABLE credit_cards ADD COLUMN annualFeeMonth INTEGER NOT NULL DEFAULT 1")
         db.execSQL("ALTER TABLE credit_cards ADD COLUMN rewardProgramName TEXT")
@@ -515,6 +516,7 @@ object DatabaseMigrations {
             statementBalanceMinor INTEGER NOT NULL,
             minimumDueMinor INTEGER NOT NULL,
             feesMinor INTEGER NOT NULL,
+            lateFeeMinor INTEGER NOT NULL,
             interestMinor INTEGER NOT NULL,
             notes TEXT,
             createdAt INTEGER NOT NULL,
