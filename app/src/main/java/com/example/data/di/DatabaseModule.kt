@@ -146,22 +146,41 @@ object DatabaseModule {
     isRobolectricRunner: Boolean = isRobolectricTestEnvironment(),
     nativeLibsLoader: (Context) -> Unit = { net.sqlcipher.database.SQLiteDatabase.loadLibs(it) },
   ): SupportSQLiteOpenHelper.Factory? {
+    var passphrase: ByteArray? = null
     return try {
       nativeLibsLoader(context)
-      val passphrase = passphraseProvider.getOrCreatePassphrase()
-      SupportFactory(passphrase)
-    } catch (t: Throwable) {
+      val key = passphraseProvider.getOrCreatePassphrase()
+      passphrase = key
+      val factory = SupportFactory(key, null, true)
+      // SupportFactory owns the key buffer and clears it after SQLCipher opens the DB.
+      passphrase = null
+      factory
+    } catch (error: Exception) {
+      passphrase?.fill(0)
       val allowTestFallback = !isReleaseBuild && isRobolectricRunner
       if (allowTestFallback) {
         null
       } else {
-        throw (t as? DatabaseSecurityException)
+        throw (error as? DatabaseSecurityException)
           ?: DatabaseSecurityException(
             reason = PassphraseFailureReason.SQLCIPHER_INIT_FAILED,
             isRecoverable = true,
             message = "SQLCipher encrypted database initialization failed; plaintext fallback is prohibited.",
-            cause = t,
+            cause = error,
           )
+      }
+    } catch (error: LinkageError) {
+      passphrase?.fill(0)
+      val allowTestFallback = !isReleaseBuild && isRobolectricRunner
+      if (allowTestFallback) {
+        null
+      } else {
+        throw DatabaseSecurityException(
+          reason = PassphraseFailureReason.SQLCIPHER_INIT_FAILED,
+          isRecoverable = true,
+          message = "SQLCipher native initialization failed; plaintext fallback is prohibited.",
+          cause = error,
+        )
       }
     }
   }
