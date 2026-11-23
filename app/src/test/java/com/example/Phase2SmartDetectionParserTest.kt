@@ -7,6 +7,7 @@ import com.example.domain.model.TransactionType
 import com.example.feature.smartdetection.engine.DeduplicationEngine
 import com.example.feature.smartdetection.engine.SmartTransactionParser
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
