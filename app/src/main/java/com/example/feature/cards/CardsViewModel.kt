@@ -182,6 +182,7 @@ constructor(
     billingCycleDay: Int,
     paymentDueDayOffset: Int,
     aprPercent: String,
+    joiningFeeDecimal: String = "0",
     annualFeeDecimal: String = "0",
     annualFeeMonth: Int = 1,
     rewardProgramName: String? = null,
@@ -195,8 +196,9 @@ constructor(
 
     viewModelScope.launch {
       val limitMinor = parseAmountToMinor(limitDecimal, account.currencyCode)
+      val joiningFeeMinor = parseAmountToMinor(joiningFeeDecimal.ifBlank { "0" }, account.currencyCode)
       val annualFeeMinor = parseAmountToMinor(annualFeeDecimal.ifBlank { "0" }, account.currencyCode)
-      if (limitMinor == null || annualFeeMinor == null) {
+      if (limitMinor == null || joiningFeeMinor == null || annualFeeMinor == null) {
         _userMessage.value = "Enter a valid credit limit"
         _isErrorMessage.value = true
         return@launch
@@ -212,6 +214,7 @@ constructor(
         billingCycleDay = billingCycleDay,
         paymentDueDayOffset = paymentDueDayOffset,
         aprPercent = aprPercent.ifBlank { "0" },
+        joiningFeeMinor = joiningFeeMinor,
         annualFeeMinor = annualFeeMinor,
         annualFeeMonth = annualFeeMonth,
         rewardProgramName = rewardProgramName,
@@ -234,19 +237,21 @@ constructor(
   fun updateCard(
     card: CreditCard,
     limitDecimal: String,
+    joiningFeeDecimal: String,
     annualFeeDecimal: String,
     onSuccess: () -> Unit,
   ) {
     val uid = currentUid() ?: return
     viewModelScope.launch {
       val limitMinor = parseAmountToMinor(limitDecimal, card.currencyCode)
+      val joiningFeeMinor = parseAmountToMinor(joiningFeeDecimal.ifBlank { "0" }, card.currencyCode)
       val annualFeeMinor = parseAmountToMinor(annualFeeDecimal.ifBlank { "0" }, card.currencyCode)
-      if (limitMinor == null || annualFeeMinor == null) {
+      if (limitMinor == null || joiningFeeMinor == null || annualFeeMinor == null) {
         _userMessage.value = "Enter valid credit limit and annual fee amounts"
         _isErrorMessage.value = true
         return@launch
       }
-      updateCreditCardUseCase(uid, card.copy(creditLimitMinor = limitMinor, annualFeeMinor = annualFeeMinor))
+      updateCreditCardUseCase(uid, card.copy(creditLimitMinor = limitMinor, joiningFeeMinor = joiningFeeMinor, annualFeeMinor = annualFeeMinor))
         .onSuccess {
           _userMessage.value = "Card updated"
           _isErrorMessage.value = false
