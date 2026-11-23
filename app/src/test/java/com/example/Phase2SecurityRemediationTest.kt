@@ -398,6 +398,90 @@ class Phase2SecurityRemediationTest {
   // --- Requirement 7.6: Logout / account-switch state isolation & DAO UID predicates ---
 
   @Test
+  fun `duplicate account mapping rules never choose an arbitrary account`() = runTest {
+    val uid = "uid_duplicate_mapping"
+    val accounts = listOf(
+      FinancialAccount(
+        id = "acc_dup_a",
+        userId = uid,
+        name = "Bank A",
+        type = AccountType.BANK,
+        currencyCode = "INR",
+        initialBalanceMinor = 100_000L,
+        currentBalanceMinor = 100_000L,
+        accountNumberLast4 = "4321",
+      ),
+      FinancialAccount(
+        id = "acc_dup_b",
+        userId = uid,
+        name = "Bank B",
+        type = AccountType.BANK,
+        currencyCode = "INR",
+        initialBalanceMinor = 200_000L,
+        currentBalanceMinor = 200_000L,
+        accountNumberLast4 = "4321",
+      ),
+    )
+    accounts.forEach { accountRepo.createAccount(uid, it) }
+    detectionRepo.updateDetectionSettings(
+      uid,
+      DetectionSettings(
+        userId = uid,
+        isNotificationDetectionEnabled = true,
+        isAutoSaveHighConfidenceEnabled = true,
+      ),
+    )
+    database.accountMappingRuleDao().insertRule(
+      AccountMappingRuleEntity(
+        id = "rule_dup_a",
+        userId = uid,
+        accountId = "acc_dup_a",
+        matchPattern = "4321",
+        institutionHint = null,
+        isAutoMapped = false,
+        createdAt = 1L,
+      )
+    )
+    database.accountMappingRuleDao().insertRule(
+      AccountMappingRuleEntity(
+        id = "rule_dup_b",
+        userId = uid,
+        accountId = "acc_dup_b",
+        matchPattern = "4321",
+        institutionHint = null,
+        isAutoMapped = false,
+        createdAt = 2L,
+      )
+    )
+
+    val parsed = SmartTransactionParser.parse(
+      "Rs. 250.00 debited from A/c XX4321 paid to Swiggy Ref 5566778899",
+      "com.android.messaging",
+      1_700_000_000_000L,
+    )!!
+    val event = detectionRepo.processIncomingEvent(uid, "com.android.messaging", "Bank SMS", parsed).getOrThrow()
+
+    assertEquals(DetectionEventStatus.IN_REVIEW, event.status)
+    assertEquals(100_000L, accountRepo.getAccountById(uid, "acc_dup_a")!!.currentBalanceMinor)
+    assertEquals(200_000L, accountRepo.getAccountById(uid, "acc_dup_b")!!.currentBalanceMinor)
+    assertTrue(
+      "The API must reject a second rule for the same account reference",
+      detectionRepo.addAccountMappingRule(
+        uid,
+        AccountMappingRule(
+          id = "rule_dup_c",
+          userId = uid,
+          accountId = "acc_dup_a",
+          matchPattern = "4321",
+          institutionHint = null,
+          isAutoMapped = false,
+          createdAt = 3L,
+        ),
+      ).isFailure,
+    )
+  }
+
+  @Test
   fun `logout and account switch isolate auto-saved notices and DAOs enforce UID predicates`() = runTest {
     val uidAlice = "uid_alice"
     val uidBob = "uid_bob"
