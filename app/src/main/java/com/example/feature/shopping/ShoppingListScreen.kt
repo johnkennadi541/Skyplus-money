@@ -357,7 +357,7 @@ fun ShoppingListContent(
 
     if (lists.isEmpty()) {
       Box(
-        modifier = Modifier.fillMaxSize().padding(vertical = OceanSpacing.lg),
+        modifier = Modifier.fillMaxWidth().padding(vertical = OceanSpacing.lg),
         contentAlignment = Alignment.TopCenter,
       ) {
         OceanCard(modifier = Modifier.testTag("shopping_empty_state")) {
