@@ -323,6 +323,12 @@ fun InvestmentsContent(
         val absoluteReturn = activeSummary?.absoluteReturnMinor ?: 0L
         val returnPct = activeSummary?.returnPercent?.toPlainString() ?: "0.00"
         val staleCount = activeSummary?.staleHoldingCount ?: 0
+        val awaitingPriceCount =
+          performances.count { performance ->
+            performance.holding.currencyCode.equals(activeCurrency, ignoreCase = true) &&
+              performance.holding.lastPriceUpdateDate <= 0L &&
+              !performance.isFullyExited
+          }
 
         OceanCard(modifier = Modifier.fillMaxWidth().testTag("portfolio_summary_card")) {
           Row(
@@ -331,7 +337,9 @@ fun InvestmentsContent(
             verticalAlignment = Alignment.CenterVertically,
           ) {
             Text(
-              text = "Portfolio Valuation ($activeCurrency)",
+              text =
+                if (awaitingPriceCount > 0) "Estimated Valuation ($activeCurrency)"
+                else "Portfolio Valuation ($activeCurrency)",
               style = MaterialTheme.typography.labelLarge,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -347,6 +355,15 @@ fun InvestmentsContent(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
           )
+          if (awaitingPriceCount > 0) {
+            Spacer(modifier = Modifier.height(OceanSpacing.xxs))
+            Text(
+              text = "$awaitingPriceCount holding(s) use purchase-price estimates until a current price is entered.",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.testTag("awaiting_price_summary_note"),
+            )
+          }
           Spacer(modifier = Modifier.height(OceanSpacing.xs))
           Row(
             modifier = Modifier.fillMaxWidth(),
