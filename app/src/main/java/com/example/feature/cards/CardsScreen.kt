@@ -742,6 +742,8 @@ private fun CardDetailsDialog(
           }
         }
 
+        CardDueDateCalendar(statements)
+
         OceanCard {
           Text("Rewards", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
           Text("$pointsBalance points", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -850,6 +852,75 @@ private fun CardDetailsDialog(
         }
       },
     )
+  }
+}
+
+@Composable
+private fun CardDueDateCalendar(statements: List<CreditCardStatementSummary>) {
+  val calendar = remember {
+    java.util.Calendar.getInstance().apply {
+      set(java.util.Calendar.DAY_OF_MONTH, 1)
+      set(java.util.Calendar.HOUR_OF_DAY, 0)
+      set(java.util.Calendar.MINUTE, 0)
+      set(java.util.Calendar.SECOND, 0)
+      set(java.util.Calendar.MILLISECOND, 0)
+    }
+  }
+  val monthLabel = java.text.SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(calendar.time)
+  val offset = (calendar.get(java.util.Calendar.DAY_OF_WEEK) - java.util.Calendar.MONDAY + 7) % 7
+  val daysInMonth = calendar.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+  val dueDays = statements.mapNotNull { statement ->
+    java.util.Calendar.getInstance().apply { timeInMillis = statement.statement.dueDate }
+      .takeIf { it.get(java.util.Calendar.MONTH) == calendar.get(java.util.Calendar.MONTH) &&
+        it.get(java.util.Calendar.YEAR) == calendar.get(java.util.Calendar.YEAR) }
+      ?.get(java.util.Calendar.DAY_OF_MONTH)
+  }.toSet()
+  val cells: List<Int?> = (List(offset) { null } + (1..daysInMonth).map { it }).let { values ->
+    values + List((7 - values.size % 7) % 7) { null }
+  }
+
+  OceanCard {
+    Text("Payment due-date calendar", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+    Text(monthLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(modifier = Modifier.fillMaxWidth()) {
+      listOf("M", "T", "W", "T", "F", "S", "S").forEach { day ->
+        Text(day, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center, style = MaterialTheme.typography.labelSmall)
+      }
+    }
+    cells.chunked(7).forEach { week ->
+      Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        week.forEach { day ->
+          Surface(
+            modifier = Modifier.weight(1f).height(34.dp),
+            shape = RoundedCornerShape(50),
+            color = when {
+              day == null -> MaterialTheme.colorScheme.surface
+              day in dueDays -> OceanTheme.colors.accentContainer
+              else -> MaterialTheme.colorScheme.surfaceVariant
+            },
+          ) {
+            Box(contentAlignment = Alignment.Center) {
+              if (day != null) {
+                Text(
+                  text = day.toString(),
+                  style = MaterialTheme.typography.labelSmall,
+                  fontWeight = if (day in dueDays) FontWeight.Bold else FontWeight.Normal,
+                )
+              }
+            }
+          }
+        }
+      }
+    }
+    if (dueDays.isNotEmpty()) {
+      Text(
+        "Due dates highlighted: ${dueDays.sorted().joinToString(", ")}",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    } else {
+      Text("No statement due dates in this month.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
   }
 }
 
