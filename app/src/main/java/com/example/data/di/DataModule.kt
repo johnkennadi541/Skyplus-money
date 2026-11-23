@@ -22,6 +22,12 @@ abstract class DataModule {
 
   @Binds
   @Singleton
+  abstract fun bindWelcomeEmailSender(
+    impl: com.example.data.remote.FirebaseWelcomeEmailSender
+  ): com.example.domain.repository.WelcomeEmailSender
+
+  @Binds
+  @Singleton
   abstract fun bindConsentRepository(
     impl: ConsentRepositoryImpl
   ): ConsentRepository
