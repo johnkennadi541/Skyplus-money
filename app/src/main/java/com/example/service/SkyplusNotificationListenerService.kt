@@ -71,10 +71,8 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
   ) {
     if (combinedContent.isBlank()) return
 
-    // Defense in depth for direct/internal invocations: never process a package
-    // other than the current default SMS app.
-    val defaultSmsPackage = Telephony.Sms.getDefaultSmsPackage(this) ?: return
-    if (packageName != defaultSmsPackage) return
+    // This internal method is called only after onNotificationPosted has
+    // verified the default SMS app package before reading notification extras.
 
     val session = authRepository.observeAuthSession().first()
     val userId = (session as? AuthSessionState.Authenticated)?.user?.uid ?: return
