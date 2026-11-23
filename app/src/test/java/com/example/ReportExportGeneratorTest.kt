@@ -3,6 +3,8 @@ package com.example
 import com.example.domain.model.AccountType
 import com.example.domain.model.FinancialAccount
 import com.example.domain.model.FinancialTransaction
+import com.example.domain.model.InvestmentCategory
+import com.example.domain.model.InvestmentHolding
 import com.example.domain.model.ReportDateWindow
 import com.example.domain.model.ReportExportFormat
 import com.example.domain.model.ReportPeriodType
@@ -91,7 +93,25 @@ class ReportExportGeneratorTest {
       budgets = emptyList(),
       loans = emptyList(),
       loanPayments = emptyList(),
-      holdings = emptyList(),
+      holdings =
+        listOf(
+          InvestmentHolding(
+            id = "holding_report_test",
+            userId = "secret_uid_999",
+            name = "Index Fund",
+            category = InvestmentCategory.MUTUAL_FUNDS,
+            symbolOrTicker = "119598",
+            currencyCode = "INR",
+            purchaseDate = 1_750_000_000_000L,
+            quantityDecimal = "10",
+            totalInvestedMinor = 100_000L,
+            totalBuyCostMinor = 100_000L,
+            realizedPnlMinor = 5_000L,
+            currentMarketPriceDecimal = "125.00",
+            currentValuationMinor = 125_000L,
+            lastPriceUpdateDate = 1_751_900_000_000L,
+          ),
+        ),
       investmentTransactions = emptyList(),
       investmentPriceHistory = emptyList(),
       shoppingLists = emptyList(),
@@ -112,6 +132,29 @@ class ReportExportGeneratorTest {
     assertTrue(csvText.contains("'=CMD_INJECTION"))
     assertFalse("UID must never appear in CSV export", csvText.contains("secret_uid_999"))
     assertFalse("Account number must never appear in CSV export", csvText.contains("9876"))
+  }
+
+  @Test
+  fun `investment exports include realized return and quote freshness details`() {
+    val snapshot = buildSampleSnapshot()
+    val csvText = String(exportGenerator.generateExport(snapshot, ReportExportFormat.CSV).bytes, StandardCharsets.UTF_8)
+    assertTrue(csvText.contains("Realized"))
+    assertTrue(csvText.contains("Return 30.00%"))
+    assertTrue(csvText.contains("Price as of"))
+    assertTrue(csvText.contains("Stale false"))
+
+    val docx = exportGenerator.generateExport(snapshot, ReportExportFormat.DOCX)
+    val entries = mutableMapOf<String, String>()
+    ZipInputStream(ByteArrayInputStream(docx.bytes)).use { zis ->
+      var entry = zis.nextEntry
+      while (entry != null) {
+        entries[entry.name] = String(zis.readBytes(), StandardCharsets.UTF_8)
+        entry = zis.nextEntry
+      }
+    }
+    val documentXml = entries.getValue("word/document.xml")
+    assertTrue(documentXml.contains("Realized"))
+    assertTrue(documentXml.contains("Price as of"))
   }
 
   @Test
