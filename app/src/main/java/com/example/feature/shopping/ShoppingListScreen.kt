@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
@@ -87,6 +89,9 @@ import com.example.domain.usecase.ShoppingReceiptDraft
 import com.example.domain.usecase.ShoppingInsightsEngine
 import com.example.domain.usecase.ShoppingPantryEngine
 import com.example.domain.usecase.ShoppingMealPlannerEngine
+import com.example.domain.usecase.ShoppingAnalyticsSnapshot
+import com.example.domain.usecase.PantryAlert
+import com.example.domain.usecase.ShoppingSmartSuggestion
 import com.example.domain.usecase.ShoppingItemDraft
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -283,6 +288,7 @@ fun ShoppingListContent(
         .fillMaxSize()
         .padding(horizontal = OceanSpacing.md, vertical = OceanSpacing.md)
         .widthIn(max = 840.dp)
+        .then(if (lists.isEmpty()) Modifier.verticalScroll(rememberScrollState()) else Modifier)
         .testTag("shopping_screen"),
     verticalArrangement = Arrangement.spacedBy(OceanSpacing.sm),
   ) {
@@ -315,157 +321,6 @@ fun ShoppingListContent(
             Icon(imageVector = Icons.Rounded.Add, contentDescription = null)
             Spacer(modifier = Modifier.width(4.dp))
             Text("Keyboard")
-          }
-        }
-      }
-    }
-
-    ShoppingReceiptCaptureAction(
-      onReceiptReady = { receiptDraft = it },
-      modifier = Modifier.fillMaxWidth(),
-    )
-    if (activeList != null) {
-      ShoppingCaptureActions(
-        onDraftsReady = { drafts -> importedDrafts = drafts },
-        modifier = Modifier.fillMaxWidth(),
-      )
-    }
-
-    if (analytics.totalsByCurrency.isNotEmpty()) {
-      OceanCard(modifier = Modifier.fillMaxWidth().testTag("shopping_analytics_card")) {
-        Column(
-          modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
-          verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
-        ) {
-          Text("Shopping Analytics", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-          analytics.totalsByCurrency.forEach { total ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-              Text("Actual spend · ${total.currencyCode}")
-              Text(formatMoneyUseCase.format(Money.fromMinorUnits(total.actualSpentMinor, total.currencyCode)), fontWeight = FontWeight.SemiBold)
-            }
-          }
-          analytics.categories.take(4).forEach { category ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-              Text(category.category, style = MaterialTheme.typography.bodySmall)
-              Text(formatMoneyUseCase.format(Money.fromMinorUnits(category.actualSpentMinor, category.currencyCode)), style = MaterialTheme.typography.bodySmall)
-            }
-          }
-          analytics.monthly.takeLast(4).forEach { month ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-              Text(month.yearMonthUtc + " · " + month.currencyCode, style = MaterialTheme.typography.bodySmall)
-              Text(formatMoneyUseCase.format(Money.fromMinorUnits(month.actualSpentMinor, month.currencyCode)), style = MaterialTheme.typography.bodySmall)
-            }
-          }
-        }
-      }
-    }
-
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs)) {
-      OutlinedButton(onClick = { showPantryDialog = true }, modifier = Modifier.weight(1f)) { Text("Add Pantry Stock") }
-      OutlinedButton(onClick = { showMealPlanDialog = true }, modifier = Modifier.weight(1f)) { Text("Plan a Meal") }
-    }
-
-    OceanCard(modifier = Modifier.fillMaxWidth().testTag("shopping_pantry_card")) {
-      Column(
-        modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
-        verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
-      ) {
-        Text("Pantry & Expiry", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        if (pantry.isEmpty()) Text("No pantry stock tracked yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        pantry.take(5).forEach { item ->
-          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(item.name, modifier = Modifier.weight(1f))
-            Text(item.quantityDecimal + " " + item.unit, style = MaterialTheme.typography.bodySmall)
-            TextButton(onClick = { onDeletePantryItem(item.id) }) { Text("Remove") }
-          }
-        }
-        pantryAlerts.take(5).forEach { alert ->
-          Text(
-            alert.item.name + " · " + when (alert.type) {
-              com.example.domain.usecase.PantryAlertType.LOW_STOCK -> "Low stock"
-              com.example.domain.usecase.PantryAlertType.EXPIRING_SOON -> "Expiring soon"
-              com.example.domain.usecase.PantryAlertType.EXPIRED -> "Expired"
-            },
-            color = if (alert.type == com.example.domain.usecase.PantryAlertType.EXPIRED) OceanTheme.colors.negative else MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodySmall,
-          )
-        }
-      }
-    }
-
-    if (receipts.isNotEmpty()) {
-      OceanCard(modifier = Modifier.fillMaxWidth().testTag("shopping_receipt_history_card")) {
-        Column(
-          modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
-          verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
-        ) {
-          Text("Receipt History", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-          receipts.take(5).forEach { receipt ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-              Column(modifier = Modifier.weight(1f)) {
-                Text(receipt.merchant ?: "Shopping receipt")
-                Text(receipt.status.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall)
-              }
-              Text(formatMoneyUseCase.format(Money.fromMinorUnits(receipt.totalMinor, receipt.currencyCode)))
-            }
-          }
-        }
-      }
-    }
-
-    OceanCard(modifier = Modifier.fillMaxWidth().testTag("shopping_meal_planner_card")) {
-      Column(
-        modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
-        verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
-      ) {
-        Text("Meal Planner", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        if (mealPlans.isEmpty()) Text("No meals planned yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        mealPlans.take(4).forEach { plan ->
-          Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-              Text(plan.title, fontWeight = FontWeight.Medium)
-              Text(plan.mealType.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall)
-              Text(SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date(plan.plannedDate)), style = MaterialTheme.typography.bodySmall)
-            }
-            if (plan.ingredients.isNotEmpty() && activeList != null) {
-              Text(plan.ingredients.joinToString { it.name + " " + it.quantityDecimal + " " + it.unit }, style = MaterialTheme.typography.bodySmall)
-              TextButton(onClick = { onAddMealIngredientsToList(plan, activeList.id, pantry) }) { Text("Add missing ingredients to list") }
-            }
-            TextButton(onClick = { onDeleteMealPlan(plan.id) }) { Text("Remove plan") }
-          }
-        }
-      }
-    }
-
-    if (smartSuggestions.isNotEmpty()) {
-      OceanCard(modifier = Modifier.fillMaxWidth().testTag("shopping_smart_suggestions_card")) {
-        Column(
-          modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
-          verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
-        ) {
-          Text("Smart Suggestions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-          smartSuggestions.take(5).forEach { suggestion ->
-            Text(
-              suggestion.itemName + " · " + suggestion.suggestedQuantityDecimal + " " + suggestion.unit,
-              style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(suggestion.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (activeList != null) {
-              TextButton(
-                onClick = {
-                  onAddItem(
-                    activeList.id,
-                    suggestion.itemName,
-                    ShoppingInputParser.suggestCategory(suggestion.itemName),
-                    suggestion.suggestedQuantityDecimal,
-                    suggestion.unit,
-                    "0",
-                    null,
-                    "Added from Smart Suggestions · price not entered",
-                  ) {}
-                },
-              ) { Text("Add to Shopping List") }
-            }
           }
         }
       }
@@ -538,6 +393,22 @@ fun ShoppingListContent(
           }
         }
       }
+      ShoppingExtendedSections(
+        analytics = analytics,
+        pantry = pantry,
+        pantryAlerts = pantryAlerts,
+        receipts = receipts,
+        mealPlans = mealPlans,
+        smartSuggestions = smartSuggestions,
+        activeList = activeList,
+        formatMoneyUseCase = formatMoneyUseCase,
+        onAddPantryClick = { showPantryDialog = true },
+        onPlanMealClick = { showMealPlanDialog = true },
+        onDeletePantryItem = onDeletePantryItem,
+        onDeleteMealPlan = onDeleteMealPlan,
+        onAddMealIngredientsToList = onAddMealIngredientsToList,
+        onAddItem = onAddItem,
+      )
     } else if (activeList != null && activeSummary != null) {
       // List Selector Row
       LazyRow(
@@ -669,6 +540,24 @@ fun ShoppingListContent(
         }
 
         item(key = "bottom_spacer") { Spacer(modifier = Modifier.height(OceanSpacing.xl)) }
+        item(key = "shopping_extended_workspace") {
+          ShoppingExtendedSections(
+            analytics = analytics,
+            pantry = pantry,
+            pantryAlerts = pantryAlerts,
+            receipts = receipts,
+            mealPlans = mealPlans,
+            smartSuggestions = smartSuggestions,
+            activeList = activeList,
+            formatMoneyUseCase = formatMoneyUseCase,
+            onAddPantryClick = { showPantryDialog = true },
+            onPlanMealClick = { showMealPlanDialog = true },
+            onDeletePantryItem = onDeletePantryItem,
+            onDeleteMealPlan = onDeleteMealPlan,
+            onAddMealIngredientsToList = onAddMealIngredientsToList,
+            onAddItem = onAddItem,
+          )
+        }
       }
     }
   }
@@ -1306,4 +1195,154 @@ private fun ShoppingMealPlanDialog(
     },
     dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
   )
+}
+
+
+@Composable
+private fun ShoppingExtendedSections(
+  analytics: ShoppingAnalyticsSnapshot,
+  pantry: List<ShoppingPantryItem>,
+  pantryAlerts: List<PantryAlert>,
+  receipts: List<ShoppingReceipt>,
+  mealPlans: List<ShoppingMealPlan>,
+  smartSuggestions: List<ShoppingSmartSuggestion>,
+  activeList: ShoppingList?,
+  formatMoneyUseCase: FormatMoneyUseCase,
+  onAddPantryClick: () -> Unit,
+  onPlanMealClick: () -> Unit,
+  onDeletePantryItem: (String) -> Unit,
+  onDeleteMealPlan: (String) -> Unit,
+  onAddMealIngredientsToList: (ShoppingMealPlan, String, List<ShoppingPantryItem>) -> Unit,
+  onAddItem: (String, String, String, String, String, String, String?, String?, () -> Unit) -> Unit,
+) {
+  Column(verticalArrangement = Arrangement.spacedBy(OceanSpacing.sm)) {
+    ShoppingReceiptCaptureAction(
+      onReceiptReady = { /* handled by the parent receipt dialog state */ },
+      modifier = Modifier.fillMaxWidth(),
+    )
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      OutlinedButton(onClick = onAddPantryClick, modifier = Modifier.weight(1f)) { Text("Add Pantry Stock") }
+      OutlinedButton(onClick = onPlanMealClick, modifier = Modifier.weight(1f)) { Text("Plan a Meal") }
+    }
+    if (analytics.totalsByCurrency.isNotEmpty()) {
+      OceanCard(modifier = Modifier.fillMaxWidth().testTag("shopping_analytics_card")) {
+        Column(
+          modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
+          verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
+        ) {
+          Text("Shopping Analytics", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+          analytics.totalsByCurrency.forEach { total ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+              Text("Actual spend · " + total.currencyCode)
+              Text(formatMoneyUseCase.format(Money.fromMinorUnits(total.actualSpentMinor, total.currencyCode)), fontWeight = FontWeight.SemiBold)
+            }
+          }
+          analytics.categories.take(4).forEach { category ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+              Text(category.category, style = MaterialTheme.typography.bodySmall)
+              Text(formatMoneyUseCase.format(Money.fromMinorUnits(category.actualSpentMinor, category.currencyCode)), style = MaterialTheme.typography.bodySmall)
+            }
+          }
+          analytics.monthly.takeLast(4).forEach { month ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+              Text(month.yearMonthUtc + " · " + month.currencyCode, style = MaterialTheme.typography.bodySmall)
+              Text(formatMoneyUseCase.format(Money.fromMinorUnits(month.actualSpentMinor, month.currencyCode)), style = MaterialTheme.typography.bodySmall)
+            }
+          }
+        }
+      }
+    }
+    OceanCard(modifier = Modifier.fillMaxWidth().testTag("shopping_pantry_card")) {
+      Column(
+        modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
+      ) {
+        Text("Pantry & Expiry", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        if (pantry.isEmpty()) Text("No pantry stock tracked yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        pantry.take(5).forEach { item ->
+          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(item.name, modifier = Modifier.weight(1f))
+            Text(item.quantityDecimal + " " + item.unit, style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = { onDeletePantryItem(item.id) }) { Text("Remove") }
+          }
+        }
+        pantryAlerts.take(5).forEach { alert ->
+          Text(
+            alert.item.name + " · " + when (alert.type) {
+              com.example.domain.usecase.PantryAlertType.LOW_STOCK -> "Low stock"
+              com.example.domain.usecase.PantryAlertType.EXPIRING_SOON -> "Expiring soon"
+              com.example.domain.usecase.PantryAlertType.EXPIRED -> "Expired"
+            },
+            color = if (alert.type == com.example.domain.usecase.PantryAlertType.EXPIRED) OceanTheme.colors.negative else MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+          )
+        }
+      }
+    }
+    if (receipts.isNotEmpty()) {
+      OceanCard(modifier = Modifier.fillMaxWidth().testTag("shopping_receipt_history_card")) {
+        Column(
+          modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
+          verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
+        ) {
+          Text("Receipt History", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+          receipts.take(5).forEach { receipt ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+              Column(modifier = Modifier.weight(1f)) {
+                Text(receipt.merchant ?: "Shopping receipt")
+                Text(receipt.status.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall)
+              }
+              Text(formatMoneyUseCase.format(Money.fromMinorUnits(receipt.totalMinor, receipt.currencyCode)))
+            }
+          }
+        }
+      }
+    }
+    OceanCard(modifier = Modifier.fillMaxWidth().testTag("shopping_meal_planner_card")) {
+      Column(
+        modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
+      ) {
+        Text("Meal Planner", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        if (mealPlans.isEmpty()) Text("No meals planned yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        mealPlans.take(4).forEach { plan ->
+          Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+              Text(plan.title, fontWeight = FontWeight.Medium)
+              Text(plan.mealType.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall)
+              Text(SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date(plan.plannedDate)), style = MaterialTheme.typography.bodySmall)
+            }
+            if (plan.ingredients.isNotEmpty() && activeList != null) {
+              Text(plan.ingredients.joinToString { it.name + " " + it.quantityDecimal + " " + it.unit }, style = MaterialTheme.typography.bodySmall)
+              TextButton(onClick = { onAddMealIngredientsToList(plan, activeList.id, pantry) }) { Text("Add missing ingredients to list") }
+            }
+            TextButton(onClick = { onDeleteMealPlan(plan.id) }) { Text("Remove plan") }
+          }
+        }
+      }
+    }
+    if (smartSuggestions.isNotEmpty()) {
+      OceanCard(modifier = Modifier.fillMaxWidth().testTag("shopping_smart_suggestions_card")) {
+        Column(
+          modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
+          verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
+        ) {
+          Text("Smart Suggestions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+          smartSuggestions.take(5).forEach { suggestion ->
+            Text(suggestion.itemName + " · " + suggestion.suggestedQuantityDecimal + " " + suggestion.unit, style = MaterialTheme.typography.bodyMedium)
+            Text(suggestion.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (activeList != null) {
+              TextButton(onClick = {
+                onAddItem(
+                  activeList.id, suggestion.itemName, ShoppingInputParser.suggestCategory(suggestion.itemName),
+                  suggestion.suggestedQuantityDecimal, suggestion.unit, "0", null,
+                  "Added from Smart Suggestions · price not entered",
+                ) {}
+              }) { Text("Add to Shopping List") }
+            }
+          }
+        }
+      }
+    }
+  }
 }
