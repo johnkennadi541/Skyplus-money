@@ -9,10 +9,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +28,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,6 +55,7 @@ import com.example.core.designsystem.component.SkyplusPrimaryButton
 import com.example.core.designsystem.component.SkyplusTextField
 import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
+import com.example.domain.model.CreditCard
 import com.example.domain.model.CreditCardNetwork
 import com.example.domain.model.CreditCardSummary
 import com.example.domain.model.FinancialAccount
@@ -417,6 +423,8 @@ private fun CardTile(
 @Composable
 private fun CardFormDialog(
   linkableAccounts: List<FinancialAccount>,
+  existingCard: CreditCard? = null,
+  existingAccountName: String? = null,
   onDismiss: () -> Unit,
   onSave: (
     accountId: String,
@@ -427,147 +435,206 @@ private fun CardFormDialog(
     billingCycleDay: Int,
     paymentDueDayOffset: Int,
     aprPercent: String,
-    onSuccess: () -> Unit
+    annualFeeDecimal: String,
+    annualFeeMonth: Int,
+    rewardProgramName: String?,
+    reminderEnabled: Boolean,
+    reminderDaysBefore: Int,
+    notes: String?,
+    onSuccess: () -> Unit,
   ) -> Unit,
 ) {
-  var selectedAccountId by remember { mutableStateOf(linkableAccounts.firstOrNull()?.id.orEmpty()) }
-  var issuer by remember { mutableStateOf("") }
-  var network by remember { mutableStateOf(CreditCardNetwork.VISA) }
-  var last4 by remember { mutableStateOf("") }
-  var limitText by remember { mutableStateOf("") }
-  var aprText by remember { mutableStateOf("0") }
+  var selectedAccountId by remember { mutableStateOf(existingCard?.accountId ?: linkableAccounts.firstOrNull()?.id.orEmpty()) }
+  var issuer by remember { mutableStateOf(existingCard?.issuerName.orEmpty()) }
+  var network by remember { mutableStateOf(existingCard?.network ?: CreditCardNetwork.VISA) }
+  var last4 by remember { mutableStateOf(existingCard?.last4.orEmpty()) }
+  var limitText by remember {
+    mutableStateOf(existingCard?.let { minorToDecimal(it.creditLimitMinor, it.currencyCode) }.orEmpty())
+  }
+  var aprText by remember { mutableStateOf(existingCard?.aprPercent ?: "0") }
+  var billingCycleDay by remember { mutableStateOf((existingCard?.billingCycleDay ?: 1).toString()) }
+  var dueOffset by remember { mutableStateOf((existingCard?.paymentDueDayOffset ?: 20).toString()) }
+  var annualFeeText by remember {
+    mutableStateOf(existingCard?.let { minorToDecimal(it.annualFeeMinor, it.currencyCode) } ?: "0")
+  }
+  var annualFeeMonth by remember { mutableStateOf((existingCard?.annualFeeMonth ?: 1).toString()) }
+  var rewardProgram by remember { mutableStateOf(existingCard?.rewardProgramName.orEmpty()) }
+  var reminderEnabled by remember { mutableStateOf(existingCard?.reminderEnabled ?: true) }
+  var reminderDays by remember { mutableStateOf((existingCard?.reminderDaysBefore ?: 3).toString()) }
+  var notes by remember { mutableStateOf(existingCard?.notes.orEmpty()) }
   var formError by remember { mutableStateOf<String?>(null) }
 
   androidx.compose.material3.AlertDialog(
     onDismissRequest = onDismiss,
     modifier = Modifier.testTag("card_form_dialog"),
-    title = { Text("Add credit card") },
+    title = { Text(if (existingCard == null) "Add credit card" else "Edit credit card") },
     text = {
-      Column(verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs)) {
-        Text(
-          text = "Choose the credit card account this card belongs to",
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (linkableAccounts.isEmpty()) {
+      Column(
+        modifier = Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
+      ) {
+        if (existingCard == null) {
           Text(
-            text = "No credit card account is available. Create one in Accounts first.",
+            text = "Choose the credit card account this card belongs to",
             style = MaterialTheme.typography.bodySmall,
-            color = OceanTheme.colors.warning,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
-        }
-        linkableAccounts.forEach { account ->
-          val selected = account.id == selectedAccountId
-          Surface(
-            modifier =
-              Modifier.fillMaxWidth()
-                .clickable { selectedAccountId = account.id }
-                .testTag("card_account_option_${account.id}"),
-            shape = MaterialTheme.shapes.small,
-            color =
-              if (selected) OceanTheme.colors.accentContainer
-              else MaterialTheme.colorScheme.surfaceVariant,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
-          ) {
+          if (linkableAccounts.isEmpty()) {
             Text(
-              text = "${account.name} (${account.currencyCode})",
+              text = "No credit card account is available. Create one in Accounts first.",
               style = MaterialTheme.typography.bodySmall,
-              modifier = Modifier.padding(OceanSpacing.xs),
+              color = OceanTheme.colors.warning,
             )
           }
-        }
-
-        SkyplusTextField(
-          value = issuer,
-          onValueChange = { issuer = it },
-          label = "Issuer",
-          placeholder = "HDFC Bank",
-          modifier = Modifier.testTag("card_issuer_input"),
-        )
-        SkyplusTextField(
-          value = last4,
-          onValueChange = { if (it.length <= 4) last4 = it.filter { c -> c.isDigit() } },
-          label = "Last 4 digits",
-          placeholder = "1234",
-          modifier = Modifier.testTag("card_last4_input"),
-        )
-        SkyplusTextField(
-          value = limitText,
-          onValueChange = { limitText = it },
-          label = "Credit limit",
-          placeholder = "100000",
-          modifier = Modifier.testTag("card_limit_input"),
-        )
-        SkyplusTextField(
-          value = aprText,
-          onValueChange = { aprText = it },
-          label = "APR %",
-          placeholder = "42",
-          modifier = Modifier.testTag("card_apr_input"),
-        )
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
-        ) {
-          CreditCardNetwork.entries.take(4).forEach { candidate ->
-            val selected = candidate == network
+          linkableAccounts.forEach { account ->
+            val selected = account.id == selectedAccountId
             Surface(
-              modifier =
-                Modifier.clickable { network = candidate }.testTag("card_network_${candidate.name}"),
+              modifier = Modifier.fillMaxWidth().clickable { selectedAccountId = account.id }
+                .testTag("card_account_option_${account.id}"),
               shape = MaterialTheme.shapes.small,
-              color =
-                if (selected) OceanTheme.colors.accentContainer
-                else MaterialTheme.colorScheme.surfaceVariant,
+              color = if (selected) OceanTheme.colors.accentContainer else MaterialTheme.colorScheme.surfaceVariant,
+              border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
             ) {
               Text(
-                text = candidate.name,
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(horizontal = OceanSpacing.xs, vertical = 4.dp),
+                text = "${account.name} (${account.currencyCode})",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(OceanSpacing.xs),
               )
             }
           }
-        }
-        if (formError != null) {
+        } else {
           Text(
-            text = formError!!,
-            style = MaterialTheme.typography.labelSmall,
-            color = OceanTheme.colors.negative,
+            text = "Linked account: ${existingAccountName ?: existingCard.accountId}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
+        }
+
+        SkyplusTextField(value = issuer, onValueChange = { issuer = it }, label = "Issuer", placeholder = "HDFC Bank")
+        SkyplusTextField(
+          value = last4,
+          onValueChange = { last4 = it.filter(Char::isDigit).take(4) },
+          label = "Last 4 digits",
+          placeholder = "1234",
+        )
+        SkyplusTextField(value = limitText, onValueChange = { limitText = it }, label = "Credit limit", placeholder = "100000")
+        SkyplusTextField(value = aprText, onValueChange = { aprText = it }, label = "APR %", placeholder = "36.0")
+        SkyplusTextField(
+          value = billingCycleDay,
+          onValueChange = { billingCycleDay = it.filter(Char::isDigit).take(2) },
+          label = "Statement closing day (1–28)",
+          placeholder = "5",
+        )
+        SkyplusTextField(
+          value = dueOffset,
+          onValueChange = { dueOffset = it.filter(Char::isDigit).take(2) },
+          label = "Payment due days after closing (0–45)",
+          placeholder = "20",
+        )
+        SkyplusTextField(value = annualFeeText, onValueChange = { annualFeeText = it }, label = "Annual fee", placeholder = "0")
+        SkyplusTextField(
+          value = annualFeeMonth,
+          onValueChange = { annualFeeMonth = it.filter(Char::isDigit).take(2) },
+          label = "Annual fee month (1–12)",
+          placeholder = "1",
+        )
+        SkyplusTextField(
+          value = rewardProgram,
+          onValueChange = { rewardProgram = it.take(80) },
+          label = "Rewards programme",
+          placeholder = "Cashback / Reward points",
+        )
+        Text("Card network", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        CreditCardNetwork.entries.chunked(3).forEach { rowNetworks ->
+          Row(horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs)) {
+            rowNetworks.forEach { candidate ->
+              val selected = candidate == network
+              Surface(
+                modifier = Modifier.clickable { network = candidate }.testTag("card_network_${candidate.name}"),
+                shape = MaterialTheme.shapes.small,
+                color = if (selected) OceanTheme.colors.accentContainer else MaterialTheme.colorScheme.surfaceVariant,
+              ) {
+                Text(
+                  text = candidate.name,
+                  style = MaterialTheme.typography.labelSmall,
+                  modifier = Modifier.padding(horizontal = OceanSpacing.xs, vertical = 4.dp),
+                )
+              }
+            }
+          }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+          Column(modifier = Modifier.weight(1f)) {
+            Text("Payment reminders", style = MaterialTheme.typography.labelLarge)
+            Text("Notify before the statement due date", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          }
+          Switch(checked = reminderEnabled, onCheckedChange = { reminderEnabled = it })
+        }
+        if (reminderEnabled) {
+          SkyplusTextField(
+            value = reminderDays,
+            onValueChange = { reminderDays = it.filter(Char::isDigit).take(2) },
+            label = "Reminder days before due date (1–30)",
+            placeholder = "3",
+          )
+        }
+        SkyplusTextField(value = notes, onValueChange = { notes = it.take(500) }, label = "Notes", placeholder = "Optional card notes")
+        if (formError != null) {
+          Text(text = formError!!, style = MaterialTheme.typography.labelSmall, color = OceanTheme.colors.negative)
         }
       }
     },
     confirmButton = {
       SkyplusPrimaryButton(
-        text = "Save",
+        text = if (existingCard == null) "Save card" else "Save changes",
         onClick = {
+          val cycle = billingCycleDay.toIntOrNull()
+          val due = dueOffset.toIntOrNull()
+          val feeMonth = annualFeeMonth.toIntOrNull()
+          val reminderLead = reminderDays.toIntOrNull()
           if (selectedAccountId.isBlank()) {
             formError = "Choose an account first"
-            return@SkyplusPrimaryButton
-          }
-          if (issuer.isBlank()) {
+          } else if (issuer.isBlank()) {
             formError = "Enter the card issuer"
-            return@SkyplusPrimaryButton
+          } else if (cycle !in 1..28) {
+            formError = "Statement closing day must be between 1 and 28"
+          } else if (due !in 0..45) {
+            formError = "Payment due offset must be between 0 and 45"
+          } else if (feeMonth !in 1..12) {
+            formError = "Annual fee month must be between 1 and 12"
+          } else if (reminderEnabled && reminderLead !in 1..30) {
+            formError = "Reminder lead time must be between 1 and 30 days"
+          } else {
+            formError = null
+            onSave(
+              selectedAccountId,
+              issuer,
+              network,
+              last4,
+              limitText,
+              cycle!!,
+              due!!,
+              aprText.ifBlank { "0" },
+              annualFeeText.ifBlank { "0" },
+              feeMonth!!,
+              rewardProgram.ifBlank { null },
+              reminderEnabled,
+              reminderLead ?: 3,
+              notes.ifBlank { null },
+            ) { onDismiss() }
           }
-          formError = null
-          onSave(
-            selectedAccountId,
-            issuer,
-            network,
-            last4,
-            limitText,
-            1,
-            20,
-            aprText.ifBlank { "0" },
-          ) { onDismiss() }
         },
         modifier = Modifier.testTag("save_card_button"),
       )
     },
     dismissButton = {
-      com.example.core.designsystem.component.SkyplusTertiaryButton(
-        text = "Cancel",
-        onClick = onDismiss,
-      )
+      com.example.core.designsystem.component.SkyplusTertiaryButton(text = "Cancel", onClick = onDismiss)
     },
   )
+}
+
+private fun minorToDecimal(amountMinor: Long, currencyCode: String): String {
+  val digits = runCatching { java.util.Currency.getInstance(currencyCode).defaultFractionDigits }
+    .getOrDefault(2).coerceAtLeast(0)
+  return java.math.BigDecimal.valueOf(amountMinor, digits).stripTrailingZeros().toPlainString()
 }
