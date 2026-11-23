@@ -201,6 +201,12 @@ fun CardsContent(
         items(cards, key = { it.card.id }) { summary ->
           CardTile(
             summary = summary,
+            onOpenDetails = {
+              cardToDetails = summary
+              onSelectCardDetails(summary.card.id)
+            },
+            onEdit = { cardToEdit = summary },
+            onToggleFreeze = { frozen -> onToggleCardFrozen(summary.card.id, frozen) },
             onDelete = { cardToDelete = summary },
           )
         }
@@ -212,9 +218,54 @@ fun CardsContent(
     CardFormDialog(
       linkableAccounts = linkableAccounts,
       onDismiss = { showCreateDialog = false },
-      onSave = { accountId, issuer, network, last4, limit, cycleDay, dueOffset, apr, onDone ->
-        onCreateCard(accountId, issuer, network, last4, limit, cycleDay, dueOffset, apr, onDone)
+      onSave = { accountId, issuer, network, last4, limit, cycleDay, dueOffset, apr, annualFee, annualMonth, rewardProgram, reminderEnabled, reminderDays, notes, onDone ->
+        onCreateCard(
+          accountId, issuer, network, last4, limit, cycleDay, dueOffset, apr,
+          annualFee, annualMonth, rewardProgram, reminderEnabled, reminderDays, notes, onDone,
+        )
       },
+    )
+  }
+
+  cardToEdit?.let { summary ->
+    CardFormDialog(
+      linkableAccounts = emptyList(),
+      existingCard = summary.card,
+      existingAccountName = summary.account.name,
+      onDismiss = { cardToEdit = null },
+      onSave = { _, issuer, network, last4, limit, cycleDay, dueOffset, apr, annualFee, annualMonth, rewardProgram, reminderEnabled, reminderDays, notes, onDone ->
+        val updated = summary.card.copy(
+          issuerName = issuer,
+          network = network,
+          last4 = last4,
+          billingCycleDay = cycleDay,
+          paymentDueDayOffset = dueOffset,
+          aprPercent = apr,
+          annualFeeMonth = annualMonth,
+          rewardProgramName = rewardProgram,
+          reminderEnabled = reminderEnabled,
+          reminderDaysBefore = reminderDays,
+          notes = notes,
+        )
+        onUpdateCard(updated, limit, annualFee, onDone)
+      },
+    )
+  }
+
+  cardToDetails?.let { summary ->
+    CardDetailsDialog(
+      summary = summary,
+      statements = selectedCardStatements,
+      rewardEvents = selectedCardRewardEvents,
+      transactions = selectedCardTransactions,
+      analytics = selectedCardAnalytics,
+      onDismiss = {
+        cardToDetails = null
+        onClearCardDetails()
+      },
+      onToggleFrozen = { frozen -> onToggleCardFrozen(summary.card.id, frozen) },
+      onCreateStatement = onCreateStatement,
+      onAddRewardEvent = onAddRewardEvent,
     )
   }
 
