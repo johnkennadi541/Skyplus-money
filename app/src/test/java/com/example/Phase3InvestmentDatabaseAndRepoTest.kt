@@ -181,6 +181,56 @@ class Phase3InvestmentDatabaseAndRepoTest {
   }
 
   @Test
+  fun `market sync rotates through holdings beyond the five request cycle cap`() = runTest {
+    val uid = "uid_market_rotation"
+    syncPreferences.setAutoUpdateConsent(uid, true)
+    var fetchCount = 0
+    val repo = buildRepo(
+      object : MarketPriceDataSource {
+        override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult {
+          fetchCount++
+          return MarketQuoteFetchResult.Success(
+            unitPriceDecimal = "105.00",
+            asOfMillis = System.currentTimeMillis(),
+            source = PriceSourceType.MFAPI_AMFI_EOD,
+            providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
+          )
+        }
+      }
+    )
+
+    val created = (1..6).map { index ->
+      repo.createHoldingWithInitialBuy(
+        authenticatedUserId = uid,
+        name = "Fund $index",
+        category = InvestmentCategory.MUTUAL_FUNDS,
+        symbolOrTicker = (12000 + index).toString(),
+        isin = null,
+        brokerOrPlatform = null,
+        currencyCode = "INR",
+        purchaseDate = System.currentTimeMillis() - 10_000L,
+        quantityDecimal = "1",
+        purchasePriceDecimal = "100",
+        chargesMinor = 0L,
+        currentMarketPriceDecimal = null,
+        autoPriceUpdateEnabled = true,
+        notes = null,
+      ).getOrThrow()
+    }
+
+    val firstCycle = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = true).getOrThrow()
+    assertEquals(5, firstCycle.updatedCount)
+    assertEquals(5, fetchCount)
+
+    // A second cycle must prioritize the one never-quoted holding instead of repeating
+    // the first five holdings that now have a fresh EOD quote.
+    val secondCycle = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = false).getOrThrow()
+    assertEquals(1, secondCycle.updatedCount)
+    assertEquals(6, fetchCount)
+    assertTrue(created.all { repo.getHoldingById(uid, it.id)?.lastPriceSource == PriceSourceType.MFAPI_AMFI_EOD })
+  }
+
+  @Test
   fun `new investment holdings reject non INR currencies`() = runTest {
     val repo = buildRepo(
       object : MarketPriceDataSource {
