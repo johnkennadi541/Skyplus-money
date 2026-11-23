@@ -783,7 +783,7 @@ private fun CardDetailsDialog(
                   style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
-                  "Minimum ${formatter.format(item.minimumDue)} • Paid ${formatter.format(Money.fromMinorUnits(item.paidAmountMinor, item.currencyCode))} • Remaining ${formatter.format(item.remainingDue)}",
+                  "Minimum remaining ${formatter.format(item.remainingMinimumDue)} • Paid ${formatter.format(Money.fromMinorUnits(item.paidAmountMinor, item.currencyCode))} • Balance remaining ${formatter.format(item.remainingDue)}",
                   style = MaterialTheme.typography.bodySmall,
                   color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
