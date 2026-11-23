@@ -26,7 +26,7 @@ class CreditCardManagementValidationTest {
   @Test
   fun `card rejects negative annual fee and invalid reminder preferences`() {
     assertThrows(IllegalArgumentException::class.java) {
-      CreditCardValidation.requireValid(card.copy(joiningFeeMinor = -1L), card.userId)
+      CreditCardValidation.requireValidCard(card.copy(joiningFeeMinor = -1L), card.userId)
     }
     assertThrows(IllegalArgumentException::class.java) {
       CreditCardValidation.requireValid(card.copy(annualFeeMinor = -1L), card.userId)
