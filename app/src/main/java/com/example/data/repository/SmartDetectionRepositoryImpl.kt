@@ -393,6 +393,9 @@ class SmartDetectionRepositoryImpl @Inject constructor(
                 .getOrDefault(TransactionType.EXPENSE)
           val finalType =
             if (parsedType == TransactionType.PENDING) TransactionType.EXPENSE else parsedType
+          require(finalType != TransactionType.TRANSFER) {
+            "Transfer detections require both source and destination accounts; create a paired transfer from Transactions."
+          }
           val finalAmount = correctedAmountMinor ?: event.detectedAmountMinor
           val safeMerchant = sanitizeMerchant(merchant ?: event.detectedMerchant)
 
