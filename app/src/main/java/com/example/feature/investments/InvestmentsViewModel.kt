@@ -81,7 +81,7 @@ class InvestmentsViewModel @Inject constructor(
       authRepository
         .observeAuthSession()
         .distinctUntilChangedBy { (it as? AuthSessionState.Authenticated)?.user?.uid }
-        .collect {
+        .collect { session ->
           _userMessage.value = null
           _isErrorMessage.value = false
           _selectedCurrency.value = null
