@@ -45,6 +45,7 @@ class SipCalculatorNavigationRobolectricTest {
     composeTestRule.onNodeWithTag("sip_monthly_investment_input").assertIsDisplayed()
     composeTestRule.onNodeWithTag("sip_annual_rate_input").assertIsDisplayed()
     composeTestRule.onNodeWithTag("sip_tenure_input").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("sip_calculator_screen").performScrollToNode(hasTestTag("sip_result_card"))
     composeTestRule.onNodeWithTag("sip_result_card").assertIsDisplayed()
     composeTestRule.onNodeWithTag("sip_maturity_value").assertIsDisplayed()
   }
