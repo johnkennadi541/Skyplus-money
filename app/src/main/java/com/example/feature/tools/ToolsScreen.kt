@@ -53,6 +53,7 @@ fun ToolsScreen(
   onOpenBudgets: () -> Unit,
   onOpenLoans: () -> Unit,
   onOpenEmiCalculator: () -> Unit,
+  onOpenSipCalculator: () -> Unit = {},
   onOpenShoppingList: () -> Unit,
   onOpenSmartDetection: () -> Unit,
   onOpenReports: () -> Unit,
@@ -129,6 +130,13 @@ fun ToolsScreen(
         subtitle = "Work out an EMI before you borrow",
         testTag = "tools_emi_item",
         onClick = onOpenEmiCalculator,
+      )
+      ToolRow(
+        icon = Icons.Rounded.Calculate,
+        title = "SIP calculator",
+        subtitle = "Estimate monthly investment growth",
+        testTag = "tools_sip_item",
+        onClick = onOpenSipCalculator,
       )
     }
 
