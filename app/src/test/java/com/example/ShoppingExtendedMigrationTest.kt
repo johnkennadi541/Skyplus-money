@@ -6,15 +6,22 @@ import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.local.db.DatabaseMigrations
 import org.junit.Assert.assertTrue
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import org.junit.Test
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
 class ShoppingExtendedMigrationTest {
   @Test
   fun migration10To11AddsShoppingTablesWithoutDroppingExistingTables() {
     val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+    val databaseName = "shopping_extended_migration_test.db"
+    context.deleteDatabase(databaseName)
     val helper = FrameworkSQLiteOpenHelperFactory().create(
       SupportSQLiteOpenHelper.Configuration.builder(context)
-        .name(null)
+        .name(databaseName)
         .callback(object : SupportSQLiteOpenHelper.Callback(10) {
           override fun onCreate(db: SupportSQLiteDatabase) {
             db.execSQL("CREATE TABLE financial_transactions (id TEXT NOT NULL PRIMARY KEY)")
