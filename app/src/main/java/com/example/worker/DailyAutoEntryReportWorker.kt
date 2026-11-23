@@ -86,7 +86,7 @@ class DailyAutoEntryReportWorker @AssistedInject constructor(
       val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
         .setSmallIcon(android.R.drawable.ic_menu_report_image)
         .setContentTitle("SKYPLUS MONEY • Daily Auto-Entry Report")
-        .setContentText("$date — ${report.autoSavedCount} entries • ${report.exceptionCount} need attention")
+        .setContentText("$date — ${report.postedCount} entries • ${report.exceptionCount} need attention")
         .setStyle(NotificationCompat.BigTextStyle().bigText("$date\n$body"))
         .setContentIntent(pendingIntent)
         .setAutoCancel(true)
