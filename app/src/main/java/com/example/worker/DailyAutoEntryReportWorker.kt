@@ -12,11 +12,9 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.MainActivity
-import com.example.R
 import com.example.data.local.ReportPreferencesDataSource
 import com.example.data.local.db.dao.TransactionDetectionEventDao
 import com.example.domain.model.AuthSessionState
-import com.example.domain.model.DailyAutoEntryReportSettings
 import com.example.domain.model.DetectionEventStatus
 import com.example.domain.model.TransactionDetectionEvent
 import com.example.domain.model.TransactionType
@@ -62,7 +60,7 @@ class DailyAutoEntryReportWorker @AssistedInject constructor(
 
     // Schedule the next local-time report even if Android currently suppresses notifications.
     val latestSettings = reportPreferences.observeDailyAutoEntrySettings(userId).first()
-    if (latestSettings.enabled) scheduler.updateSchedule(userId, latestSettings)
+    if (latestSettings.enabled) scheduler.updateSchedule(userId, latestSettings, appendAfterCurrent = true)
     return Result.success()
   }
 
@@ -85,16 +83,39 @@ class DailyAutoEntryReportWorker @AssistedInject constructor(
     }
 
     val date = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(reportDayStart))
+    val entryLines = autoSaved
+      .sortedBy { it.receivedAt }
+      .take(8)
+      .map { event ->
+        val direction = when (event.detectedType) {
+          TransactionType.INCOME, TransactionType.REFUND, TransactionType.REVERSAL -> "INCOME"
+          TransactionType.EXPENSE -> "EXPENSE"
+          else -> event.detectedType.name
+        }
+        val title = event.detectedMerchant ?: event.senderOrTitle
+        val accountHint = event.detectedAccountLast4?.let { " • A/c ••$it" }.orEmpty()
+        "$direction • $title • ${formatMinor(event.detectedAmountMinor, event.detectedCurrency)} ${event.detectedCurrency}$accountHint"
+      }
+
     val body = buildString {
-      append("Auto entries: ${autoSaved.size}")
+      append("Automatically posted: ${autoSaved.size}")
       if (totals.isNotEmpty()) {
         append("\n")
         append(totals.joinToString("\n"))
       } else {
         append("\nNo automatic entries were posted.")
       }
-      append("\nNeeds attention: $exceptions")
+      if (entryLines.isNotEmpty()) {
+        append("\n\nEntries:")
+        append("\n")
+        append(entryLines.joinToString("\n"))
+        if (autoSaved.size > entryLines.size) {
+          append("\n+ ${autoSaved.size - entryLines.size} more entries")
+        }
+      }
+      append("\n\nNeeds attention: $exceptions")
       append("\nDuplicates skipped: $duplicates")
+      append("\nSource: SMS notifications only")
     }
 
     runCatching {
