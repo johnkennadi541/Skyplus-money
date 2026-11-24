@@ -24,6 +24,7 @@ import com.example.domain.model.DetectionConfidence
 import com.example.domain.model.DetectionEventStatus
 import com.example.domain.model.DetectionSettings
 import com.example.domain.model.FinancialTransaction
+import com.example.domain.model.MerchantCategoryOverridePersistenceException
 import com.example.domain.model.ParsedFinancialMessage
 import com.example.domain.model.TransactionDetectionEvent
 import com.example.domain.model.TransactionStatus
@@ -32,6 +33,7 @@ import com.example.domain.repository.FinancialTransactionRepository
 import com.example.domain.repository.SmartDetectionRepository
 import com.example.feature.smartdetection.engine.DeduplicationEngine
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -84,6 +86,11 @@ class SmartDetectionRepositoryImpl @Inject constructor(
       eventDao.getEventById(userId, eventId)?.toDomain()
     }
 
+  override suspend fun getMerchantCategoryOverride(userId: String, merchant: String): String? =
+    withContext(dispatchers.io) {
+      readMerchantCategoryOverride(userId, merchant)
+    }
+
   override suspend fun processIncomingEvent(
     userId: String,
     rawPackageName: String,
@@ -101,7 +108,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
         val safeTitle = sanitizeSenderTitle(senderOrTitle)
         val safeMerchant = sanitizeMerchant(parsed.merchantOrPayee)
         val merchantOverride = safeMerchant?.let { merchant ->
-          context.detectionDataStore.data.first()[merchantCategoryOverrideKey(userId, merchant)]
+          readMerchantCategoryOverride(userId, merchant)
         }
 
         var pendingNotice: com.example.domain.model.AutoSavedTransactionNotice? = null
@@ -416,7 +423,8 @@ class SmartDetectionRepositoryImpl @Inject constructor(
           val finalAmount = correctedAmountMinor ?: event.detectedAmountMinor
           val safeMerchant = sanitizeMerchant(merchant ?: event.detectedMerchant)
           if (rememberMerchantCategory && finalType == TransactionType.EXPENSE &&
-            !safeMerchant.isNullOrBlank() && category in com.example.domain.model.TransactionCategories.EXPENSE_CATEGORIES
+            !safeMerchant.isNullOrBlank() && normalizeMerchantKey(safeMerchant).isNotBlank() &&
+            category in com.example.domain.model.TransactionCategories.EXPENSE_CATEGORIES
           ) {
             merchantOverrideToSave = safeMerchant to category
           }
@@ -488,8 +496,16 @@ class SmartDetectionRepositoryImpl @Inject constructor(
           }
         }
         merchantOverrideToSave?.let { (merchantName, selectedCategory) ->
-          context.detectionDataStore.edit { preferences ->
-            preferences[merchantCategoryOverrideKey(userId, merchantName)] = selectedCategory
+          try {
+            context.detectionDataStore.edit { preferences ->
+              preferences[merchantCategoryOverrideKey(userId, merchantName)] = selectedCategory
+            }
+          } catch (cancelled: CancellationException) {
+            throw cancelled
+          } catch (error: Exception) {
+            // Room has already committed the financial transaction. Report the partial
+            // outcome explicitly; never mislabel a saved transaction as an approval failure.
+            throw MerchantCategoryOverridePersistenceException(error)
           }
         }
         Unit
@@ -649,11 +665,24 @@ class SmartDetectionRepositoryImpl @Inject constructor(
       "merchant_category_override_${sha256Hex(userId).take(24)}_${sha256Hex(normalizeMerchantKey(merchant)).take(32)}"
     )
 
+  private suspend fun readMerchantCategoryOverride(userId: String, merchant: String): String? {
+    if (userId.isBlank()) return null
+    val normalizedMerchant = normalizeMerchantKey(merchant)
+    if (normalizedMerchant.isBlank()) return null
+    return try {
+      context.detectionDataStore.data.first()[merchantCategoryOverrideKey(userId, normalizedMerchant)]
+        ?.takeIf { it in com.example.domain.model.TransactionCategories.EXPENSE_CATEGORIES }
+    } catch (cancelled: CancellationException) {
+      throw cancelled
+    } catch (_: Exception) {
+      // A preference read is optional: keep transaction detection available and
+      // fall back to the parser's deterministic category when DataStore is unavailable.
+      null
+    }
+  }
+
   private fun normalizeMerchantKey(merchant: String): String =
-    merchant.uppercase()
-      .replace(Regex("[^A-Z0-9]+"), " ")
-      .trim()
-      .replace(Regex("\\s+"), " ")
+    MerchantCategoryResolver.normalizeMerchantName(merchant)
 
   private fun sha256Hex(value: String): String =
     MessageDigest.getInstance("SHA-256")
