@@ -11,12 +11,6 @@ import java.util.regex.Pattern
 
 object SmartTransactionParser {
 
-  private val SENSITIVE_PATTERN =
-    Pattern.compile(
-      "\\b(?:O[\\s.]*T[\\s.]*P|one[\\s-]+time[\\s-]+password|secret\\s+code|verification\\s+code|security\\s+code|auth(?:entication)?\\s+code|login\\s+code|2\\s*F\\s*A|two[\\s-]+factor|do\\s+not\\s+share|C[\\s.]*V[\\s.]*[VC]|M[\\s.]*P[\\s.]*I[\\s.]*N|T[\\s.]*P[\\s.]*I[\\s.]*N|UPI\\s+PIN|ATM\\s+PIN|P[\\s.]+I[\\s.]+N|PIN|password|pass\\s*code)\\b",
-      Pattern.CASE_INSENSITIVE,
-    )
-
   private val LONG_DIGITS_PATTERN = Regex("[0-9]{6,}")
 
   // Currencies: INR, USD, EUR, GBP, KWD, AED, SAR, QAR, BHD, OMR
@@ -98,7 +92,7 @@ object SmartTransactionParser {
     timestamp: Long = System.currentTimeMillis(),
   ): ParsedFinancialMessage? {
     // Zero-tolerance privacy protection: immediately reject sensitive auth/security messages
-    if (SENSITIVE_PATTERN.matcher(text).find()) {
+    if (SensitiveNotificationFilter.containsSensitiveContent(text)) {
       return null
     }
 
