@@ -20,6 +20,8 @@ class MerchantCategoryResolverTest {
     assertEquals("Bills & Utilities", MerchantCategoryResolver.resolve("TANGEDCO", TransactionType.EXPENSE))
     assertEquals("Bills & Utilities", MerchantCategoryResolver.resolve("Airtel Payments", TransactionType.EXPENSE))
     assertEquals("Transport", MerchantCategoryResolver.resolve("Uber Trip", TransactionType.EXPENSE))
+    assertEquals("Fuel", MerchantCategoryResolver.resolve("Indian Oil", TransactionType.EXPENSE))
+    assertEquals("Fuel", MerchantCategoryResolver.resolve("HPCL Fuel", TransactionType.EXPENSE))
     assertEquals("Medical & Healthcare", MerchantCategoryResolver.resolve("Apollo Pharmacy", TransactionType.EXPENSE))
     assertEquals("Entertainment", MerchantCategoryResolver.resolve("Netflix", TransactionType.EXPENSE))
     assertEquals("Shopping", MerchantCategoryResolver.resolve("Amazon Marketplace", TransactionType.EXPENSE))

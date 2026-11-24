@@ -806,7 +806,7 @@ class Phase2FinalDaoRemediationTest {
             override suspend fun getEventById(userId: String, eventId: String) = null
             override suspend fun processIncomingEvent(userId: String, rawPackageName: String, senderOrTitle: String, parsed: ParsedFinancialMessage) =
               Result.failure<TransactionDetectionEvent>(IllegalStateException("unused"))
-            override suspend fun approveReviewEvent(userId: String, eventId: String, selectedAccountId: String, category: String, merchant: String?, correctedType: TransactionType?, correctedAmountMinor: Long?) =
+            override suspend fun approveReviewEvent(userId: String, eventId: String, selectedAccountId: String, category: String, merchant: String?, correctedType: TransactionType?, correctedAmountMinor: Long?, rememberMerchantCategory: Boolean) =
               Result.success(Unit)
             override suspend fun dismissReviewEvent(userId: String, eventId: String) = Result.success(Unit)
             override suspend fun clearDetectionHistory(userId: String) = Result.success(Unit)

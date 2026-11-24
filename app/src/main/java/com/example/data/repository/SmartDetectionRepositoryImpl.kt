@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.withTransaction
 import com.example.core.common.DispatcherProvider
@@ -37,6 +38,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.security.MessageDigest
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -98,6 +100,9 @@ class SmartDetectionRepositoryImpl @Inject constructor(
 
         val safeTitle = sanitizeSenderTitle(senderOrTitle)
         val safeMerchant = sanitizeMerchant(parsed.merchantOrPayee)
+        val merchantOverride = safeMerchant?.let { merchant ->
+          context.detectionDataStore.data.first()[merchantCategoryOverrideKey(userId, merchant)]
+        }
 
         var pendingNotice: com.example.domain.model.AutoSavedTransactionNotice? = null
         val processedEvent = database.withTransaction {
@@ -297,7 +302,8 @@ class SmartDetectionRepositoryImpl @Inject constructor(
 
           if (targetAutoSaveAccountId != null) {
             val defaultCategory =
-              parsed.suggestedCategory
+              merchantOverride?.takeIf { parsed.type == TransactionType.EXPENSE }
+                ?: parsed.suggestedCategory
                 ?: if (parsed.type == TransactionType.INCOME) "Other Income" else "Other Expenses"
             val newTxn =
               FinancialTransaction(
@@ -381,12 +387,14 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     merchant: String?,
     correctedType: TransactionType?,
     correctedAmountMinor: Long?,
+    rememberMerchantCategory: Boolean,
   ): Result<Unit> =
     withContext(dispatchers.io) {
       runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(eventId.isNotBlank()) { "Event ID is required" }
         require(selectedAccountId.isNotBlank()) { "Selected account ID is required" }
+        var merchantOverrideToSave: Pair<String, String>? = null
         database.withTransaction {
           val event =
             eventDao.getEventById(userId, eventId)
@@ -407,6 +415,11 @@ class SmartDetectionRepositoryImpl @Inject constructor(
           }
           val finalAmount = correctedAmountMinor ?: event.detectedAmountMinor
           val safeMerchant = sanitizeMerchant(merchant ?: event.detectedMerchant)
+          if (rememberMerchantCategory && finalType == TransactionType.EXPENSE &&
+            !safeMerchant.isNullOrBlank() && category in com.example.domain.model.TransactionCategories.EXPENSE_CATEGORIES
+          ) {
+            merchantOverrideToSave = safeMerchant to category
+          }
 
           val targetAccount =
             accountDao.getAccountById(userId, selectedAccountId)
@@ -474,6 +487,12 @@ class SmartDetectionRepositoryImpl @Inject constructor(
             }
           }
         }
+        merchantOverrideToSave?.let { (merchantName, selectedCategory) ->
+          context.detectionDataStore.edit { preferences ->
+            preferences[merchantCategoryOverrideKey(userId, merchantName)] = selectedCategory
+          }
+        }
+        Unit
       }
     }
 
@@ -624,6 +643,22 @@ class SmartDetectionRepositoryImpl @Inject constructor(
         Unit
       }
     }
+
+  private fun merchantCategoryOverrideKey(userId: String, merchant: String) =
+    stringPreferencesKey(
+      "merchant_category_override_${sha256Hex(userId).take(24)}_${sha256Hex(normalizeMerchantKey(merchant)).take(32)}"
+    )
+
+  private fun normalizeMerchantKey(merchant: String): String =
+    merchant.uppercase()
+      .replace(Regex("[^A-Z0-9]+"), " ")
+      .trim()
+      .replace(Regex("\\s+"), " ")
+
+  private fun sha256Hex(value: String): String =
+    MessageDigest.getInstance("SHA-256")
+      .digest(value.toByteArray(Charsets.UTF_8))
+      .joinToString("") { byte -> "%02x".format(byte) }
 
   private fun merchantsEquivalent(a: String, b: String): Boolean {
     val normA = a.trim().lowercase()
