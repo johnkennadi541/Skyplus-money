@@ -649,6 +649,20 @@ class Phase3InvestmentDatabaseAndRepoTest {
     ).getOrThrow()
     assertEquals(9550_00L, repo.getHoldingById("uid_man", mfHolding.id)?.currentValuationMinor)
 
+    // A manual observation older than the latest accepted observation must not roll
+    // the current valuation or its freshness watermark backwards.
+    val backdatedManualPrice =
+      repo.updateManualMarketPrice(
+        authenticatedUserId = "uid_man",
+        holdingId = mfHolding.id,
+        newUnitPriceDecimal = "80.00",
+        priceDate = 1_750_500_000_000L,
+      )
+    assertTrue("Backdated manual price must be rejected", backdatedManualPrice.isFailure)
+    assertEquals("95.5", repo.getHoldingById("uid_man", mfHolding.id)?.currentMarketPriceDecimal)
+    assertEquals(1_751_000_000_000L, repo.getHoldingById("uid_man", mfHolding.id)?.lastPriceUpdateDate)
+    assertEquals(2, repo.getPriceHistoryForHolding("uid_man", mfHolding.id).first().size)
+
     // Reset persisted DataStore state so this test is isolated from earlier tests.
     // The preference store is application-scoped and can survive between Robolectric tests.
     repo.setAutoUpdateConsent("uid_man", false)
