@@ -492,6 +492,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
             preferences[merchantCategoryOverrideKey(userId, merchantName)] = selectedCategory
           }
         }
+        Unit
       }
     }
 
