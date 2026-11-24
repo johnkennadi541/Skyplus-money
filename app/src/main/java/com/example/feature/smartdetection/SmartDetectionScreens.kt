@@ -39,6 +39,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -81,6 +82,7 @@ import com.example.domain.model.FinancialAccount
 import com.example.domain.model.TransactionCategories
 import com.example.domain.model.TransactionDetectionEvent
 import com.example.domain.model.TransactionType
+import com.example.feature.smartdetection.engine.MerchantCategoryResolver
 import com.example.domain.usecase.FormatMoneyUseCase
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -597,7 +599,7 @@ fun ReviewQueueScreen(
       event = item,
       accounts = accounts,
       onDismiss = { itemToApprove = null },
-      onConfirm = { accountId, type, category, merchant, amountDecimal ->
+      onConfirm = { accountId, type, category, merchant, amountDecimal, rememberMerchantCategory ->
         viewModel.approveReviewItem(
           eventId = item.id,
           selectedAccountId = accountId,
@@ -606,6 +608,7 @@ fun ReviewQueueScreen(
           correctedType = type,
           correctedAmountDecimal = amountDecimal,
           currencyCode = item.detectedCurrency,
+          rememberMerchantCategory = rememberMerchantCategory,
         )
         itemToApprove = null
       },
@@ -711,6 +714,7 @@ fun TransactionCorrectionDialog(
     category: String,
     merchant: String?,
     amountDecimal: String,
+    rememberMerchantCategory: Boolean,
   ) -> Unit,
 ) {
   var selectedType by remember {
@@ -730,10 +734,12 @@ fun TransactionCorrectionDialog(
       when (selectedType) {
         TransactionType.INCOME -> TransactionCategories.INCOME_CATEGORIES.first()
         TransactionType.REFUND, TransactionType.REVERSAL -> "Refunds"
-        else -> TransactionCategories.EXPENSE_CATEGORIES.first()
+        else -> MerchantCategoryResolver.resolve(event.detectedMerchant, selectedType)
+          ?: TransactionCategories.EXPENSE_CATEGORIES.first()
       }
     )
   }
+  var rememberForMerchant by remember(event.id) { mutableStateOf(false) }
   var merchantText by remember { mutableStateOf(event.detectedMerchant.orEmpty()) }
   var amountText by remember { mutableStateOf(event.detectedMoney.toBigDecimal().toPlainString()) }
 
@@ -775,9 +781,13 @@ fun TransactionCorrectionDialog(
               selected = selectedType == type,
               onClick = {
                 selectedType = type
-                selectedCategory =
-                  if (type == TransactionType.INCOME) TransactionCategories.INCOME_CATEGORIES.first()
-                  else TransactionCategories.EXPENSE_CATEGORIES.first()
+                selectedCategory = when (type) {
+                  TransactionType.INCOME -> TransactionCategories.INCOME_CATEGORIES.first()
+                  TransactionType.REFUND, TransactionType.REVERSAL -> "Refunds"
+                  else -> MerchantCategoryResolver.resolve(event.detectedMerchant, type)
+                    ?: TransactionCategories.EXPENSE_CATEGORIES.first()
+                }
+                rememberForMerchant = false
               },
               label = { Text(type.name) },
             )
@@ -819,6 +829,17 @@ fun TransactionCorrectionDialog(
           }
         }
 
+        if (selectedType == TransactionType.EXPENSE && merchantText.isNotBlank()) {
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(
+              checked = rememberForMerchant,
+              onCheckedChange = { rememberForMerchant = it },
+              modifier = Modifier.testTag("remember_merchant_category_checkbox"),
+            )
+            Text("Remember this category for this merchant", style = MaterialTheme.typography.bodySmall)
+          }
+        }
+
         OutlinedTextField(
           value = merchantText,
           onValueChange = { merchantText = it },
@@ -832,7 +853,7 @@ fun TransactionCorrectionDialog(
       Button(
         onClick = {
           if (selectedAccountId.isNotBlank() && amountText.isNotBlank()) {
-            onConfirm(selectedAccountId, selectedType, selectedCategory, merchantText.ifBlank { null }, amountText)
+            onConfirm(selectedAccountId, selectedType, selectedCategory, merchantText.ifBlank { null }, amountText, rememberForMerchant)
           }
         },
         enabled = selectedAccountId.isNotBlank() && amountText.isNotBlank(),

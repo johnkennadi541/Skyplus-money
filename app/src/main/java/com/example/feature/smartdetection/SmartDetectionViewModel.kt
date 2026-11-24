@@ -166,6 +166,7 @@ class SmartDetectionViewModel @Inject constructor(
     correctedType: TransactionType? = null,
     correctedAmountDecimal: String? = null,
     currencyCode: String = "INR",
+    rememberMerchantCategory: Boolean = false,
   ) {
     viewModelScope.launch {
       val session = authRepository.observeAuthSession().first()
@@ -189,6 +190,7 @@ class SmartDetectionViewModel @Inject constructor(
         merchant = merchant,
         correctedType = correctedType,
         correctedAmountMinor = correctedMinor,
+        rememberMerchantCategory = rememberMerchantCategory,
       )
         .onSuccess { _userMessage.value = "Transaction approved and saved" }
         .onFailure { error -> _userMessage.value = "Approval failed: ${error.message}" }

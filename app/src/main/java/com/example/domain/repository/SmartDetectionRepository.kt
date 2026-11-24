@@ -28,6 +28,7 @@ interface SmartDetectionRepository {
     merchant: String?,
     correctedType: TransactionType? = null,
     correctedAmountMinor: Long? = null,
+    rememberMerchantCategory: Boolean = false,
   ): Result<Unit>
   suspend fun dismissReviewEvent(userId: String, eventId: String): Result<Unit>
   suspend fun clearDetectionHistory(userId: String): Result<Unit>

@@ -47,6 +47,7 @@ class ApproveReviewItemUseCase @Inject constructor(
     merchant: String?,
     correctedType: TransactionType? = null,
     correctedAmountMinor: Long? = null,
+    rememberMerchantCategory: Boolean = false,
   ): Result<Unit> =
     repository.approveReviewEvent(
       userId = userId,
@@ -56,6 +57,7 @@ class ApproveReviewItemUseCase @Inject constructor(
       merchant = merchant,
       correctedType = correctedType,
       correctedAmountMinor = correctedAmountMinor,
+      rememberMerchantCategory = rememberMerchantCategory,
     )
 }
 

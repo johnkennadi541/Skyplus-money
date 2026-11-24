@@ -37,6 +37,7 @@ object TransactionCategories {
       "Groceries",
       "Shopping",
       "Transport",
+      "Fuel",
       "Housing",
       "Utilities",
       "Bills & Utilities",
