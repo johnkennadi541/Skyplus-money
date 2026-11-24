@@ -82,6 +82,12 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
     return readOnlyProcessor.process(metadata, access, contentProvider)
   }
 
+  private fun boundedNotificationField(value: CharSequence?): String {
+    if (value == null) return ""
+    val maxChars = NotificationText.MAX_NOTIFICATION_CHARS + 1
+    return value.subSequence(0, minOf(value.length, maxChars)).toString()
+  }
+
   private suspend fun resolveNotificationAccess(): NotificationAccessContext {
     val session =
       runCatching { authRepository.observeAuthSession().first() }.getOrNull()
