@@ -302,6 +302,62 @@ class InvestmentCalculationEngineTest {
   }
 
   @Test
+  fun `unquoted holdings do not produce a fake epoch latest market update date`() {
+    val holding =
+      InvestmentHolding(
+        userId = "u1",
+        name = "Awaiting quote",
+        category = InvestmentCategory.STOCKS,
+        currencyCode = "INR",
+        purchaseDate = 1_750_000_000_000L,
+        quantityDecimal = "1",
+        totalInvestedMinor = 10_000L,
+        totalBuyCostMinor = 10_000L,
+        currentMarketPriceDecimal = "100",
+        currentValuationMinor = 10_000L,
+        lastPriceUpdateDate = 0L,
+      )
+
+    val summary = engine.calculateCurrencySummaries(listOf(holding))["INR"]
+    assertEquals(null, summary?.lastMarketUpdateMillis)
+  }
+
+  @Test
+  fun `growth timeline waits until every holding has an authentic snapshot`() {
+    val t1 = 1_750_000_000_000L
+    val t2 = t1 + 86_400_000L
+    val t3 = t2 + 86_400_000L
+    fun snapshot(holdingId: String, date: Long, valuation: Long, invested: Long) =
+      InvestmentPriceHistory(
+        holdingId = holdingId,
+        userId = "u1",
+        priceDate = date,
+        unitPriceDecimal = "100",
+        valuationMinor = valuation,
+        totalInvestedMinor = invested,
+        realizedPnlMinor = 0L,
+        currencyCode = "INR",
+        source = PriceSourceType.MANUAL,
+        providerLabel = "Manual",
+      )
+
+    val history =
+      listOf(
+        snapshot("holding-a", t1, 10_000L, 10_000L),
+        snapshot("holding-a", t2, 11_000L, 10_000L),
+        snapshot("holding-b", t2, 5_000L, 5_000L),
+        snapshot("holding-b", t3, 6_000L, 5_000L),
+      )
+
+    val points = engine.buildAuthenticGrowthTimeline(history, holdingsCount = 2)
+    assertEquals(2, points.size)
+    assertEquals(t2, points[0].timestampMillis)
+    assertEquals(16_000L, points[0].valuationMinor)
+    assertEquals(t3, points[1].timestampMillis)
+    assertEquals(17_000L, points[1].valuationMinor)
+  }
+
+  @Test
   fun `authentic growth timeline returns empty when fewer than two distinct dated snapshots exist`() {
     val t1 = 1_750_000_000_000L
     val t2 = t1 + 86_400_000L
