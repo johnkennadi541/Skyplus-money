@@ -46,6 +46,7 @@ import com.example.domain.usecase.SignInWithGoogleIdTokenUseCase
 import com.example.domain.usecase.SignOutUseCase
 import com.example.feature.authentication.AuthViewModel
 import com.example.feature.smartdetection.engine.SmartTransactionParser
+import com.example.feature.smartdetection.engine.ReadOnlyNotificationResult
 import com.example.service.SkyplusNotificationListenerService
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -417,21 +418,27 @@ class Phase2SecurityRemediationTest {
 
     val smsLikeNotif = "Rs. 400.00 debited from A/c XX8899 paid to Uber Ref N1234567"
 
-    // 1. Missing consent -> MUST be blocked
-    service.processNotificationContent("com.phonepe.app", "PhonePe", smsLikeNotif, 1_700_000_000_000L)
+    // 1. Missing consent -> content is rejected and no persistence occurs.
+    val missingConsentResult =
+      service.processNotificationContent("com.phonepe.app", "PhonePe", smsLikeNotif, 1_700_000_000_000L)
+    assertTrue(missingConsentResult is ReadOnlyNotificationResult.Blocked)
     assertEquals(0, detectionRepo.getDetectionEvents(uid).first().size)
 
-    // 2. Outdated consent (0.9.0 != 1.0.0) -> MUST be blocked
+    // 2. Outdated consent (0.9.0 != 1.0.0) -> fail closed.
     fakeConsentRepo.records[uid] = ConsentRecord("0.9.0", ConsentRecord.CURRENT_PRIVACY_VERSION, 1000L)
-    service.processNotificationContent("com.phonepe.app", "PhonePe", smsLikeNotif, 1_700_000_010_000L)
+    val outdatedConsentResult =
+      service.processNotificationContent("com.phonepe.app", "PhonePe", smsLikeNotif, 1_700_000_010_000L)
+    assertTrue(outdatedConsentResult is ReadOnlyNotificationResult.Blocked)
     assertEquals(0, detectionRepo.getDetectionEvents(uid).first().size)
 
-    // 3. Up-to-date consent -> allowed and processed
+    // 3. Current consent permits classification only; event table and account balance stay unchanged.
     fakeConsentRepo.records[uid] =
       ConsentRecord(ConsentRecord.CURRENT_TERMS_VERSION, ConsentRecord.CURRENT_PRIVACY_VERSION, 2000L)
-    service.processNotificationContent("com.phonepe.app", "PhonePe", smsLikeNotif, 1_700_000_020_000L)
-    assertEquals(1, detectionRepo.getDetectionEvents(uid).first().size)
-    assertEquals(160_000L, accountRepo.getAccountById(uid, "acc_n1")!!.currentBalanceMinor)
+    val classifiedResult =
+      service.processNotificationContent("com.phonepe.app", "PhonePe", smsLikeNotif, 1_700_000_020_000L)
+    assertTrue(classifiedResult is ReadOnlyNotificationResult.Classified)
+    assertEquals(0, detectionRepo.getDetectionEvents(uid).first().size)
+    assertEquals(200_000L, accountRepo.getAccountById(uid, "acc_n1")!!.currentBalanceMinor)
   }
 
   // --- Requirement 5: Consent DataStore error handling + spaced OTP/2FA/digit masking ---
