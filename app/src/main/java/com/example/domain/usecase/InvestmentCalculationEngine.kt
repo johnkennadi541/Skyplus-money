@@ -11,7 +11,6 @@ import com.example.domain.model.PortfolioGrowthPoint
 import com.example.domain.model.ProviderPolicyInfo
 import com.example.domain.model.ProviderSupportLevel
 import java.math.BigDecimal
-import java.math.MathContext
 import java.math.RoundingMode
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -40,6 +39,7 @@ class InvestmentCalculationEngine @Inject constructor() {
     const val STALE_PRICE_THRESHOLD_MILLIS: Long = 7L * 24L * 60L * 60L * 1000L
     private val HUNDRED = BigDecimal("100")
     private val ZERO_PERCENT = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+    private val INVESTMENT_DECIMAL_REGEX = Regex("^\\d{1,18}(\\.\\d{1,12})?$")
 
     val PROVIDER_POLICIES: List<ProviderPolicyInfo> =
       listOf(
@@ -116,6 +116,9 @@ class InvestmentCalculationEngine @Inject constructor() {
   fun parsePositiveDecimal(input: String, fieldName: String): BigDecimal {
     val trimmed = input.trim()
     require(trimmed.isNotEmpty()) { "$fieldName is required" }
+    require(INVESTMENT_DECIMAL_REGEX.matches(trimmed)) {
+      "$fieldName must use up to 18 integer digits and 12 decimal places"
+    }
     val parsed =
       try {
         BigDecimal(trimmed)
@@ -128,6 +131,9 @@ class InvestmentCalculationEngine @Inject constructor() {
 
   fun parseNonNegativeDecimal(input: String, fieldName: String): BigDecimal {
     val trimmed = input.trim().ifEmpty { "0" }
+    require(INVESTMENT_DECIMAL_REGEX.matches(trimmed)) {
+      "$fieldName must use up to 18 integer digits and 12 decimal places"
+    }
     val parsed =
       try {
         BigDecimal(trimmed)
@@ -149,7 +155,7 @@ class InvestmentCalculationEngine @Inject constructor() {
       Money.resolveFractionDigits(currencyCode)
       return 0L
     }
-    val rawTotal = quantity.multiply(unitPrice, MathContext.DECIMAL128)
+    val rawTotal = quantity.multiply(unitPrice)
     return Money.fromBigDecimal(rawTotal, currencyCode, RoundingMode.HALF_UP).minorUnits
   }
 
@@ -236,7 +242,7 @@ class InvestmentCalculationEngine @Inject constructor() {
     } else {
       costSoldMinor =
         BigDecimal.valueOf(currentOpenCostBasisMinor)
-          .multiply(sellQty, MathContext.DECIMAL128)
+          .multiply(sellQty)
           .divide(currentQty, 0, RoundingMode.HALF_EVEN)
           .longValueExact()
           .coerceIn(0L, currentOpenCostBasisMinor)
