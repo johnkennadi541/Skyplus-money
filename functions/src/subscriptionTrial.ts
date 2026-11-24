@@ -184,7 +184,10 @@ export const deliverSubscriptionTrialReminders = onSchedule(
       const timeZone = safeTimeZone(state.timeZone);
       const localNow = localParts(now, timeZone);
       if (localNow.hour < 9) continue;
-      const activationLocal = localParts(activation.toMillis(), timeZone);\n      const beforeActivationClock = localNow.hour * 60 + localNow.minute <\n        activationLocal.hour * 60 + activationLocal.minute;\n      const dayIndex = localNow.day - activationLocal.day - (beforeActivationClock ? 1 : 0);
+      const activationLocal = localParts(activation.toMillis(), timeZone);
+      const beforeActivationClock = localNow.hour * 60 + localNow.minute <
+        activationLocal.hour * 60 + activationLocal.minute;
+      const dayIndex = localNow.day - activationLocal.day - (beforeActivationClock ? 1 : 0);
       if (dayIndex < REMINDER_START_DAY || dayIndex > LOCK_DAY) continue;
 
       const uid = document.id;
