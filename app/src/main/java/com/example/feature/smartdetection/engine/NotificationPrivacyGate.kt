@@ -6,6 +6,7 @@ package com.example.feature.smartdetection.engine
 data class NotificationAccessContext(
   val isAuthenticated: Boolean,
   val hasCurrentConsent: Boolean,
+  val hasAllAppNotificationConsent: Boolean = false,
   val isDetectionEnabled: Boolean,
   val excludedPackages: Set<String> = emptySet(),
 )
@@ -14,6 +15,7 @@ enum class NotificationGateBlockReason {
   INVALID_SOURCE,
   NOT_AUTHENTICATED,
   CONSENT_REQUIRED,
+  ALL_APP_CONSENT_REQUIRED,
   DETECTION_DISABLED,
   SOURCE_EXCLUDED,
 }
@@ -43,6 +45,9 @@ object NotificationPrivacyGate {
     }
     if (!access.hasCurrentConsent) {
       return NotificationGateDecision.Blocked(NotificationGateBlockReason.CONSENT_REQUIRED)
+    }
+    if (!access.hasAllAppNotificationConsent) {
+      return NotificationGateDecision.Blocked(NotificationGateBlockReason.ALL_APP_CONSENT_REQUIRED)
     }
     if (!access.isDetectionEnabled) {
       return NotificationGateDecision.Blocked(NotificationGateBlockReason.DETECTION_DISABLED)
