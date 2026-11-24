@@ -47,6 +47,7 @@ import com.example.domain.usecase.SignOutUseCase
 import com.example.feature.authentication.AuthViewModel
 import com.example.feature.smartdetection.engine.SmartTransactionParser
 import com.example.service.SkyplusNotificationListenerService
+import com.example.service.SmsNotificationContent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -574,22 +575,60 @@ class Phase2SecurityRemediationTest {
     }
 
     val smsLikeNotif = "Rs. 400.00 debited from A/c XX8899 paid to Uber Ref N1234567"
+    val defaultSmsPackage = "com.google.android.apps.messaging"
+    var bodyReadCount = 0
 
-    // 1. Missing consent -> MUST be blocked
-    service.processNotificationContent("com.phonepe.app", "PhonePe", smsLikeNotif, 1_700_000_000_000L)
+    // 1. Missing consent -> body provider must never be invoked.
+    service.processNotification(
+      packageName = defaultSmsPackage,
+      defaultSmsPackage = defaultSmsPackage,
+      timestamp = 1_700_000_000_000L,
+    ) {
+      bodyReadCount += 1
+      SmsNotificationContent("Messages", smsLikeNotif, "")
+    }
+    assertEquals(0, bodyReadCount)
     assertEquals(0, detectionRepo.getDetectionEvents(uid).first().size)
 
-    // 2. Outdated consent (0.9.0 != 1.0.0) -> MUST be blocked
+    // 2. Outdated consent -> body provider must still never be invoked.
     fakeConsentRepo.records[uid] = ConsentRecord("0.9.0", ConsentRecord.CURRENT_PRIVACY_VERSION, 1000L)
-    service.processNotificationContent("com.phonepe.app", "PhonePe", smsLikeNotif, 1_700_000_010_000L)
+    service.processNotification(
+      packageName = defaultSmsPackage,
+      defaultSmsPackage = defaultSmsPackage,
+      timestamp = 1_700_000_010_000L,
+    ) {
+      bodyReadCount += 1
+      SmsNotificationContent("Messages", smsLikeNotif, "")
+    }
+    assertEquals(0, bodyReadCount)
     assertEquals(0, detectionRepo.getDetectionEvents(uid).first().size)
 
-    // 3. Up-to-date consent -> allowed and processed
+    // 3. Current legal consent permits body access and the completed transaction is processed.
     fakeConsentRepo.records[uid] =
       ConsentRecord(ConsentRecord.CURRENT_TERMS_VERSION, ConsentRecord.CURRENT_PRIVACY_VERSION, 2000L)
-    service.processNotificationContent("com.phonepe.app", "PhonePe", smsLikeNotif, 1_700_000_020_000L)
+    service.processNotification(
+      packageName = defaultSmsPackage,
+      defaultSmsPackage = defaultSmsPackage,
+      timestamp = 1_700_000_020_000L,
+    ) {
+      bodyReadCount += 1
+      SmsNotificationContent("Messages", smsLikeNotif, "")
+    }
+    assertEquals(1, bodyReadCount)
     assertEquals(1, detectionRepo.getDetectionEvents(uid).first().size)
     assertEquals(160_000L, accountRepo.getAccountById(uid, "acc_n1")!!.currentBalanceMinor)
+
+    // 4. A non-default app is blocked before its body provider can be invoked.
+    service.processNotification(
+      packageName = "com.gmail",
+      defaultSmsPackage = defaultSmsPackage,
+      timestamp = 1_700_000_030_000L,
+    ) {
+      bodyReadCount += 1
+      SmsNotificationContent("Gmail", smsLikeNotif, "")
+    }
+    assertEquals(1, bodyReadCount)
+    assertEquals(1, detectionRepo.getDetectionEvents(uid).first().size)
   }
 
   // --- Requirement 5: Consent DataStore error handling + spaced OTP/2FA/digit masking ---
