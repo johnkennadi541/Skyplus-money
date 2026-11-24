@@ -12,7 +12,6 @@ import com.example.domain.repository.SmartDetectionRepository
 import com.example.feature.smartdetection.engine.SensitiveNotificationFilter
 import com.example.feature.smartdetection.engine.SmartTransactionParser
 import com.example.feature.smartdetection.engine.SmsNotificationAccessContext
-import com.example.feature.smartdetection.engine.SmsNotificationGateDecision
 import com.example.feature.smartdetection.engine.SmsNotificationPrivacyGate
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -95,17 +94,7 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
     contentProvider: () -> SmsNotificationContent?,
   ) {
     // Fail closed on source mismatch before authentication or content access.
-    val sourceDecision =
-      SmsNotificationPrivacyGate.evaluate(
-        SmsNotificationAccessContext(
-          packageName = packageName,
-          defaultSmsPackage = defaultSmsPackage,
-          isAuthenticated = false,
-          hasCurrentConsent = false,
-          isDetectionEnabled = false,
-        )
-      )
-    if (sourceDecision is SmsNotificationGateDecision.Blocked) return
+    if (!SmsNotificationPrivacyGate.isSourceAllowed(packageName, defaultSmsPackage)) return
 
     val session =
       try {
