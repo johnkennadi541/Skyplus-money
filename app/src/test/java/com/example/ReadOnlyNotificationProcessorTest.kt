@@ -126,6 +126,20 @@ class ReadOnlyNotificationProcessorTest {
   }
 
   @Test
+  fun `oversized notification is rejected before combined content is created`() {
+    val processor = ReadOnlyNotificationProcessor()
+    val result =
+      processor.process(metadata(), access) {
+        NotificationText(text = "x".repeat(NotificationText.MAX_NOTIFICATION_CHARS + 1))
+      }
+
+    assertEquals(
+      NotificationClassification.Sensitive,
+      (result as ReadOnlyNotificationResult.Classified).classification,
+    )
+  }
+
+  @Test
   fun `exact redelivery is stopped before content provider runs twice`() {
     val processor = ReadOnlyNotificationProcessor()
     var reads = 0
