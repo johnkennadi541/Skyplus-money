@@ -70,6 +70,7 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
     composeTestRule.onNodeWithTag("investments_back_button").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("profile_menu_button").assertIsDisplayed()
 
     // Open Investments from Profile menu
     composeTestRule.onNodeWithTag("profile_menu_button").performClick()
