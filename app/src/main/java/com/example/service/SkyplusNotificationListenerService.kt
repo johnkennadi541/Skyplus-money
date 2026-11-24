@@ -127,8 +127,9 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
     return NotificationAccessContext(
       isAuthenticated = true,
       hasCurrentConsent = consent?.isUpToDate == true,
+      hasAllAppNotificationConsent = settings?.hasAllAppNotificationConsent == true,
       isDetectionEnabled = settings?.isNotificationDetectionEnabled == true,
-      excludedPackages = emptySet(),
+      excludedPackages = settings?.excludedPackages ?: emptySet(),
     )
   }
 }
