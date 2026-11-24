@@ -738,7 +738,7 @@ fun TransactionCorrectionDialog(
   var selectedCategory by remember(event.id, preferredCategory) {
     mutableStateOf(
       when {
-        selectedType == TransactionType.EXPENSE && preferredCategory in TransactionCategories.EXPENSE_CATEGORIES -> preferredCategory!!
+        selectedType == TransactionType.EXPENSE && preferredCategory != null && preferredCategory in TransactionCategories.EXPENSE_CATEGORIES -> preferredCategory
         selectedType == TransactionType.INCOME -> TransactionCategories.INCOME_CATEGORIES.first()
         selectedType == TransactionType.REFUND || selectedType == TransactionType.REVERSAL -> "Refunds"
         else -> MerchantCategoryResolver.resolve(event.detectedMerchant, selectedType)
