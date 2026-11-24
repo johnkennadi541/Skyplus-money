@@ -1,6 +1,7 @@
 package com.example
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -196,6 +197,7 @@ class Phase2UiRobolectricTest {
         TransactionCorrectionDialog(
           event = event,
           accounts = listOf(acc),
+          preferredCategory = "Groceries",
           onDismiss = {},
           onConfirm = { _, _, _, _, _, _ -> confirmed = true },
         )
@@ -205,6 +207,7 @@ class Phase2UiRobolectricTest {
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("sms_policy_status_screen").assertIsDisplayed()
     composeTestRule.onNodeWithTag("correction_amount_input").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("category_chip_Groceries").assertIsSelected()
     composeTestRule.onNodeWithTag("confirm_correction_button").performClick()
     assertTrue(confirmed)
   }
