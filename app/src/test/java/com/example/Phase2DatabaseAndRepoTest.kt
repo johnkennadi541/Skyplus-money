@@ -426,6 +426,70 @@ class Phase2DatabaseAndRepoTest {
   }
 
   @Test
+  fun `remembered merchant override persists across repository instances and remains UID scoped`() = runTest {
+    val uid = "uid_merchant_override_test"
+    accountRepo.createAccount(
+      uid,
+      FinancialAccount(
+        id = "acc_override_test",
+        userId = uid,
+        name = "Primary INR",
+        type = AccountType.BANK,
+        currencyCode = "INR",
+        initialBalanceMinor = 500_000L,
+        currentBalanceMinor = 500_000L,
+        accountNumberLast4 = "7788",
+      ),
+    )
+    detectionRepo.updateDetectionSettings(
+      uid,
+      DetectionSettings(userId = uid, isNotificationDetectionEnabled = true, isAutoSaveHighConfidenceEnabled = false),
+    )
+
+    val parsed =
+      SmartTransactionParser.parse(
+        "Payment of Rs. 250.00 to Uber is pending Ref OVR123456",
+        "com.phonepe.app",
+        1_700_050_000_000L,
+      )!!
+    val review =
+      detectionRepo.processIncomingEvent(
+        userId = uid,
+        rawPackageName = "com.phonepe.app",
+        senderOrTitle = "PhonePe",
+        parsed = parsed,
+      ).getOrThrow()
+    assertEquals(DetectionEventStatus.IN_REVIEW, review.status)
+
+    detectionRepo.approveReviewEvent(
+      userId = uid,
+      eventId = review.id,
+      selectedAccountId = "acc_override_test",
+      category = "Groceries",
+      merchant = "தமிழ்-கடை",
+      correctedType = TransactionType.EXPENSE,
+      correctedAmountMinor = 25_000L,
+      rememberMerchantCategory = true,
+    ).getOrThrow()
+
+    assertEquals("Groceries", detectionRepo.getMerchantCategoryOverride(uid, "தமிழ் கடை"))
+    assertEquals(null, detectionRepo.getMerchantCategoryOverride("another_user", "தமிழ் கடை"))
+
+    val recreatedRepository =
+      SmartDetectionRepositoryImpl(
+        context = context,
+        database = database,
+        eventDao = database.transactionDetectionEventDao(),
+        mappingDao = database.accountMappingRuleDao(),
+        accountDao = database.financialAccountDao(),
+        transactionDao = database.financialTransactionDao(),
+        transactionRepository = txnRepo,
+        dispatchers = testDispatchers,
+      )
+    assertEquals("Groceries", recreatedRepository.getMerchantCategoryOverride(uid, "தமிழ் கடை"))
+  }
+
+  @Test
   fun `financial data and detection events are strictly isolated by UID`() = runTest {
     accountRepo.createAccount(
       "uid_alice",
