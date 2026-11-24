@@ -243,29 +243,24 @@ fun SmartDetectionSettingsScreen(
         }
       }
 
-      // Auto-save toggle
+      // Auto-save is intentionally unavailable in the read-only notification phase.
       item {
         OceanCard(modifier = Modifier.widthIn(max = 760.dp)) {
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
-            Column(modifier = Modifier.weight(1f)) {
-              Text(
-                text = "Automatic Save (High Confidence)",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-              )
-              Text(
-                text = "Verified completed transactions with >=80% confidence and mapped accounts auto-save offline.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-              )
-            }
+          Column {
+            Text(
+              text = "Automatic Save — Paused",
+              style = MaterialTheme.typography.titleMedium,
+              fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+              text = "Notification classification is read-only. No detected notification is saved to your financial records in this phase.",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Switch(
-              checked = settings.isAutoSaveHighConfidenceEnabled,
-              onCheckedChange = { viewModel.toggleAutoSave(it) },
+              checked = false,
+              onCheckedChange = {},
+              enabled = false,
               modifier = Modifier.testTag("toggle_auto_save_switch"),
             )
           }
@@ -369,20 +364,49 @@ fun SmartDetectionSettingsScreen(
         }
       }
 
-      // Permitted Source Financial Apps Section
+      // Explicit opt-in for broad notification visibility.
       item {
+        OceanCard(modifier = Modifier.widthIn(max = 760.dp).testTag("all_app_notification_consent_card")) {
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Column(modifier = Modifier.weight(1f)) {
+              Text(
+                text = "All-app Notification Classification",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+              )
+              Spacer(modifier = Modifier.height(OceanSpacing.xs))
+              Text(
+                text = "If enabled, new notifications from all apps (except apps you exclude below) may be inspected on this device to identify financial alerts. OTP, PIN, CVV and password messages are rejected. Notification text is not saved, uploaded or logged. This phase never creates transactions.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+            Switch(
+              checked = settings.hasAllAppNotificationConsent,
+              onCheckedChange = { viewModel.toggleAllAppNotificationConsent(it) },
+              modifier = Modifier.testTag("toggle_all_app_notification_consent"),
+            )
+          }
+        }
+      }
+
+      // Source exclusion controls (all apps are eligible by default).\n      item {
         OceanSectionHeader(
-          title = "Permitted Financial Apps",
-          subtitle = "Notifications from unselected apps are ignored immediately",
+          title = "Excluded Apps",
+          subtitle = "All apps are considered by default. Excluded apps are skipped before notification text is read.",
           modifier = Modifier.widthIn(max = 760.dp),
         )
       }
 
       items(SUPPORTED_FINANCIAL_APPS, key = { it.first }) { (pkg, label) ->
-        val isAllowed = settings.permittedPackages.contains(pkg)
+        val isExcluded = settings.excludedPackages.contains(pkg)
         OceanCard(
-          modifier = Modifier.widthIn(max = 760.dp).testTag("permitted_app_$pkg"),
-          onClick = { viewModel.togglePermittedPackage(pkg, !isAllowed) },
+          modifier = Modifier.widthIn(max = 760.dp).testTag("excluded_app_$pkg"),
+          onClick = { viewModel.toggleExcludedPackage(pkg, !isExcluded) },
         ) {
           Row(
             modifier = Modifier.fillMaxWidth(),
@@ -392,10 +416,11 @@ fun SmartDetectionSettingsScreen(
             Column(modifier = Modifier.weight(1f)) {
               Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
               Text(pkg, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+              Text("Exclude this app", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Checkbox(
-              checked = isAllowed,
-              onCheckedChange = { checked -> viewModel.togglePermittedPackage(pkg, checked) },
+              checked = isExcluded,
+              onCheckedChange = { checked -> viewModel.toggleExcludedPackage(pkg, checked) },
             )
           }
         }
