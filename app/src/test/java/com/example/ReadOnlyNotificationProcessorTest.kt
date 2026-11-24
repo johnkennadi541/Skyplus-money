@@ -55,6 +55,46 @@ class ReadOnlyNotificationProcessorTest {
   }
 
   @Test
+  fun `missing all-app opt-in prevents notification text extraction`() {
+    val processor = ReadOnlyNotificationProcessor()
+    var contentRead = false
+    val result =
+      processor.process(
+        metadata(),
+        access.copy(hasAllAppNotificationConsent = false),
+      ) {
+        contentRead = true
+        NotificationText(text = "INR 100.00 debited from A/c XX1234")
+      }
+
+    assertEquals(
+      ReadOnlyNotificationResult.Blocked(NotificationGateBlockReason.ALL_APP_CONSENT_REQUIRED),
+      result,
+    )
+    assertFalse(contentRead)
+  }
+
+  @Test
+  fun `excluded source prevents notification text extraction`() {
+    val processor = ReadOnlyNotificationProcessor()
+    var contentRead = false
+    val result =
+      processor.process(
+        metadata(packageName = "com.private.chat"),
+        access.copy(excludedPackages = setOf("com.private.chat")),
+      ) {
+        contentRead = true
+        NotificationText(text = "INR 100.00 debited from A/c XX1234")
+      }
+
+    assertEquals(
+      ReadOnlyNotificationResult.Blocked(NotificationGateBlockReason.SOURCE_EXCLUDED),
+      result,
+    )
+    assertFalse(contentRead)
+  }
+
+  @Test
   fun `unlisted app source can be classified after all user gates pass`() {
     val processor = ReadOnlyNotificationProcessor()
     val result =
