@@ -476,6 +476,29 @@ class Phase2DatabaseAndRepoTest {
     assertEquals("Groceries", detectionRepo.getMerchantCategoryOverride(uid, "தமிழ் கடை"))
     assertEquals(null, detectionRepo.getMerchantCategoryOverride("another_user", "தமிழ் கடை"))
 
+    val invalidCategoryEvent =
+      detectionRepo.processIncomingEvent(
+        userId = uid,
+        rawPackageName = "com.phonepe.app",
+        senderOrTitle = "PhonePe",
+        parsed = SmartTransactionParser.parse(
+          "Payment of Rs. 100.00 to Local Shop is pending Ref OVR654321",
+          "com.phonepe.app",
+          1_700_050_100_000L,
+        )!!,
+      ).getOrThrow()
+    detectionRepo.approveReviewEvent(
+      userId = uid,
+      eventId = invalidCategoryEvent.id,
+      selectedAccountId = "acc_override_test",
+      category = "Not A Valid Expense Category",
+      merchant = "invalid-category-store",
+      correctedType = TransactionType.EXPENSE,
+      correctedAmountMinor = 10_000L,
+      rememberMerchantCategory = true,
+    ).getOrThrow()
+    assertEquals(null, detectionRepo.getMerchantCategoryOverride(uid, "invalid-category-store"))
+
     val recreatedRepository =
       SmartDetectionRepositoryImpl(
         context = context,
