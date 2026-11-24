@@ -349,6 +349,10 @@ fun SkyplusAppShell(
       currentDestination == null
 
   var headerVisible by remember { mutableStateOf(true) }
+  LaunchedEffect(currentDestination) {
+    // Restore the compact header whenever navigation returns to a top-level screen.
+    headerVisible = true
+  }
   val headerScrollConnection = remember {
     object : NestedScrollConnection {
       override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
