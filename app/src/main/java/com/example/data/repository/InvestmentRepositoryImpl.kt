@@ -630,6 +630,9 @@ class InvestmentRepositoryImpl @Inject constructor(
           require(priceDate >= existing.purchaseDate) {
             "Price date cannot be before the original purchase"
           }
+          require(priceDate >= existing.lastPriceUpdateDate) {
+            "Manual price date cannot be earlier than the latest accepted price observation"
+          }
 
           val currentQty =
             calculationEngine.parseNonNegativeDecimal(existing.quantityDecimal, "Current quantity")
