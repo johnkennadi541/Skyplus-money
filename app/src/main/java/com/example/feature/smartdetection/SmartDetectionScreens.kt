@@ -394,7 +394,8 @@ fun SmartDetectionSettingsScreen(
         }
       }
 
-      // Source exclusion controls (all apps are eligible by default).\n      item {
+      // Source exclusion controls (all apps are eligible by default).
+      item {
         OceanSectionHeader(
           title = "Excluded Apps",
           subtitle = "All apps are considered by default. Use the list below to exclude supported apps before notification text is read.",
