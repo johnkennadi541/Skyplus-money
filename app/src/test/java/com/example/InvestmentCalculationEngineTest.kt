@@ -7,6 +7,7 @@ import com.example.domain.model.PriceSourceType
 import com.example.domain.usecase.InvestmentCalculationEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
@@ -319,7 +320,7 @@ class InvestmentCalculationEngineTest {
       )
 
     val summary = engine.calculateCurrencySummaries(listOf(holding))["INR"]
-    assertEquals(null, summary?.lastMarketUpdateMillis)
+    assertNull(summary?.lastMarketUpdateMillis)
   }
 
   @Test
