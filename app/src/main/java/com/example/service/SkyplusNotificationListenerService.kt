@@ -65,9 +65,9 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
           null
         } else {
           NotificationText(
-            title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty(),
-            text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty(),
-            bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString().orEmpty(),
+            title = boundedNotificationField(extras.getCharSequence(Notification.EXTRA_TITLE)),
+            text = boundedNotificationField(extras.getCharSequence(Notification.EXTRA_TEXT)),
+            bigText = boundedNotificationField(extras.getCharSequence(Notification.EXTRA_BIG_TEXT)),
           )
         }
       }
@@ -78,6 +78,12 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
    * Kept as an internal test seam for legacy consent tests. The supplied content is already
    * in memory, so production callbacks must use [processNotification] with a lazy provider.
    */
+  private fun boundedNotificationField(value: CharSequence?): String {
+    if (value == null) return ""
+    val maxChars = NotificationText.MAX_NOTIFICATION_CHARS + 1
+    return value.subSequence(0, minOf(value.length, maxChars)).toString()
+  }
+
   internal suspend fun processNotificationContent(
     packageName: String,
     title: String,
