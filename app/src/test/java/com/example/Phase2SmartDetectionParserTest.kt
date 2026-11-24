@@ -62,6 +62,14 @@ class Phase2SmartDetectionParserTest {
   }
 
   @Test
+  fun `maps fixed merchant categories for grocery and utility providers`() {
+    val grocery = SmartTransactionParser.parse("INR 1,250.00 debited from A/c XX4321 paid to D-Mart Ref GROC123456")!!
+    assertEquals("Groceries", grocery.suggestedCategory)
+    val utility = SmartTransactionParser.parse("INR 850.00 debited from A/c XX4321 paid to TANGEDCO Ref BILL123456")!!
+    assertEquals("Bills & Utilities", utility.suggestedCategory)
+  }
+
+  @Test
   fun `parses credit card purchase without misclassifying credit substring as income`() {
     val msg = "Spent USD 89.95 on your Credit Card ending 7788 at Amazon Marketplace Ref TXN99887766"
     val parsed = SmartTransactionParser.parse(msg, "com.chase.sig.android", 1_700_000_000_000L)

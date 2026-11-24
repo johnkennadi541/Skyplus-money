@@ -343,36 +343,19 @@ object SmartTransactionParser {
       TransactionType.REVERSAL -> "Refunds"
       TransactionType.TRANSFER -> "Transfer"
       else ->
-        when {
-          combined.contains("starbucks") ||
-            combined.contains("swiggy") ||
-            combined.contains("zomato") ||
-            combined.contains("coffee") ||
-            combined.contains("cafe") ||
-            combined.contains("restaurant") ||
-            combined.contains("dining") -> "Food & Dining"
-          combined.contains("uber") ||
-            combined.contains("ola") ||
-            combined.contains("metro") ||
-            combined.contains("fuel") ||
-            combined.contains("petrol") -> "Transport"
-          combined.contains("amazon") ||
-            combined.contains("flipkart") ||
-            combined.contains("walmart") ||
-            combined.contains("mall") -> "Shopping"
-          combined.contains("emi") || combined.contains("loan") -> "EMI Payments"
-          combined.contains("electricity") ||
-            combined.contains("water") ||
-            combined.contains("broadband") ||
-            combined.contains("recharge") -> "Utilities"
-          combined.contains("hospital") ||
-            combined.contains("pharmacy") ||
-            combined.contains("medical") -> "Medical & Healthcare"
-          combined.contains("netflix") ||
-            combined.contains("spotify") ||
+        MerchantCategoryResolver.resolve(merchant, type)
+          ?: when {
+            combined.contains("emi") || combined.contains("loan") -> "EMI Payments"
+            combined.contains("electricity") ||
+              combined.contains("water") ||
+              combined.contains("broadband") ||
+              combined.contains("recharge") -> "Bills & Utilities"
+            combined.contains("hospital") ||
+              combined.contains("pharmacy") ||
+              combined.contains("medical") -> "Medical & Healthcare"
             combined.contains("cinema") -> "Entertainment"
-          else -> "Other Expenses"
-        }
+            else -> "Other Expenses"
+          }
     }
   }
 }
