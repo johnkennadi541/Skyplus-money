@@ -14,6 +14,7 @@ class NotificationPrivacyGateTest {
       isAuthenticated = true,
       hasCurrentConsent = true,
       isDetectionEnabled = true,
+      hasAllAppNotificationConsent = true,
     )
 
   @Test
