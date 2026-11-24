@@ -74,35 +74,6 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
     }
   }
 
-  /**
-   * Kept as an internal test seam for legacy consent tests. The supplied content is already
-   * in memory, so production callbacks must use [processNotification] with a lazy provider.
-   */
-  private fun boundedNotificationField(value: CharSequence?): String {
-    if (value == null) return ""
-    val maxChars = NotificationText.MAX_NOTIFICATION_CHARS + 1
-    return value.subSequence(0, minOf(value.length, maxChars)).toString()
-  }
-
-  internal suspend fun processNotificationContent(
-    packageName: String,
-    title: String,
-    combinedContent: String,
-    timestamp: Long = System.currentTimeMillis(),
-  ): ReadOnlyNotificationResult {
-    val metadata =
-      NotificationMetadata(
-        packageName = packageName,
-        notificationKey = null,
-        postTime = timestamp,
-        receivedAtWallClockMillis = timestamp,
-        receivedAtElapsedRealtimeMillis = SystemClock.elapsedRealtime(),
-      )
-    return processNotification(metadata) {
-      NotificationText(title = title, text = combinedContent)
-    }
-  }
-
   internal suspend fun processNotification(
     metadata: NotificationMetadata,
     contentProvider: () -> NotificationText?,
