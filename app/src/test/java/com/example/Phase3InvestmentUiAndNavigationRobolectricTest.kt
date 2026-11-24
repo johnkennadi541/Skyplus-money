@@ -249,12 +249,16 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
     composeTestRule.onNodeWithTag("investment_detail_list").performScrollToNode(hasTestTag("detail_buy_more_button"))
     composeTestRule.onNodeWithTag("detail_buy_more_button").performClick()
     composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("trade_price_input").assertTextEquals("")
+    // Typing a known value and asserting the exact result proves the field started empty:
+    // a prefilled cost-price fallback would remain before the typed value.
+    composeTestRule.onNodeWithTag("trade_price_input").performTextInput("123.45")
+    composeTestRule.onNodeWithTag("trade_price_input").assertTextEquals("123.45")
     composeTestRule.onNodeWithTag("cancel_trade_dialog").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("detail_update_price_button").performClick()
     composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("manual_price_input").assertTextEquals("")
+    composeTestRule.onNodeWithTag("manual_price_input").performTextInput("234.56")
+    composeTestRule.onNodeWithTag("manual_price_input").assertTextEquals("234.56")
   }
 
   @Test
