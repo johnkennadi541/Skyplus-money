@@ -20,7 +20,7 @@ class ExampleRobolectricTest {
   fun `verify package id app name and security manifest flags`() {
     val context = ApplicationProvider.getApplicationContext<Context>()
     assertEquals("com.skyplus.money", context.packageName)
-    assertEquals("SKYPLUS MONEY", context.getString(R.string.app_name))
+    assertEquals("SkyPlus Money", context.getString(R.string.app_name))
     assertEquals("Take Control. Build Wealth.", context.getString(R.string.app_tagline))
 
     val appInfo = context.applicationInfo
