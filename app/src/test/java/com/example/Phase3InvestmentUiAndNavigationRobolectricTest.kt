@@ -10,7 +10,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.text.AnnotatedString
 import com.example.core.designsystem.theme.SkyplusOceanTheme
 import com.example.domain.model.InvestmentCategory
 import com.example.domain.model.InvestmentHolding
@@ -250,16 +253,15 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
     composeTestRule.onNodeWithTag("investment_detail_list").performScrollToNode(hasTestTag("detail_buy_more_button"))
     composeTestRule.onNodeWithTag("detail_buy_more_button").performClick()
     composeTestRule.waitForIdle()
-    // Typing a known value and asserting the exact result proves the field started empty:
-    // a prefilled cost-price fallback would remain before the typed value.
-    composeTestRule.onNodeWithTag("trade_price_input").performTextInput("123.45")
-    composeTestRule.onNodeWithTag("trade_price_input").assertTextEquals("123.45")
+    // Inspect the editable-text semantic value directly; TextField's visible label is separate.
+    composeTestRule.onNodeWithTag("trade_price_input")
+      .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
     composeTestRule.onNodeWithTag("cancel_trade_dialog").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("detail_update_price_button").performClick()
     composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithTag("manual_price_input").performTextInput("234.56")
-    composeTestRule.onNodeWithTag("manual_price_input").assertTextEquals("234.56")
+    composeTestRule.onNodeWithTag("manual_price_input")
+      .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
   }
 
   @Test
