@@ -12,6 +12,7 @@ import com.example.domain.repository.SmartDetectionRepository
 import com.example.feature.smartdetection.engine.SensitiveNotificationFilter
 import com.example.feature.smartdetection.engine.SmartTransactionParser
 import com.example.feature.smartdetection.engine.SmsNotificationAccessContext
+import com.example.feature.smartdetection.engine.SmsNotificationGateDecision
 import com.example.feature.smartdetection.engine.SmsNotificationPrivacyGate
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
