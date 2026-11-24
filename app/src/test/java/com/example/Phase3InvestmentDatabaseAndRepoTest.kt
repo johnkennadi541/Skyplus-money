@@ -231,6 +231,86 @@ class Phase3InvestmentDatabaseAndRepoTest {
   }
 
   @Test
+  fun `failed NAV quotes rotate fairly instead of monopolizing the five request cap`() = runTest {
+    val uid = "uid_failed_quote_rotation"
+    syncPreferences.setAutoUpdateConsent(uid, true)
+    val requestedHoldingIds = mutableListOf<String>()
+    val repo = buildRepo(
+      object : MarketPriceDataSource {
+        override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult {
+          requestedHoldingIds += request.holdingId
+          return MarketQuoteFetchResult.NetworkError("temporary offline")
+        }
+      }
+    )
+    val created = (1..6).map { index ->
+      repo.createHoldingWithInitialBuy(
+        authenticatedUserId = uid,
+        name = "Failed Fund $index",
+        category = InvestmentCategory.MUTUAL_FUNDS,
+        symbolOrTicker = (13000 + index).toString(),
+        isin = null,
+        brokerOrPlatform = null,
+        currencyCode = "INR",
+        purchaseDate = System.currentTimeMillis() - 10_000L,
+        quantityDecimal = "1",
+        purchasePriceDecimal = "100",
+        chargesMinor = 0L,
+        currentMarketPriceDecimal = null,
+        autoPriceUpdateEnabled = true,
+        notes = null,
+      ).getOrThrow()
+    }
+
+    val firstCycle = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = true).getOrThrow()
+    assertEquals(5, firstCycle.errorCount)
+    assertEquals(5, requestedHoldingIds.take(5).toSet().size)
+    val neverAttemptedHolding = created.single { it.id !in requestedHoldingIds.take(5) }
+
+    val secondCycle = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = true).getOrThrow()
+    assertEquals(5, secondCycle.errorCount)
+    assertEquals(
+      "The never-attempted sixth holding must be tried before previously failed holdings",
+      neverAttemptedHolding.id,
+      requestedHoldingIds[5],
+    )
+  }
+
+  @Test
+  fun `rate limit retry after is propagated to the worker summary`() = runTest {
+    val uid = "uid_retry_after_summary"
+    syncPreferences.setAutoUpdateConsent(uid, true)
+    val repo = buildRepo(
+      object : MarketPriceDataSource {
+        override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult =
+          MarketQuoteFetchResult.RateLimited(
+            retryAfterMillis = 120_000L,
+            message = "Provider rate limit",
+          )
+      }
+    )
+    repo.createHoldingWithInitialBuy(
+      authenticatedUserId = uid,
+      name = "Rate limited fund",
+      category = InvestmentCategory.MUTUAL_FUNDS,
+      symbolOrTicker = "140001",
+      isin = null,
+      brokerOrPlatform = null,
+      currencyCode = "INR",
+      purchaseDate = System.currentTimeMillis() - 10_000L,
+      quantityDecimal = "1",
+      purchasePriceDecimal = "100",
+      chargesMinor = 0L,
+      currentMarketPriceDecimal = null,
+      autoPriceUpdateEnabled = true,
+      notes = null,
+    ).getOrThrow()
+
+    val summary = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = true).getOrThrow()
+    assertEquals(1, summary.rateLimitedCount)
+    assertEquals(120_000L, summary.retryAfterMillis)
+  }
+  @Test
   fun `new investment holdings reject non INR currencies`() = runTest {
     val repo = buildRepo(
       object : MarketPriceDataSource {

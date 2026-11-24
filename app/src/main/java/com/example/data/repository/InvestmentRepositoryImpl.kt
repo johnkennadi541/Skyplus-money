@@ -806,18 +806,25 @@ class InvestmentRepositoryImpl @Inject constructor(
           )
         }
 
-        // Process never-quoted and oldest-quoted holdings first. The sync is capped
-        // at five requests per cycle; ordering by recency prevents the same first
-        // five rows from monopolizing every daily run.
+        // Rotate by persisted last-attempt time, not quote-success time. A failed
+        // holding therefore moves behind never-attempted holdings on the next cycle.
+        val lastQuoteAttemptByHoldingId =
+          syncPreferencesDataSource.quoteAttemptTimes(authenticatedUserId)
         val holdings =
           investmentDao.getAllHoldingsSync(authenticatedUserId)
             .map { it.toDomain() }
-            .sortedWith(compareBy<InvestmentHolding> { it.lastPriceUpdateDate }.thenBy { it.updatedAt })
+            .sortedWith(
+              compareBy<InvestmentHolding> { lastQuoteAttemptByHoldingId[it.id] ?: 0L }
+                .thenBy { it.lastPriceUpdateDate }
+                .thenBy { it.updatedAt }
+                .thenBy { it.id }
+            )
         var updatedCount = 0
         var skippedManualCount = 0
         var unsupportedCount = 0
         var rateLimitedCount = 0
         var errorCount = 0
+        var retryAfterMillis: Long? = null
         var requestsSent = 0
 
         for (holding in holdings) {
@@ -856,6 +863,7 @@ class InvestmentRepositoryImpl @Inject constructor(
             continue
           }
 
+          syncPreferencesDataSource.recordQuoteAttempt(authenticatedUserId, holding.id)
           requestsSent++
           val quoteResult =
             marketPriceDataSource.fetchLatestQuote(
@@ -892,6 +900,7 @@ class InvestmentRepositoryImpl @Inject constructor(
             }
             is MarketQuoteFetchResult.RateLimited -> {
               rateLimitedCount++
+              retryAfterMillis = quoteResult.retryAfterMillis
               break
             }
             is MarketQuoteFetchResult.UnsupportedCategoryOrIdentifier -> {
@@ -921,6 +930,7 @@ class InvestmentRepositoryImpl @Inject constructor(
           rateLimitedCount = rateLimitedCount,
           errorCount = errorCount,
           message = statusMsg,
+          retryAfterMillis = retryAfterMillis,
         )
       }
     }

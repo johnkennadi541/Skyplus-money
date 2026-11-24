@@ -2,8 +2,13 @@ package com.example.worker
 
 import android.content.Context
 import androidx.hilt.work.HiltWorker
+import androidx.work.Constraints
 import androidx.work.CoroutineWorker
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import java.util.concurrent.TimeUnit
 import com.example.domain.model.AuthSessionState
 import com.example.domain.repository.AuthRepository
 import com.example.domain.repository.InvestmentRepository
@@ -39,9 +44,32 @@ class InvestmentMarketSyncWorker @AssistedInject constructor(
 
     return outcome.fold(
       onSuccess = { summary ->
-        // Per-holding network/response failures are summarized inside a successful
-        // repository result; ask WorkManager to retry those rather than waiting a day.
-        if (summary.errorCount > 0) Result.retry() else Result.success()
+        val retryAfterMillis = summary.retryAfterMillis
+        if (retryAfterMillis != null && retryAfterMillis > 0L) {
+          val delayedRetry =
+            OneTimeWorkRequestBuilder<InvestmentMarketSyncWorker>()
+              .setConstraints(
+                Constraints.Builder()
+                  .setRequiredNetworkType(
+                    if (settings.syncOnlyOnWifi) NetworkType.UNMETERED else NetworkType.CONNECTED
+                  )
+                  .setRequiresBatteryNotLow(true)
+                  .build()
+              )
+              .setInitialDelay(retryAfterMillis, TimeUnit.MILLISECONDS)
+              .build()
+          try {
+            WorkManager.getInstance(applicationContext).enqueue(delayedRetry)
+            Result.success()
+          } catch (_: Exception) {
+            Result.retry()
+          }
+        } else if (summary.errorCount > 0) {
+          // Retry network/response failures with WorkManager backoff when no Retry-After exists.
+          Result.retry()
+        } else {
+          Result.success()
+        }
       },
       onFailure = { Result.retry() },
     )

@@ -11,6 +11,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.example.domain.model.MarketSyncSettings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,6 +32,10 @@ class MarketPriceSyncPreferencesDataSource @Inject constructor(
   private fun wifiOnlyKey(userId: String) = booleanPreferencesKey("sync_only_on_wifi_$userId")
   private fun lastSyncMillisKey(userId: String) = longPreferencesKey("last_sync_attempt_millis_$userId")
   private fun lastSyncStatusKey(userId: String) = stringPreferencesKey("last_sync_status_message_$userId")
+  private fun lastQuoteAttemptKey(userId: String, holdingId: String) =
+    longPreferencesKey("last_quote_attempt_holding_${userId}_$holdingId")
+  private fun lastQuoteAttemptSequenceKey(userId: String) =
+    longPreferencesKey("last_quote_attempt_sequence_$userId")
 
   fun syncSettings(userId: String): Flow<MarketSyncSettings> {
     require(userId.isNotBlank()) { "Authenticated user ID is required" }
@@ -58,6 +63,33 @@ class MarketPriceSyncPreferencesDataSource @Inject constructor(
     }
   }
 
+  /** Returns the last quote-attempt timestamp for each holding owned by this user. */
+  suspend fun quoteAttemptTimes(userId: String): Map<String, Long> {
+    require(userId.isNotBlank()) { "Authenticated user ID is required" }
+    val prefix = "last_quote_attempt_holding_${userId}_"
+    return context.marketSyncDataStore.data.first().asMap().mapNotNull { (key, value) ->
+      if (key.name.startsWith(prefix) && value is Long) {
+        key.name.removePrefix(prefix) to value
+      } else {
+        null
+      }
+    }.toMap()
+  }
+
+  /** Persists a user-scoped monotonic attempt time so failed holdings rotate fairly. */
+  suspend fun recordQuoteAttempt(userId: String, holdingId: String): Long {
+    require(userId.isNotBlank()) { "Authenticated user ID is required" }
+    require(holdingId.isNotBlank()) { "Holding ID is required" }
+    var recordedAt = 0L
+    context.marketSyncDataStore.edit { prefs ->
+      val sequenceKey = lastQuoteAttemptSequenceKey(userId)
+      val key = lastQuoteAttemptKey(userId, holdingId)
+      recordedAt = maxOf(System.currentTimeMillis(), (prefs[sequenceKey] ?: 0L) + 1L)
+      prefs[sequenceKey] = recordedAt
+      prefs[key] = recordedAt
+    }
+    return recordedAt
+  }
   suspend fun recordSyncResult(userId: String, timestampMillis: Long, statusMessage: String) {
     require(userId.isNotBlank()) { "Authenticated user ID is required" }
     context.marketSyncDataStore.edit { prefs ->

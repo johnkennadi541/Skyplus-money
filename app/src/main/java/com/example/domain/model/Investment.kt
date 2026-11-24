@@ -155,4 +155,5 @@ data class MarketSyncSummary(
   val rateLimitedCount: Int,
   val errorCount: Int,
   val message: String,
+  val retryAfterMillis: Long? = null,
 )
