@@ -283,7 +283,7 @@ fun SmartDetectionSettingsScreen(
               Spacer(modifier = Modifier.width(OceanSpacing.sm))
               Column {
                 Text("Review Queue", style = MaterialTheme.typography.titleMedium)
-                Text("Uncertain or unmapped detections awaiting review", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Previously saved review items only; new notifications are not queued in read-only mode", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
               }
             }
             OceanStatusBadge(
@@ -332,7 +332,7 @@ fun SmartDetectionSettingsScreen(
               Spacer(modifier = Modifier.width(OceanSpacing.sm))
               Column {
                 Text("Automatic Detection History", style = MaterialTheme.typography.titleMedium)
-                Text("Audit log of auto-saved, reviewed, and duplicate events", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Previously saved detection events; read-only classifications are not stored", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
               }
             }
             Text("View →", style = MaterialTheme.typography.labelMedium, color = OceanTheme.colors.gold)
@@ -485,8 +485,8 @@ fun NotificationAccessSetupScreen(
         Spacer(modifier = Modifier.height(OceanSpacing.sm))
         Text(
           text = "Why SKYPLUS MONEY requests Notification Access:\n" +
-            "• Automatically detects debit, credit, UPI, card, wallet, and refund alerts from your chosen bank/payment apps.\n" +
-            "• Eliminates manual entry while staying 100% compliant with Google Play permissions.",
+            "• Only after you separately opt in, it can inspect new notifications from apps you have not excluded and classify possible financial alerts.\n" +
+            "• Notification Access does not read your historical SMS inbox. This read-only phase never creates or saves transactions.",
           style = MaterialTheme.typography.bodyMedium,
         )
       }
@@ -499,10 +499,11 @@ fun NotificationAccessSetupScreen(
         }
         Spacer(modifier = Modifier.height(OceanSpacing.xs))
         Text(
-          text = "• On-Device Only: Parsing runs locally on your phone with zero external AI/cloud calls.\n" +
-            "• OTP & PIN Rejection: Notifications containing OTPs, PINs, MPINs, CVVs, or passwords are discarded immediately.\n" +
-            "• App Allowlist: Only notifications from bank/UPI apps you enable are examined.\n" +
-            "• Encrypted Storage: Verified transactions are stored exclusively inside your SQLCipher-encrypted database.",
+          text = "• Explicit Opt-in: All-app notification classification is OFF until you enable it in Smart Detection settings.\n" +
+            "• On-Device Only: Classification runs locally; notification content is not uploaded or sent to cloud AI.\n" +
+            "• Sensitive Rejection: OTP, PIN, MPIN, CVV, password and recognized security-code notifications are discarded.\n" +
+            "• Read-only: Notification text and classification results are not logged or persisted; no transaction is created.\n" +
+            "• Source Controls: You can exclude supported apps and withdraw the all-app opt-in at any time.",
           style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
