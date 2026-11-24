@@ -2,7 +2,7 @@ import { getAuth } from "firebase-admin/auth";
 import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { defineSecret, defineString } from "firebase-functions/params";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { CallableRequest, HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
 const db = getFirestore();
@@ -13,7 +13,7 @@ const REMINDER_START_DAY = 30;
 const LOCK_DAY = 45;
 const DEFAULT_TIME_ZONE = "Asia/Kolkata";
 
-function requireGoogleUser(request: Parameters<Parameters<typeof onCall>[1]>[0]): string {
+function requireGoogleUser(request: CallableRequest<unknown>): string {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in is required.");
   if (request.auth?.token.firebase?.sign_in_provider !== "google.com") {
@@ -32,7 +32,7 @@ function safeTimeZone(value: unknown): string {
   }
 }
 
-function localParts(timestamp: number, timeZone: string): { day: number; hour: number } {
+function localParts(timestamp: number, timeZone: string): { day: number; hour: number; minute: number } {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",
@@ -43,7 +43,7 @@ function localParts(timestamp: number, timeZone: string): { day: number; hour: n
   }).formatToParts(new Date(timestamp));
   const get = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? "0");
   const day = Math.floor(Date.UTC(get("year"), get("month") - 1, get("day")) / DAY_MS);
-  return { day, hour: get("hour") };
+  return { day, hour: get("hour"), minute: get("minute") };
 }
 
 async function sendSubscriptionEmail(uid: string): Promise<void> {
@@ -184,7 +184,7 @@ export const deliverSubscriptionTrialReminders = onSchedule(
       const timeZone = safeTimeZone(state.timeZone);
       const localNow = localParts(now, timeZone);
       if (localNow.hour < 9) continue;
-      const dayIndex = localNow.day - localParts(activation.toMillis(), timeZone).day;
+      const activationLocal = localParts(activation.toMillis(), timeZone);\n      const beforeActivationClock = localNow.hour * 60 + localNow.minute <\n        activationLocal.hour * 60 + activationLocal.minute;\n      const dayIndex = localNow.day - activationLocal.day - (beforeActivationClock ? 1 : 0);
       if (dayIndex < REMINDER_START_DAY || dayIndex > LOCK_DAY) continue;
 
       const uid = document.id;
