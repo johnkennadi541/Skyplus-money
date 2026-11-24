@@ -103,6 +103,6 @@ class ReadOnlyNotificationProcessorTest {
     val forbiddenNames = listOf("Repository", "Dao", "Database", "Context")
     val fieldTypes =
       ReadOnlyNotificationProcessor::class.java.declaredFields.map { it.type.name }
-    assertFalse(fieldTypes.any { type -> forbiddenNames.any(type::contains) })
+    assertFalse(fieldTypes.any { type -> forbiddenNames.any { forbidden -> type.contains(forbidden) } })
   }
 }
