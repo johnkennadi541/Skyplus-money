@@ -832,6 +832,7 @@ fun TransactionCorrectionDialog(
               selected = selectedCategory == cat,
               onClick = { selectedCategory = cat },
               label = { Text(cat) },
+              modifier = Modifier.testTag("category_chip_$cat"),
             )
           }
         }
