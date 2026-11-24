@@ -10,6 +10,7 @@ import com.example.domain.model.MarketSyncSummary
 import com.example.domain.model.Money
 import com.example.domain.model.PortfolioCurrencySummary
 import com.example.domain.repository.InvestmentRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import java.math.BigDecimal
@@ -96,7 +97,9 @@ class CreateInvestmentUseCase @Inject constructor(
       try {
         val chargesBd = calculationEngine.parseNonNegativeDecimal(chargesDecimal, "Transaction charges")
         Money.fromBigDecimal(chargesBd, currencyCode, RoundingMode.HALF_UP).minorUnits
-      } catch (e: Throwable) {
+      } catch (cancelled: CancellationException) {
+        throw cancelled
+      } catch (e: Exception) {
         return Result.failure(e)
       }
 
@@ -137,7 +140,9 @@ class RecordInvestmentBuyUseCase @Inject constructor(
       try {
         val chargesBd = calculationEngine.parseNonNegativeDecimal(chargesDecimal, "Transaction charges")
         Money.fromBigDecimal(chargesBd, currencyCode, RoundingMode.HALF_UP).minorUnits
-      } catch (e: Throwable) {
+      } catch (cancelled: CancellationException) {
+        throw cancelled
+      } catch (e: Exception) {
         return Result.failure(e)
       }
 
@@ -171,7 +176,9 @@ class RecordInvestmentSellUseCase @Inject constructor(
       try {
         val chargesBd = calculationEngine.parseNonNegativeDecimal(chargesDecimal, "Transaction charges")
         Money.fromBigDecimal(chargesBd, currencyCode, RoundingMode.HALF_UP).minorUnits
-      } catch (e: Throwable) {
+      } catch (cancelled: CancellationException) {
+        throw cancelled
+      } catch (e: Exception) {
         return Result.failure(e)
       }
 
@@ -231,20 +238,21 @@ class SetHoldingAutoPriceUseCase @Inject constructor(
 class SyncMarketPricesUseCase @Inject constructor(
   private val repository: InvestmentRepository,
 ) {
-  fun observeSettings(): Flow<MarketSyncSettings> = repository.observeSyncSettings()
+  fun observeSettings(authenticatedUserId: String): Flow<MarketSyncSettings> =
+    repository.observeSyncSettings(authenticatedUserId)
 
-  suspend fun setAutoUpdateConsent(enabled: Boolean) = repository.setAutoUpdateConsent(enabled)
+  suspend fun setAutoUpdateConsent(authenticatedUserId: String, enabled: Boolean) =
+    repository.setAutoUpdateConsent(authenticatedUserId, enabled)
 
-  suspend fun setSyncOnlyOnWifi(wifiOnly: Boolean) = repository.setSyncOnlyOnWifi(wifiOnly)
+  suspend fun setSyncOnlyOnWifi(authenticatedUserId: String, wifiOnly: Boolean) =
+    repository.setSyncOnlyOnWifi(authenticatedUserId, wifiOnly)
 
   suspend fun syncNow(
     authenticatedUserId: String,
-    allowOverwriteManual: Boolean = false,
     forceBypassCooldown: Boolean = true,
   ): Result<MarketSyncSummary> =
     repository.syncEligibleMarketPrices(
       authenticatedUserId = authenticatedUserId,
-      allowOverwriteManual = allowOverwriteManual,
       forceBypassCooldown = forceBypassCooldown,
     )
 }

@@ -133,6 +133,9 @@ interface InvestmentDao {
   )
   fun getAllTransactionsForUser(userId: String): Flow<List<InvestmentTransactionEntity>>
 
+  @Query("SELECT MAX(transactionDate) FROM investment_transactions WHERE userId = :userId AND holdingId = :holdingId")
+  suspend fun getLatestTransactionDate(userId: String, holdingId: String): Long?
+
   @Insert(onConflict = OnConflictStrategy.ABORT)
   suspend fun insertTransaction(transaction: InvestmentTransactionEntity)
 

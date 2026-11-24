@@ -20,14 +20,25 @@ enum class CreditCardNetwork {
   OTHER,
 }
 
+enum class CreditCardStatementStatus {
+  UNPAID,
+  PARTIALLY_PAID,
+  PAID,
+  OVERDUE,
+}
+
+enum class CreditCardRewardEventType {
+  EARN,
+  REDEEM,
+  ADJUSTMENT,
+}
+
 /**
  * A credit card is its own entity, but it never owns a ledger.
  *
- * The money still moves through the existing `CREDIT_CARD` [FinancialAccount]: purchases are
- * ordinary expense transactions on that account and a payment is an ordinary transfer into it.
- * This record only carries the card-specific attributes that a plain account cannot hold.
- *
- * [accountId] is unique, so one card per account and one account per card.
+ * The money still moves through the existing CREDIT_CARD FinancialAccount: purchases are ordinary
+ * expense transactions on that account and payments are ordinary paired transfers into it.
+ * Card-specific metadata and reminder preferences live here.
  */
 data class CreditCard(
   val id: String = UUID.randomUUID().toString(),
@@ -45,13 +56,84 @@ data class CreditCard(
   val paymentDueDayOffset: Int = 20,
   /** Annual percentage rate as an exact decimal string; never a Double. */
   val aprPercent: String = "0",
+  val joiningFeeMinor: Long = 0L,
+  val annualFeeMinor: Long = 0L,
+  /** Month in which the annual fee is expected (1..12). */
+  val annualFeeMonth: Int = 1,
+  val rewardProgramName: String? = null,
   val isActive: Boolean = true,
+  /** Local tracker state only; this does not freeze the physical card at the issuer. */
+  val isFrozen: Boolean = false,
+  val reminderEnabled: Boolean = true,
+  /** Number of days before statement due date to notify. */
+  val reminderDaysBefore: Int = 3,
+  val notes: String? = null,
   val createdAt: Long = System.currentTimeMillis(),
   val updatedAt: Long = System.currentTimeMillis(),
 ) {
   val creditLimit: Money
     get() = Money.fromMinorUnits(creditLimitMinor, currencyCode)
+
+  val annualFee: Money
+    get() = Money.fromMinorUnits(annualFeeMinor, currencyCode)
 }
+
+/** A statement imported or entered by the user; payments are reconciled from paired ledger transfers. */
+data class CreditCardStatement(
+  val id: String = UUID.randomUUID().toString(),
+  val userId: String,
+  val cardId: String,
+  val currencyCode: String,
+  val statementDate: Long,
+  val dueDate: Long,
+  val statementBalanceMinor: Long,
+  val minimumDueMinor: Long,
+  val feesMinor: Long = 0L,
+  val lateFeeMinor: Long = 0L,
+  val interestMinor: Long = 0L,
+  val notes: String? = null,
+  val createdAt: Long = System.currentTimeMillis(),
+  val updatedAt: Long = System.currentTimeMillis(),
+) {
+  val statementBalance: Money
+    get() = Money.fromMinorUnits(statementBalanceMinor, currencyCode)
+}
+
+/** Statement with ledger-derived payment status; it never trusts a manually toggled paid flag. */
+data class CreditCardStatementSummary(
+  val statement: CreditCardStatement,
+  val currencyCode: String,
+  val paidAmountMinor: Long,
+  val remainingDueMinor: Long,
+  val remainingMinimumDueMinor: Long,
+  val status: CreditCardStatementStatus,
+) {
+  val statementBalance: Money
+    get() = Money.fromMinorUnits(statement.statementBalanceMinor, currencyCode)
+
+  val minimumDue: Money
+    get() = Money.fromMinorUnits(statement.minimumDueMinor, currencyCode)
+
+  val remainingDue: Money
+    get() = Money.fromMinorUnits(remainingDueMinor, currencyCode)
+
+  val remainingMinimumDue: Money
+    get() = Money.fromMinorUnits(remainingMinimumDueMinor, currencyCode)
+}
+
+/** Immutable reward ledger event. Positive pointsDelta earns points; negative redeems/adjusts them. */
+data class CreditCardRewardEvent(
+  val id: String = UUID.randomUUID().toString(),
+  val userId: String,
+  val cardId: String,
+  val eventDate: Long,
+  val eventType: CreditCardRewardEventType,
+  val pointsDelta: Long,
+  val cashValueMinor: Long = 0L,
+  val currencyCode: String,
+  val description: String,
+  val createdAt: Long = System.currentTimeMillis(),
+)
 
 /** A card joined with its ledger account, ready for display. */
 data class CreditCardSummary(
@@ -70,4 +152,16 @@ data class CreditCardSummary(
 
   val isOverLimit: Boolean
     get() = card.creditLimitMinor > 0L && outstandingMinor > card.creditLimitMinor
+}
+
+data class CreditCardSpendingAnalytics(
+  val currencyCode: String,
+  val periodStart: Long,
+  val periodEnd: Long,
+  val totalSpentMinor: Long,
+  val transactionCount: Int,
+  val categoryTotalsMinor: Map<String, Long>,
+) {
+  val totalSpent: Money
+    get() = Money.fromMinorUnits(totalSpentMinor, currencyCode)
 }

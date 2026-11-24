@@ -24,13 +24,19 @@ import androidx.compose.material.icons.rounded.Gavel
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -378,8 +384,11 @@ fun ProfileScreen(
   modifier: Modifier = Modifier,
   onOpenInvestments: () -> Unit = {},
   onSignOut: (() -> Unit)? = null,
+  profileFirstName: String = "",
+  onSaveProfileFirstName: (String) -> Unit = {},
 ) {
   BackHandler(onBack = onNavigateBack)
+  var firstName by remember(authenticatedUser?.uid, profileFirstName) { mutableStateOf(profileFirstName) }
   Column(
     modifier =
       modifier
@@ -414,6 +423,25 @@ fun ProfileScreen(
         color = MaterialTheme.colorScheme.onSurface,
       )
       Spacer(modifier = Modifier.height(OceanSpacing.xs))
+      OutlinedTextField(
+        value = firstName,
+        onValueChange = { candidate -> if (candidate.length <= 60) firstName = candidate },
+        modifier = Modifier.fillMaxWidth().testTag("profile_first_name_input"),
+        label = { Text("First Name") },
+        singleLine = true,
+      )
+      Button(
+        onClick = { onSaveProfileFirstName(firstName.trim()) },
+        enabled = firstName.isNotBlank(),
+        modifier = Modifier.fillMaxWidth().testTag("profile_save_name_button"),
+      ) {
+        Text("Save Profile Name")
+      }
+      Text(
+        text = authenticatedUser?.displayName?.ifBlank { null } ?: "Google account name unavailable",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
       Text(
         text = authenticatedUser?.email?.ifBlank { "Authenticated User" } ?: "Authenticated User",
         style = MaterialTheme.typography.bodyLarge,

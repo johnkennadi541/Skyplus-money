@@ -46,7 +46,11 @@ data class InvestmentHoldingEntity(
       userId = userId,
       name = name,
       category =
-        runCatching { InvestmentCategory.valueOf(category) }.getOrDefault(InvestmentCategory.OTHER),
+        try {
+          InvestmentCategory.valueOf(category)
+        } catch (_: IllegalArgumentException) {
+          InvestmentCategory.OTHER
+        },
       symbolOrTicker = symbolOrTicker,
       isin = isin,
       brokerOrPlatform = brokerOrPlatform,
@@ -61,8 +65,11 @@ data class InvestmentHoldingEntity(
       currentValuationMinor = currentValuationMinor,
       lastPriceUpdateDate = lastPriceUpdateDate,
       lastPriceSource =
-        runCatching { PriceSourceType.valueOf(lastPriceSource) }
-          .getOrDefault(PriceSourceType.MANUAL),
+        try {
+          PriceSourceType.valueOf(lastPriceSource)
+        } catch (_: IllegalArgumentException) {
+          PriceSourceType.MANUAL
+        },
       lastPriceProviderLabel = lastPriceProviderLabel,
       autoPriceUpdateEnabled = autoPriceUpdateEnabled,
       notes = notes,

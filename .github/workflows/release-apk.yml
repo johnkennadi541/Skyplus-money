@@ -21,6 +21,8 @@ concurrency:
 
 jobs:
   release-apk:
+    # Never expose signing secrets to a manually selected feature branch.
+    if: github.ref == 'refs/heads/main'
     name: Build signed release APK
     runs-on: ubuntu-latest
     timeout-minutes: 45

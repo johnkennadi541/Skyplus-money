@@ -68,7 +68,7 @@ class CreateShoppingListUseCase @Inject constructor(
       } else {
         try {
           calculationEngine.parsePositiveMoneyMinor(budgetDecimal, currencyCode, "List budget")
-        } catch (e: Throwable) {
+        } catch (e: Exception) {
           return Result.failure(e)
         }
       }
@@ -100,7 +100,7 @@ class UpdateShoppingListUseCase @Inject constructor(
       } else {
         try {
           calculationEngine.parsePositiveMoneyMinor(budgetDecimal, newCurrencyCode, "List budget")
-        } catch (e: Throwable) {
+        } catch (e: Exception) {
           return Result.failure(e)
         }
       }

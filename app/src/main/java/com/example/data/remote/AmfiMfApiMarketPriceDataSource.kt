@@ -12,16 +12,25 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.Call
 import okhttp3.Request
+import okio.Buffer
+import kotlinx.coroutines.CancellationException
 import java.io.IOException
 import java.math.BigDecimal
-import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
+import java.time.format.ResolverStyle
 import java.util.Locale
-import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Public, zero-API-key Mutual Fund NAV provider backed by MFapi.in / AMFI India Official Daily Feed.
+ * Public, zero-API-key Mutual Fund NAV provider using the third-party MFapi.in API,
+ * which republishes AMFI-sourced daily NAV data. MFapi.in is not operated by AMFI.
+ * Free/no-key access is not itself a commercial redistribution licence; verify terms
+ * before any commercial release.
  *
  * Terms & Safety Guardrails:
  * - Supports ONLY [InvestmentCategory.MUTUAL_FUNDS] identified by 5-7 digit AMFI scheme code.
@@ -60,6 +69,12 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
         )
       }
 
+      if (!request.currencyCode.trim().equals(INDIAN_CURRENCY_CODE, ignoreCase = true)) {
+        return@withContext MarketQuoteFetchResult.UnsupportedCategoryOrIdentifier(
+          message = "AMFI mutual fund NAVs are denominated in INR; refusing to apply an INR quote to a non-INR holding."
+        )
+      }
+
       val schemeCode = request.symbolOrTicker?.trim().orEmpty()
       if (!AMFI_SCHEME_CODE_REGEX.matches(schemeCode)) {
         return@withContext MarketQuoteFetchResult.UnsupportedCategoryOrIdentifier(
@@ -81,8 +96,14 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
         callFactory.newCall(httpRequest).execute().use { response ->
           if (response.code == 429) {
             val retryAfterSeconds = response.header("Retry-After")?.toLongOrNull()
+            val retryAfterMillis =
+              retryAfterSeconds
+                ?.takeIf { it > 0L }
+                ?.coerceAtMost(MAX_RETRY_AFTER_SECONDS)
+                ?.times(1000L)
+                ?: DEFAULT_RETRY_AFTER_MILLIS
             return@withContext MarketQuoteFetchResult.RateLimited(
-              retryAfterMillis = (retryAfterSeconds ?: 60L) * 1000L,
+              retryAfterMillis = retryAfterMillis,
               message = "MFapi.in rate limit reached (HTTP 429). Retry later or update NAV manually.",
             )
           }
@@ -93,7 +114,39 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
             )
           }
 
-          val rawBody = response.body?.string()?.trim().orEmpty()
+          val body = response.body
+            ?: return@withContext MarketQuoteFetchResult.InvalidResponse(
+              message = "Market feed returned an empty response."
+            )
+          if (body.contentLength() > MAX_RESPONSE_BYTES) {
+            return@withContext MarketQuoteFetchResult.InvalidResponse(
+              message = "Market feed response exceeded the permitted size; existing price was preserved."
+            )
+          }
+
+          // Stream at most MAX_RESPONSE_BYTES + 1 bytes. This also handles
+          // chunked/unknown-length responses without an unbounded allocation.
+          val boundedBuffer = Buffer()
+          val source = body.source()
+          var totalRead = 0L
+          while (totalRead <= MAX_RESPONSE_BYTES) {
+            val remaining = MAX_RESPONSE_BYTES + 1L - totalRead
+            val read = source.read(boundedBuffer, minOf(8_192L, remaining))
+            if (read == -1L) break
+            totalRead += read
+          }
+          if (totalRead > MAX_RESPONSE_BYTES) {
+            boundedBuffer.clear()
+            return@withContext MarketQuoteFetchResult.InvalidResponse(
+              message = "Market feed response exceeded the permitted size; existing price was preserved."
+            )
+          }
+          val responseBytes = boundedBuffer.readByteArray()
+          val rawBody = try {
+            responseBytes.toString(Charsets.UTF_8).trim()
+          } finally {
+            responseBytes.fill(0)
+          }
           if (rawBody.isEmpty()) {
             return@withContext MarketQuoteFetchResult.InvalidResponse(
               message = "Market feed returned an empty response."
@@ -102,13 +155,15 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
 
           parseMfApiResponse(rawBody)
         }
+      } catch (cancelled: CancellationException) {
+        throw cancelled
       } catch (_: IOException) {
         MarketQuoteFetchResult.NetworkError(
           message = "Market feed unavailable while offline or unreachable. Manual entry remains active."
         )
-      } catch (t: Throwable) {
+      } catch (_: Exception) {
         MarketQuoteFetchResult.InvalidResponse(
-          message = t.message ?: "Unexpected error parsing market feed response."
+          message = "Unexpected error processing market feed response."
         )
       }
     }
@@ -132,6 +187,11 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
         ?: return MarketQuoteFetchResult.InvalidResponse("Market feed contained no NAV entries.")
 
     val navText = latestPoint.nav?.trim().orEmpty()
+    // Reject exponent notation and unbounded precision before BigDecimal.toPlainString().
+    // A tiny payload such as 1e999999999 must never trigger a huge allocation.
+    if (!NAV_DECIMAL_REGEX.matches(navText)) {
+      return MarketQuoteFetchResult.InvalidResponse("NAV decimal is outside the permitted precision.")
+    }
     val navDecimal =
       try {
         BigDecimal(navText)
@@ -143,7 +203,11 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
       return MarketQuoteFetchResult.InvalidResponse("Market feed returned non-positive NAV.")
     }
 
-    val asOfMillis = parseAmfiDateMillis(latestPoint.date)
+    val asOfMillis =
+      parseAmfiDateMillis(latestPoint.date)
+        ?: return MarketQuoteFetchResult.InvalidResponse(
+          "Market feed returned a missing, malformed, or future NAV date; existing price was preserved."
+        )
 
     return MarketQuoteFetchResult.Success(
       unitPriceDecimal = navDecimal.stripTrailingZeros().toPlainString(),
@@ -154,18 +218,19 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
     )
   }
 
-  private fun parseAmfiDateMillis(dateText: String?): Long {
-    if (dateText.isNullOrBlank()) return System.currentTimeMillis()
-    val parser =
-      SimpleDateFormat("dd-MM-yyyy", Locale.US).apply {
-        isLenient = false
-        timeZone = TimeZone.getTimeZone("Asia/Kolkata")
+  private fun parseAmfiDateMillis(dateText: String?): Long? {
+    val normalizedDate = dateText?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    val publishedDate =
+      try {
+        LocalDate.parse(normalizedDate, AMFI_DATE_FORMATTER)
+      } catch (_: DateTimeParseException) {
+        return null
       }
-    return runCatching {
-      val date = parser.parse(dateText.trim())
-      // Anchor EOD NAV at 18:00 IST (~12:30 UTC) on the published trading day
-      (date?.time ?: System.currentTimeMillis()) + (18L * 60L * 60L * 1000L)
-    }.getOrElse { System.currentTimeMillis() }
+    // AMFI publishes end-of-day NAVs; anchor the timestamp at 18:00 India Standard Time.
+    val asOfMillis =
+      publishedDate.atTime(LocalTime.of(18, 0)).atZone(INDIA_ZONE_ID).toInstant().toEpochMilli()
+    if (asOfMillis > System.currentTimeMillis() + MAX_FUTURE_CLOCK_SKEW_MILLIS) return null
+    return asOfMillis
   }
 
   @Serializable
@@ -189,7 +254,16 @@ class AmfiMfApiMarketPriceDataSource internal constructor(
 
   companion object {
     const val DEFAULT_BASE_URL = "https://api.mfapi.in"
-    const val PROVIDER_LABEL = "MFapi.in / AMFI India (EOD)"
+    const val PROVIDER_LABEL = "MFapi.in (third-party API; AMFI-sourced EOD NAV)"
+    private const val MAX_RESPONSE_BYTES = 64 * 1024
+    private const val INDIAN_CURRENCY_CODE = "INR"
+    private const val MAX_FUTURE_CLOCK_SKEW_MILLIS = 5L * 60L * 1000L
+    private const val DEFAULT_RETRY_AFTER_MILLIS = 60_000L
+    private const val MAX_RETRY_AFTER_SECONDS = 24L * 60L * 60L
+    private val NAV_DECIMAL_REGEX = Regex("^\\d{1,12}(\\.\\d{1,10})?$")
+    private val INDIA_ZONE_ID: ZoneId = ZoneId.of("Asia/Kolkata")
+    private val AMFI_DATE_FORMATTER: DateTimeFormatter =
+      DateTimeFormatter.ofPattern("dd-MM-uuuu", Locale.US).withResolverStyle(ResolverStyle.STRICT)
     private val AMFI_SCHEME_CODE_REGEX = Regex("^\\d{5,7}$")
   }
 }

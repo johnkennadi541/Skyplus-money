@@ -81,11 +81,21 @@ class InvestmentsViewModel @Inject constructor(
       authRepository
         .observeAuthSession()
         .distinctUntilChangedBy { (it as? AuthSessionState.Authenticated)?.user?.uid }
-        .collect {
+        .collect { session ->
           _userMessage.value = null
           _isErrorMessage.value = false
           _selectedCurrency.value = null
           _selectedCategory.value = null
+          val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+          if (uid.isNullOrBlank()) {
+            syncScheduler.updateSchedule(autoUpdateConsentEnabled = false, syncOnlyOnWifi = true)
+          } else {
+            val settings = syncMarketPricesUseCase.observeSettings(uid).first()
+            syncScheduler.updateSchedule(
+              autoUpdateConsentEnabled = settings.autoUpdateConsentEnabled,
+              syncOnlyOnWifi = settings.syncOnlyOnWifi,
+            )
+          }
         }
     }
   }
@@ -146,8 +156,13 @@ class InvestmentsViewModel @Inject constructor(
       )
 
   val syncSettings: StateFlow<MarketSyncSettings> =
-    syncMarketPricesUseCase
-      .observeSettings()
+    authRepository
+      .observeAuthSession()
+      .flatMapLatest { session ->
+        val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+        if (!uid.isNullOrBlank()) syncMarketPricesUseCase.observeSettings(uid)
+        else flowOf(MarketSyncSettings())
+      }
       .stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -177,9 +192,13 @@ class InvestmentsViewModel @Inject constructor(
 
   fun setAutoUpdateConsent(enabled: Boolean) {
     viewModelScope.launch(dispatchers.io) {
-      syncMarketPricesUseCase.setAutoUpdateConsent(enabled)
-      val wifiOnly = syncSettings.value.syncOnlyOnWifi
-      syncScheduler.updateSchedule(autoUpdateConsentEnabled = enabled, syncOnlyOnWifi = wifiOnly)
+      val uid = requireAuthenticatedUid() ?: return@launch
+      syncMarketPricesUseCase.setAutoUpdateConsent(uid, enabled)
+      val settings = syncMarketPricesUseCase.observeSettings(uid).first()
+      syncScheduler.updateSchedule(
+        autoUpdateConsentEnabled = settings.autoUpdateConsentEnabled,
+        syncOnlyOnWifi = settings.syncOnlyOnWifi,
+      )
       _isErrorMessage.value = false
       _userMessage.value =
         if (enabled) {
@@ -192,15 +211,17 @@ class InvestmentsViewModel @Inject constructor(
 
   fun setSyncOnlyOnWifi(wifiOnly: Boolean) {
     viewModelScope.launch(dispatchers.io) {
-      syncMarketPricesUseCase.setSyncOnlyOnWifi(wifiOnly)
+      val uid = requireAuthenticatedUid() ?: return@launch
+      syncMarketPricesUseCase.setSyncOnlyOnWifi(uid, wifiOnly)
+      val settings = syncMarketPricesUseCase.observeSettings(uid).first()
       syncScheduler.updateSchedule(
-        autoUpdateConsentEnabled = syncSettings.value.autoUpdateConsentEnabled,
-        syncOnlyOnWifi = wifiOnly,
+        autoUpdateConsentEnabled = settings.autoUpdateConsentEnabled,
+        syncOnlyOnWifi = settings.syncOnlyOnWifi,
       )
     }
   }
 
-  fun syncMarketPricesNow(allowOverwriteManual: Boolean = false) {
+  fun syncMarketPricesNow() {
     viewModelScope.launch(dispatchers.io) {
       val uid = requireAuthenticatedUid() ?: return@launch
       _isSyncing.value = true
@@ -208,7 +229,6 @@ class InvestmentsViewModel @Inject constructor(
         val result =
           syncMarketPricesUseCase.syncNow(
             authenticatedUserId = uid,
-            allowOverwriteManual = allowOverwriteManual,
             forceBypassCooldown = true,
           )
         result.fold(

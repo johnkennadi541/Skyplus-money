@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">SKYPLUS MONEY</string>
+    <string name="app_name">SkyPlus Money</string>
     <string name="app_tagline">Take Control. Build Wealth.</string>
     <string name="phase_zero_badge">Phase 0 • Foundation</string>
     <string name="auth_pending_badge">Auth Gate: Phase 1 Pending</string>

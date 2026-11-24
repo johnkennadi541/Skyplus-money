@@ -12,8 +12,8 @@ interface AccountMappingRuleDao {
   @Query("SELECT * FROM account_mapping_rules WHERE userId = :userId ORDER BY createdAt DESC")
   fun getAllRules(userId: String): Flow<List<AccountMappingRuleEntity>>
 
-  @Query("SELECT * FROM account_mapping_rules WHERE userId = :userId AND matchPattern = :pattern LIMIT 1")
-  suspend fun findRuleForPattern(userId: String, pattern: String): AccountMappingRuleEntity?
+  @Query("SELECT * FROM account_mapping_rules WHERE userId = :userId AND matchPattern = :pattern")
+  suspend fun findRulesForPattern(userId: String, pattern: String): List<AccountMappingRuleEntity>
 
   @Insert(onConflict = OnConflictStrategy.ABORT)
   suspend fun insertRule(rule: AccountMappingRuleEntity)

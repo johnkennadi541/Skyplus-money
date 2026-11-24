@@ -15,12 +15,15 @@ import com.example.data.local.db.DatabaseMigrations
 import com.example.data.local.db.dao.AccountMappingRuleDao
 import com.example.data.local.db.dao.BudgetDao
 import com.example.data.local.db.dao.CreditCardDao
+import com.example.data.local.db.dao.CreditCardStatementDao
+import com.example.data.local.db.dao.CreditCardRewardEventDao
 import com.example.data.local.db.dao.FinancialAccountDao
 import com.example.data.local.db.dao.FinancialTransactionDao
 import com.example.data.local.db.dao.InvestmentDao
 import com.example.data.local.db.dao.LoanDao
 import com.example.data.local.db.dao.SavingsGoalDao
 import com.example.data.local.db.dao.ShoppingDao
+import com.example.data.local.db.dao.ShoppingExtendedDao
 import com.example.data.local.db.dao.TransactionDetectionEventDao
 import dagger.Module
 import dagger.Provides
@@ -82,6 +85,8 @@ object DatabaseModule {
           DatabaseMigrations.MIGRATION_6_7,
           DatabaseMigrations.MIGRATION_7_8,
           DatabaseMigrations.MIGRATION_8_9,
+          DatabaseMigrations.MIGRATION_9_10,
+          DatabaseMigrations.MIGRATION_10_11,
         )
 
     if (factoryHolder.delegate != null || factoryHolder.lastError != null) {
@@ -115,6 +120,8 @@ object DatabaseModule {
           DatabaseMigrations.MIGRATION_6_7,
           DatabaseMigrations.MIGRATION_7_8,
           DatabaseMigrations.MIGRATION_8_9,
+          DatabaseMigrations.MIGRATION_9_10,
+          DatabaseMigrations.MIGRATION_10_11,
         )
 
     val encryptedFactory =
@@ -139,22 +146,41 @@ object DatabaseModule {
     isRobolectricRunner: Boolean = isRobolectricTestEnvironment(),
     nativeLibsLoader: (Context) -> Unit = { net.sqlcipher.database.SQLiteDatabase.loadLibs(it) },
   ): SupportSQLiteOpenHelper.Factory? {
+    var passphrase: ByteArray? = null
     return try {
       nativeLibsLoader(context)
-      val passphrase = passphraseProvider.getOrCreatePassphrase()
-      SupportFactory(passphrase)
-    } catch (t: Throwable) {
+      val key = passphraseProvider.getOrCreatePassphrase()
+      passphrase = key
+      val factory = SupportFactory(key, null, true)
+      // SupportFactory owns the key buffer and clears it after SQLCipher opens the DB.
+      passphrase = null
+      factory
+    } catch (error: Exception) {
+      passphrase?.fill(0)
       val allowTestFallback = !isReleaseBuild && isRobolectricRunner
       if (allowTestFallback) {
         null
       } else {
-        throw (t as? DatabaseSecurityException)
+        throw (error as? DatabaseSecurityException)
           ?: DatabaseSecurityException(
             reason = PassphraseFailureReason.SQLCIPHER_INIT_FAILED,
             isRecoverable = true,
             message = "SQLCipher encrypted database initialization failed; plaintext fallback is prohibited.",
-            cause = t,
+            cause = error,
           )
+      }
+    } catch (error: LinkageError) {
+      passphrase?.fill(0)
+      val allowTestFallback = !isReleaseBuild && isRobolectricRunner
+      if (allowTestFallback) {
+        null
+      } else {
+        throw DatabaseSecurityException(
+          reason = PassphraseFailureReason.SQLCIPHER_INIT_FAILED,
+          isRecoverable = true,
+          message = "SQLCipher native initialization failed; plaintext fallback is prohibited.",
+          cause = error,
+        )
       }
     }
   }
@@ -162,10 +188,12 @@ object DatabaseModule {
   internal fun isRobolectricTestEnvironment(): Boolean {
     if (!BuildConfig.DEBUG) return false
     if (!"robolectric".equals(Build.FINGERPRINT, ignoreCase = true)) return false
-    return runCatching {
+    return try {
       Class.forName("org.robolectric.Robolectric")
       true
-    }.getOrDefault(false)
+    } catch (_: ClassNotFoundException) {
+      false
+    }
   }
 
   private class RecoverableEncryptedOpenHelperFactory : SupportSQLiteOpenHelper.Factory {
@@ -213,6 +241,14 @@ object DatabaseModule {
     database.creditCardDao()
 
   @Provides
+  fun provideCreditCardStatementDao(database: AppDatabase): CreditCardStatementDao =
+    database.creditCardStatementDao()
+
+  @Provides
+  fun provideCreditCardRewardEventDao(database: AppDatabase): CreditCardRewardEventDao =
+    database.creditCardRewardEventDao()
+
+  @Provides
   fun provideSavingsGoalDao(database: AppDatabase): SavingsGoalDao =
     database.savingsGoalDao()
 
@@ -227,4 +263,8 @@ object DatabaseModule {
   @Provides
   fun provideShoppingDao(database: AppDatabase): ShoppingDao =
     database.shoppingDao()
+
+  @Provides
+  fun provideShoppingExtendedDao(database: AppDatabase): ShoppingExtendedDao =
+    database.shoppingExtendedDao()
 }

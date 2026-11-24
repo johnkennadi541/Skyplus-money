@@ -30,6 +30,7 @@ import androidx.compose.material.icons.rounded.Assessment
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.rounded.Calculate
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Search
@@ -81,6 +82,7 @@ import com.example.core.designsystem.theme.OceanNumericStyle
 import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
 import com.example.domain.model.FinancialAccount
+import com.example.domain.model.Money
 import com.example.domain.model.FinancialTransaction
 import com.example.domain.model.TransactionCategories
 import com.example.domain.model.TransactionStatus
@@ -669,6 +671,8 @@ fun AddEditTransactionBottomSheet(
   var amountText by remember {
     mutableStateOf(transactionToEdit?.money?.toBigDecimal()?.toPlainString().orEmpty())
   }
+  var showAmountCalculator by remember { mutableStateOf(false) }
+  var calculatorExpression by remember { mutableStateOf("") }
   var destAmountText by remember { mutableStateOf("") }
   var selectedCategory by remember {
     mutableStateOf(
@@ -785,8 +789,31 @@ fun AddEditTransactionBottomSheet(
         label = { Text("Amount (${sourceAcc?.currencyCode ?: ""}) *") },
         placeholder = { Text("0.00") },
         singleLine = true,
+        trailingIcon = {
+          IconButton(
+            onClick = {
+              calculatorExpression = amountText
+              showAmountCalculator = true
+            },
+            modifier = Modifier.testTag("transaction_amount_calculator_button"),
+          ) {
+            Icon(Icons.Rounded.Calculate, contentDescription = "Open amount calculator")
+          }
+        },
         modifier = Modifier.fillMaxWidth().testTag("transaction_amount_input"),
       )
+
+      if (showAmountCalculator) {
+        com.example.feature.calculator.SmartCalculatorAmountDialog(
+          initialExpression = calculatorExpression,
+          decimalScale = sourceAcc?.let { Money.resolveFractionDigits(it.currencyCode) } ?: 2,
+          onApply = { calculatedAmount ->
+            amountText = calculatedAmount
+            showAmountCalculator = false
+          },
+          onDismiss = { showAmountCalculator = false },
+        )
+      }
 
       Text("Account", style = MaterialTheme.typography.labelMedium)
       Row(

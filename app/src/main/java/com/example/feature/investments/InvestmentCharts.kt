@@ -1,6 +1,10 @@
 package com.example.feature.investments
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,6 +51,12 @@ fun AssetAllocationDonutChart(
   modifier: Modifier = Modifier,
 ) {
   val extended = OceanTheme.colors
+  val allocationProgress = remember(allocations, totalValuationMinor) { Animatable(0f) }
+  LaunchedEffect(allocations, totalValuationMinor) {
+    allocationProgress.snapTo(0f)
+    allocationProgress.animateTo(1f, animationSpec = tween(durationMillis = 650))
+  }
+  val chartProgress = allocationProgress.value
   val categoryColors =
     mapOf(
       InvestmentCategory.STOCKS to MaterialTheme.colorScheme.primary,
@@ -112,7 +122,7 @@ fun AssetAllocationDonutChart(
               drawArc(
                 color = sliceColor,
                 startAngle = startAngle,
-                sweepAngle = sweep.coerceAtLeast(2f),
+                sweepAngle = sweep.coerceAtLeast(2f) * chartProgress,
                 useCenter = false,
                 topLeft = topLeft,
                 size = arcSize,

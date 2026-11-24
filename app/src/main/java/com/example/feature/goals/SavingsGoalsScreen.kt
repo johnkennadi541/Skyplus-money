@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Calculate
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Savings
@@ -47,6 +48,7 @@ import com.example.core.designsystem.component.SkyplusSkeletonCard
 import com.example.core.designsystem.component.SkyplusPrimaryButton
 import com.example.core.designsystem.component.SkyplusTertiaryButton
 import com.example.core.designsystem.component.SkyplusTextField
+import com.example.feature.calculator.SmartCalculatorAmountDialog
 import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
 import com.example.domain.model.Money
@@ -515,6 +517,7 @@ private fun ContributionDialog(
   onSave: (amountDecimal: String, note: String?, onSuccess: () -> Unit) -> Unit,
 ) {
   var amount by remember { mutableStateOf("") }
+  var showContributionCalculator by remember { mutableStateOf(false) }
   var note by remember { mutableStateOf("") }
   var formError by remember { mutableStateOf<String?>(null) }
 
@@ -536,6 +539,27 @@ private fun ContributionDialog(
           placeholder = "5000",
           modifier = Modifier.testTag("contribution_amount_input"),
         )
+        androidx.compose.material3.OutlinedButton(
+          onClick = { showContributionCalculator = true },
+          modifier = Modifier.fillMaxWidth().testTag("contribution_amount_calculator_button"),
+        ) {
+          androidx.compose.material3.Icon(
+            imageVector = androidx.compose.material.icons.Icons.Rounded.Calculate,
+            contentDescription = null,
+          )
+          Text("Calculate amount")
+        }
+        if (showContributionCalculator) {
+          SmartCalculatorAmountDialog(
+            initialExpression = amount,
+            decimalScale = Money.resolveFractionDigits(summary.goal.currencyCode),
+            onApply = { calculatedAmount ->
+              amount = calculatedAmount
+              showContributionCalculator = false
+            },
+            onDismiss = { showContributionCalculator = false },
+          )
+        }
         SkyplusTextField(
           value = note,
           onValueChange = { note = it },

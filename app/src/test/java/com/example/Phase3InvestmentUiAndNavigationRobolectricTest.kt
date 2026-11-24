@@ -1,6 +1,7 @@
 package com.example
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -9,6 +10,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.text.AnnotatedString
 import com.example.core.designsystem.theme.SkyplusOceanTheme
 import com.example.domain.model.InvestmentCategory
 import com.example.domain.model.InvestmentHolding
@@ -65,6 +70,7 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
     composeTestRule.onNodeWithTag("investments_back_button").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("profile_menu_button").assertIsDisplayed()
 
     // Open Investments from Profile menu
     composeTestRule.onNodeWithTag("profile_menu_button").performClick()
@@ -75,7 +81,7 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
   }
 
   @Test
-  fun `investments dashboard renders allocation chart growth chart and stale warning in light theme`() {
+  fun `investments dashboard renders allocation chart authentic growth empty state and stale warning in light theme`() {
     val now = 1_755_000_000_000L
     val tenDaysAgo = now - (10L * 86_400_000L)
     val holdings =
@@ -106,9 +112,10 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
           quantityDecimal = "1",
           totalInvestedMinor = 50000_00L,
           totalBuyCostMinor = 50000_00L,
-          currentMarketPriceDecimal = "52000",
-          currentValuationMinor = 52000_00L,
-          lastPriceUpdateDate = now,
+          currentMarketPriceDecimal = "50000",
+          currentValuationMinor = 50000_00L,
+          lastPriceUpdateDate = 0L,
+          lastPriceProviderLabel = "Awaiting current price",
         ),
       )
 
@@ -158,11 +165,13 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
 
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("portfolio_summary_card").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Estimated Valuation (INR)").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("awaiting_price_summary_note").assertIsDisplayed()
     composeTestRule.onNodeWithTag("stale_price_warning_badge").assertIsDisplayed()
     composeTestRule.onNodeWithTag("investments_list").performScrollToNode(hasTestTag("asset_allocation_chart_card"))
     composeTestRule.onNodeWithTag("asset_allocation_canvas").assertIsDisplayed()
     composeTestRule.onNodeWithTag("investments_list").performScrollToNode(hasTestTag("portfolio_growth_chart_card"))
-    composeTestRule.onNodeWithTag("portfolio_growth_canvas").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("portfolio_growth_empty_state").assertIsDisplayed()
     composeTestRule.onNodeWithTag("investments_list").performScrollToNode(hasTestTag("holding_card_h_1"))
     composeTestRule.onNodeWithText("Tata Consultancy Services").assertIsDisplayed()
 
@@ -170,7 +179,7 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
     composeTestRule.onNodeWithTag("open_market_sync_settings_button").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("auto_sync_consent_switch").assertIsOff()
-    composeTestRule.onNodeWithText("MFapi.in / AMFI India Official Feed (EOD)").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithText("MFapi.in third-party API • AMFI-sourced EOD NAV").performScrollTo().assertIsDisplayed()
   }
 
   @Test
@@ -207,6 +216,53 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("investments_list").performScrollToNode(hasTestTag("portfolio_growth_empty_state"))
     composeTestRule.onNodeWithTag("portfolio_growth_empty_state").assertIsDisplayed()
+  }
+
+  @Test
+  fun `manual only holding shows awaiting current price and does not prefill trade price`() {
+    val now = 1_755_000_000_000L
+    val stock = InvestmentHolding(
+      id = "stock_waiting",
+      userId = "u1",
+      name = "Manual-only Stock",
+      category = InvestmentCategory.STOCKS,
+      symbolOrTicker = "TEST",
+      currencyCode = "INR",
+      purchaseDate = now,
+      quantityDecimal = "1",
+      totalInvestedMinor = 100_00L,
+      totalBuyCostMinor = 100_00L,
+      currentMarketPriceDecimal = "100",
+      currentValuationMinor = 100_00L,
+      lastPriceUpdateDate = 0L,
+      lastPriceProviderLabel = "Awaiting current price",
+    )
+
+    composeTestRule.setContent {
+      SkyplusOceanTheme(themePreference = ThemePreference.LIGHT) {
+        InvestmentDetailContent(
+          holding = stock,
+          performance = engine.evaluateHoldingPerformance(stock, now),
+          transactions = emptyList(),
+          priceHistory = emptyList(),
+        )
+      }
+    }
+
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithText("Awaiting current price").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("investment_detail_list").performScrollToNode(hasTestTag("detail_buy_more_button"))
+    composeTestRule.onNodeWithTag("detail_buy_more_button").performClick()
+    composeTestRule.waitForIdle()
+    // Inspect the editable-text semantic value directly; TextField's visible label is separate.
+    composeTestRule.onNodeWithTag("trade_price_input")
+      .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
+    composeTestRule.onNodeWithTag("cancel_trade_dialog").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("detail_update_price_button").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("manual_price_input")
+      .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
   }
 
   @Test

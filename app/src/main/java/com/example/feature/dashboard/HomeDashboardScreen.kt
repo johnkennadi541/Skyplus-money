@@ -92,6 +92,7 @@ fun HomeDashboardScreen(
   onToggleCard: (HomeCardId) -> Unit,
   onMoveCard: (HomeCardId, Boolean) -> Unit,
   onResetLayout: () -> Unit,
+  onOpenSmartCalculator: () -> Unit = {},
   modifier: Modifier = Modifier,
   autoSavedNotice: AutoSavedTransactionNotice? = null,
   onDismissAutoSavedNotice: () -> Unit = {},
@@ -195,6 +196,7 @@ fun HomeDashboardScreen(
           onOpenPortfolio = onOpenPortfolio,
           onOpenReports = onOpenReports,
           onOpenEmiCalculator = onOpenEmiCalculator,
+          onOpenSmartCalculator = onOpenSmartCalculator,
           onOpenLoans = onOpenLoans,
           onOpenSmartDetection = onOpenSmartDetection,
           onOpenReviewQueue = onOpenReviewQueue,
@@ -218,6 +220,7 @@ fun HomeDashboardScreen(
           onOpenPortfolio = onOpenPortfolio,
           onOpenReports = onOpenReports,
           onOpenEmiCalculator = onOpenEmiCalculator,
+          onOpenSmartCalculator = onOpenSmartCalculator,
           onOpenLoans = onOpenLoans,
           onOpenSmartDetection = onOpenSmartDetection,
           onOpenReviewQueue = onOpenReviewQueue,
@@ -501,6 +504,7 @@ private fun QuickActionsCard(
   onOpenPortfolio: () -> Unit,
   onOpenReports: () -> Unit,
   onOpenEmiCalculator: () -> Unit,
+  onOpenSmartCalculator: () -> Unit,
   onOpenLoans: () -> Unit,
   onOpenSmartDetection: () -> Unit,
   onOpenReviewQueue: () -> Unit,
@@ -544,6 +548,16 @@ private fun QuickActionsCard(
           onClick = onOpenEmiCalculator,
           modifier = Modifier.weight(1f),
         )
+      }
+      Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        QuickAction(
+          icon = Icons.Rounded.Calculate,
+          label = "Smart Calc",
+          testTag = "home_smart_calculator_button",
+          onClick = onOpenSmartCalculator,
+          modifier = Modifier.weight(1f),
+        )
+        Spacer(modifier = Modifier.weight(3f))
       }
       Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
         QuickAction(

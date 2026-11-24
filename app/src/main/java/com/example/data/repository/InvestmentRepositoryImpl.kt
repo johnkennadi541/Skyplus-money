@@ -45,6 +45,8 @@ class InvestmentRepositoryImpl @Inject constructor(
   companion object {
     const val AUTO_SYNC_COOLDOWN_MILLIS: Long = 12L * 60L * 60L * 1000L
     const val MAX_REQUESTS_PER_SYNC_CYCLE: Int = 5
+    const val INDIA_CURRENCY_CODE: String = "INR"
+    private const val MAX_FUTURE_CLOCK_SKEW_MILLIS = 5L * 60L * 1000L
   }
 
   override fun getHoldings(userId: String): Flow<List<InvestmentHolding>> =
@@ -88,18 +90,18 @@ class InvestmentRepositoryImpl @Inject constructor(
       .map { list -> list.map { it.toDomain() } }
       .flowOn(dispatchers.io)
 
-  override fun observeSyncSettings(): Flow<MarketSyncSettings> =
-    syncPreferencesDataSource.syncSettings
+  override fun observeSyncSettings(authenticatedUserId: String): Flow<MarketSyncSettings> =
+    syncPreferencesDataSource.syncSettings(authenticatedUserId)
 
-  override suspend fun setAutoUpdateConsent(enabled: Boolean) {
+  override suspend fun setAutoUpdateConsent(authenticatedUserId: String, enabled: Boolean) {
     withContext(dispatchers.io) {
-      syncPreferencesDataSource.setAutoUpdateConsent(enabled)
+      syncPreferencesDataSource.setAutoUpdateConsent(authenticatedUserId, enabled)
     }
   }
 
-  override suspend fun setSyncOnlyOnWifi(wifiOnly: Boolean) {
+  override suspend fun setSyncOnlyOnWifi(authenticatedUserId: String, wifiOnly: Boolean) {
     withContext(dispatchers.io) {
-      syncPreferencesDataSource.setSyncOnlyOnWifi(wifiOnly)
+      syncPreferencesDataSource.setSyncOnlyOnWifi(authenticatedUserId, wifiOnly)
     }
   }
 
@@ -120,22 +122,26 @@ class InvestmentRepositoryImpl @Inject constructor(
     notes: String?,
   ): Result<InvestmentHolding> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(name.isNotBlank()) { "Investment name is required" }
         require(purchaseDate > 0L) { "Purchase date must be valid" }
+        require(purchaseDate <= System.currentTimeMillis() + MAX_FUTURE_CLOCK_SKEW_MILLIS) {
+          "Purchase date cannot be in the future"
+        }
         require(chargesMinor >= 0L) { "Transaction charges cannot be negative" }
 
-        val normalizedCurrency = currencyCode.trim().uppercase()
+        val normalizedCurrency = requireIndiaInvestmentCurrency(currencyCode)
         Money.resolveFractionDigits(normalizedCurrency)
 
         val buyQty = calculationEngine.parsePositiveDecimal(quantityDecimal, "Units / quantity")
         val buyPrice = calculationEngine.parsePositiveDecimal(purchasePriceDecimal, "Purchase price")
+        val hasExplicitCurrentMarketPrice = !currentMarketPriceDecimal.isNullOrBlank()
         val marketPrice =
-          if (currentMarketPriceDecimal.isNullOrBlank()) {
+          if (!hasExplicitCurrentMarketPrice) {
             buyPrice
           } else {
-            calculationEngine.parsePositiveDecimal(currentMarketPriceDecimal, "Current market price")
+            calculationEngine.parsePositiveDecimal(currentMarketPriceDecimal!!, "Current market price")
           }
         val marketPriceText = marketPrice.stripTrailingZeros().toPlainString()
 
@@ -156,6 +162,14 @@ class InvestmentRepositoryImpl @Inject constructor(
         val holdingId = UUID.randomUUID().toString()
         val allowAutoForHolding =
           autoPriceUpdateEnabled && category == InvestmentCategory.MUTUAL_FUNDS
+        // An initial manual value is only a fallback when the user has opted this
+        // mutual fund into automatic NAV updates; the first EOD NAV may be older.
+        val hasRecordedInitialMarketPrice = hasExplicitCurrentMarketPrice && !allowAutoForHolding
+        if (allowAutoForHolding) {
+          require(isValidAmfiSchemeCode(symbolOrTicker)) {
+            "Enter a valid 5–7 digit AMFI scheme code to enable automatic NAV updates"
+          }
+        }
 
         val holding =
           InvestmentHolding(
@@ -175,9 +189,14 @@ class InvestmentRepositoryImpl @Inject constructor(
             totalChargesMinor = mutation.newTotalChargesMinor,
             currentMarketPriceDecimal = marketPriceText,
             currentValuationMinor = mutation.newValuationMinor,
-            lastPriceUpdateDate = purchaseDate,
+            // If the user did not enter a current price, the purchase price is only a
+            // temporary valuation fallback. Do not present it as a fresh market quote.
+            lastPriceUpdateDate = if (hasRecordedInitialMarketPrice) now else 0L,
             lastPriceSource = PriceSourceType.MANUAL,
-            lastPriceProviderLabel = "Manual",
+            lastPriceProviderLabel =
+              if (hasRecordedInitialMarketPrice) "Manual"
+              else if (allowAutoForHolding) "Awaiting first NAV"
+              else "Awaiting current price",
             autoPriceUpdateEnabled = allowAutoForHolding,
             notes = notes?.trim()?.takeIf { it.isNotEmpty() },
             createdAt = now,
@@ -202,26 +221,34 @@ class InvestmentRepositoryImpl @Inject constructor(
             createdAt = now,
           )
 
+        // Only persist a market-price history point when the user actually supplied
+        // a current price. The purchase price fallback is not a market observation.
         val initialPricePoint =
-          InvestmentPriceHistory(
-            id = UUID.randomUUID().toString(),
-            holdingId = holdingId,
-            userId = authenticatedUserId,
-            priceDate = purchaseDate,
-            unitPriceDecimal = marketPriceText,
-            valuationMinor = mutation.newValuationMinor,
-            totalInvestedMinor = mutation.newOpenCostBasisMinor,
-            realizedPnlMinor = 0L,
-            currencyCode = normalizedCurrency,
-            source = PriceSourceType.MANUAL,
-            providerLabel = "Manual (Initial)",
-            createdAt = now,
-          )
+          if (hasRecordedInitialMarketPrice) {
+            InvestmentPriceHistory(
+              id = UUID.randomUUID().toString(),
+              holdingId = holdingId,
+              userId = authenticatedUserId,
+              priceDate = now,
+              unitPriceDecimal = marketPriceText,
+              valuationMinor = mutation.newValuationMinor,
+              totalInvestedMinor = mutation.newOpenCostBasisMinor,
+              realizedPnlMinor = 0L,
+              currencyCode = normalizedCurrency,
+              source = PriceSourceType.MANUAL,
+              providerLabel = "Manual (Initial)",
+              createdAt = now,
+            )
+          } else {
+            null
+          }
 
         database.withTransaction {
           investmentDao.insertHolding(InvestmentHoldingEntity.fromDomain(holding))
           investmentDao.insertTransaction(InvestmentTransactionEntity.fromDomain(initialTx))
-          investmentDao.insertPriceHistory(InvestmentPriceHistoryEntity.fromDomain(initialPricePoint))
+          initialPricePoint?.let {
+            investmentDao.insertPriceHistory(InvestmentPriceHistoryEntity.fromDomain(it))
+          }
         }
         holding
       }
@@ -232,7 +259,7 @@ class InvestmentRepositoryImpl @Inject constructor(
     holding: InvestmentHolding,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holding.userId == authenticatedUserId) {
           "Investment ownership cannot be modified or transferred across users"
@@ -249,8 +276,37 @@ class InvestmentRepositoryImpl @Inject constructor(
           }
 
           val existingDomain = existing.toDomain()
+          requireIndiaInvestmentCurrency(existingDomain.currencyCode)
+          require(holding.category == existingDomain.category) {
+            "Investment category is part of the recorded instrument identity and cannot be changed after purchase"
+          }
+          require(holding.currencyCode.equals(existingDomain.currencyCode, ignoreCase = true)) {
+            "Investment currency cannot be changed after purchase"
+          }
+          require(holding.purchaseDate == existingDomain.purchaseDate) {
+            "Original purchase date is immutable; record a new BUY transaction for later purchases"
+          }
+          val normalizedExistingTicker =
+            existingDomain.symbolOrTicker?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }
+          val normalizedUpdatedTicker =
+            holding.symbolOrTicker?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }
+          require(normalizedUpdatedTicker == normalizedExistingTicker) {
+            "Instrument ticker or AMFI scheme code is immutable after the initial purchase"
+          }
+          val normalizedExistingIsin =
+            existingDomain.isin?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }
+          val normalizedUpdatedIsin =
+            holding.isin?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }
+          require(normalizedUpdatedIsin == normalizedExistingIsin) {
+            "Instrument ISIN is immutable after the initial purchase"
+          }
           val allowAuto =
-            holding.autoPriceUpdateEnabled && holding.category == InvestmentCategory.MUTUAL_FUNDS
+            holding.autoPriceUpdateEnabled && existingDomain.category == InvestmentCategory.MUTUAL_FUNDS
+          if (allowAuto) {
+            require(isValidAmfiSchemeCode(holding.symbolOrTicker)) {
+              "Enter a valid 5–7 digit AMFI scheme code to enable automatic NAV updates"
+            }
+          }
           val now = System.currentTimeMillis()
           val updated =
             existingDomain.copy(
@@ -281,7 +337,7 @@ class InvestmentRepositoryImpl @Inject constructor(
     enabled: Boolean,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holdingId.isNotBlank()) { "Holding ID is required" }
 
@@ -289,6 +345,10 @@ class InvestmentRepositoryImpl @Inject constructor(
           val existing =
             investmentDao.getHoldingById(authenticatedUserId, holdingId)?.toDomain()
               ?: throw SecurityException("Investment holding does not belong to authenticated user")
+          if (enabled) requireIndiaInvestmentCurrency(existing.currencyCode)
+          if (enabled && !isValidAmfiSchemeCode(existing.symbolOrTicker)) {
+            throw IllegalStateException("A valid 5–7 digit AMFI scheme code is required for automatic NAV updates")
+          }
           if (enabled && existing.category != InvestmentCategory.MUTUAL_FUNDS) {
             throw IllegalStateException(
               "Automatic market price updates are only available for Mutual Funds with an AMFI scheme code"
@@ -319,7 +379,7 @@ class InvestmentRepositoryImpl @Inject constructor(
     notes: String?,
   ): Result<InvestmentTransaction> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holdingId.isNotBlank()) { "Holding ID is required" }
         require(transactionDate > 0L) { "Transaction date must be valid" }
@@ -329,6 +389,20 @@ class InvestmentRepositoryImpl @Inject constructor(
           val existing =
             investmentDao.getHoldingById(authenticatedUserId, holdingId)?.toDomain()
               ?: throw SecurityException("Investment holding does not belong to authenticated user")
+          requireIndiaInvestmentCurrency(existing.currencyCode)
+          require(transactionDate >= existing.purchaseDate) {
+            "Additional purchase date cannot be before the original purchase"
+          }
+          val latestTransactionDate =
+            investmentDao.getLatestTransactionDate(authenticatedUserId, holdingId)
+              ?: existing.purchaseDate
+          require(transactionDate >= latestTransactionDate) {
+            "Purchase date cannot be earlier than the latest recorded investment transaction"
+          }
+
+          require(transactionDate <= System.currentTimeMillis() + MAX_FUTURE_CLOCK_SKEW_MILLIS) {
+            "Transaction date cannot be in the future"
+          }
 
           val buyQty = calculationEngine.parsePositiveDecimal(quantityDecimal, "Purchase quantity")
           val buyPrice = calculationEngine.parsePositiveDecimal(unitPriceDecimal, "Purchase price")
@@ -375,21 +449,27 @@ class InvestmentRepositoryImpl @Inject constructor(
               updatedAt = now,
             )
 
-          val snapshot =
-            InvestmentPriceHistory(
-              id = UUID.randomUUID().toString(),
-              holdingId = holdingId,
-              userId = authenticatedUserId,
-              priceDate = transactionDate,
-              unitPriceDecimal = existing.currentMarketPriceDecimal,
-              valuationMinor = mutation.newValuationMinor,
-              totalInvestedMinor = mutation.newOpenCostBasisMinor,
-              realizedPnlMinor = existing.realizedPnlMinor,
-              currencyCode = existing.currencyCode,
-              source = PriceSourceType.MANUAL,
-              providerLabel = "Additional Purchase",
-              createdAt = now,
-            )
+          // Record the resulting portfolio state only when a genuine quote exists.
+          // This is a valuation snapshot, not a new market-price observation.
+          val portfolioSnapshot =
+            if (existing.lastPriceUpdateDate > 0L) {
+              InvestmentPriceHistory(
+                id = UUID.randomUUID().toString(),
+                holdingId = holdingId,
+                userId = authenticatedUserId,
+                priceDate = now,
+                unitPriceDecimal = existing.currentMarketPriceDecimal,
+                valuationMinor = mutation.newValuationMinor,
+                totalInvestedMinor = mutation.newOpenCostBasisMinor,
+                realizedPnlMinor = existing.realizedPnlMinor,
+                currencyCode = existing.currencyCode,
+                source = existing.lastPriceSource,
+                providerLabel = "Portfolio snapshot after BUY",
+                createdAt = now,
+              )
+            } else {
+              null
+            }
 
           investmentDao.insertTransaction(InvestmentTransactionEntity.fromDomain(tx))
           val rows =
@@ -398,7 +478,9 @@ class InvestmentRepositoryImpl @Inject constructor(
               authenticatedUserId,
             )
           check(rows == 1) { "Failed to update holding after purchase" }
-          investmentDao.insertPriceHistory(InvestmentPriceHistoryEntity.fromDomain(snapshot))
+          portfolioSnapshot?.let {
+            investmentDao.insertPriceHistory(InvestmentPriceHistoryEntity.fromDomain(it))
+          }
           tx
         }
       }
@@ -414,7 +496,7 @@ class InvestmentRepositoryImpl @Inject constructor(
     notes: String?,
   ): Result<InvestmentTransaction> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holdingId.isNotBlank()) { "Holding ID is required" }
         require(transactionDate > 0L) { "Transaction date must be valid" }
@@ -424,6 +506,20 @@ class InvestmentRepositoryImpl @Inject constructor(
           val existing =
             investmentDao.getHoldingById(authenticatedUserId, holdingId)?.toDomain()
               ?: throw SecurityException("Investment holding does not belong to authenticated user")
+          requireIndiaInvestmentCurrency(existing.currencyCode)
+          require(transactionDate >= existing.purchaseDate) {
+            "Sale date cannot be before the original purchase"
+          }
+          val latestTransactionDate =
+            investmentDao.getLatestTransactionDate(authenticatedUserId, holdingId)
+              ?: existing.purchaseDate
+          require(transactionDate >= latestTransactionDate) {
+            "Sale date cannot be earlier than the latest recorded investment transaction"
+          }
+
+          require(transactionDate <= System.currentTimeMillis() + MAX_FUTURE_CLOCK_SKEW_MILLIS) {
+            "Transaction date cannot be in the future"
+          }
 
           val sellQty = calculationEngine.parsePositiveDecimal(quantityDecimal, "Sale quantity")
           val sellPrice = calculationEngine.parseNonNegativeDecimal(unitPriceDecimal, "Sale price")
@@ -470,21 +566,28 @@ class InvestmentRepositoryImpl @Inject constructor(
               updatedAt = now,
             )
 
-          val snapshot =
-            InvestmentPriceHistory(
-              id = UUID.randomUUID().toString(),
-              holdingId = holdingId,
-              userId = authenticatedUserId,
-              priceDate = transactionDate,
-              unitPriceDecimal = existing.currentMarketPriceDecimal,
-              valuationMinor = mutation.newValuationMinor,
-              totalInvestedMinor = mutation.remainingOpenCostBasisMinor,
-              realizedPnlMinor = mutation.newCumulativeRealizedPnlMinor,
-              currencyCode = existing.currencyCode,
-              source = PriceSourceType.MANUAL,
-              providerLabel = if (mutation.isCompleteExit) "Complete Sale" else "Partial Sale",
-              createdAt = now,
-            )
+          // Record the resulting portfolio state only when a genuine quote exists.
+          // The ledger retains the actual transaction date; this snapshot records when
+          // the changed valuation was recorded, using the last known quote.
+          val portfolioSnapshot =
+            if (existing.lastPriceUpdateDate > 0L) {
+              InvestmentPriceHistory(
+                id = UUID.randomUUID().toString(),
+                holdingId = holdingId,
+                userId = authenticatedUserId,
+                priceDate = now,
+                unitPriceDecimal = existing.currentMarketPriceDecimal,
+                valuationMinor = mutation.newValuationMinor,
+                totalInvestedMinor = mutation.remainingOpenCostBasisMinor,
+                realizedPnlMinor = mutation.newCumulativeRealizedPnlMinor,
+                currencyCode = existing.currencyCode,
+                source = existing.lastPriceSource,
+                providerLabel = "Portfolio snapshot after SELL",
+                createdAt = now,
+              )
+            } else {
+              null
+            }
 
           investmentDao.insertTransaction(InvestmentTransactionEntity.fromDomain(tx))
           val rows =
@@ -493,7 +596,9 @@ class InvestmentRepositoryImpl @Inject constructor(
               authenticatedUserId,
             )
           check(rows == 1) { "Failed to update holding after sale" }
-          investmentDao.insertPriceHistory(InvestmentPriceHistoryEntity.fromDomain(snapshot))
+          portfolioSnapshot?.let {
+            investmentDao.insertPriceHistory(InvestmentPriceHistoryEntity.fromDomain(it))
+          }
           tx
         }
       }
@@ -506,10 +611,13 @@ class InvestmentRepositoryImpl @Inject constructor(
     priceDate: Long,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holdingId.isNotBlank()) { "Holding ID is required" }
         require(priceDate > 0L) { "Price update date must be valid" }
+        require(priceDate <= System.currentTimeMillis() + MAX_FUTURE_CLOCK_SKEW_MILLIS) {
+          "Manual price date cannot be in the future"
+        }
 
         val parsedPrice = calculationEngine.parsePositiveDecimal(newUnitPriceDecimal, "Market price")
         val normalizedPriceText = parsedPrice.stripTrailingZeros().toPlainString()
@@ -518,6 +626,13 @@ class InvestmentRepositoryImpl @Inject constructor(
           val existing =
             investmentDao.getHoldingById(authenticatedUserId, holdingId)?.toDomain()
               ?: throw SecurityException("Investment holding does not belong to authenticated user")
+          requireIndiaInvestmentCurrency(existing.currencyCode)
+          require(priceDate >= existing.purchaseDate) {
+            "Price date cannot be before the original purchase"
+          }
+          require(priceDate >= existing.lastPriceUpdateDate) {
+            "Manual price date cannot be earlier than the latest accepted price observation"
+          }
 
           val currentQty =
             calculationEngine.parseNonNegativeDecimal(existing.quantityDecimal, "Current quantity")
@@ -573,13 +688,23 @@ class InvestmentRepositoryImpl @Inject constructor(
     priceDate: Long,
     source: PriceSourceType,
     providerLabel: String,
-    allowOverwriteManual: Boolean,
   ): Result<Boolean> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holdingId.isNotBlank()) { "Holding ID is required" }
         require(priceDate > 0L) { "Price date must be valid" }
+        require(source == PriceSourceType.MFAPI_AMFI_EOD) {
+          "Only the approved Indian mutual-fund NAV provider is supported for automatic updates"
+        }
+        require(
+          syncPreferencesDataSource.syncSettings(authenticatedUserId).first().autoUpdateConsentEnabled
+        ) {
+          "Global automatic market-data consent is disabled"
+        }
+        require(priceDate <= System.currentTimeMillis() + 5L * 60L * 1000L) {
+          "Market quote timestamp cannot be in the future"
+        }
 
         val parsedPrice = calculationEngine.parsePositiveDecimal(newUnitPriceDecimal, "Market price")
         val normalizedPriceText = parsedPrice.stripTrailingZeros().toPlainString()
@@ -588,23 +713,25 @@ class InvestmentRepositoryImpl @Inject constructor(
           val existing =
             investmentDao.getHoldingById(authenticatedUserId, holdingId)?.toDomain()
               ?: throw SecurityException("Investment holding does not belong to authenticated user")
+          require(existing.category == InvestmentCategory.MUTUAL_FUNDS) {
+            "Automatic market updates are restricted to Indian mutual funds"
+          }
+          require(isValidAmfiSchemeCode(existing.symbolOrTicker)) {
+            "A valid 5–7 digit AMFI scheme code is required for automatic NAV updates"
+          }
+          requireIndiaInvestmentCurrency(existing.currencyCode)
+          // Provider NAVs can be dated before the purchase day (e.g. a fund bought
+          // today uses the latest completed business-day NAV), so compare against the
+          // last accepted price observation rather than the transaction date.
 
-          // Never overwrite manual prices without explicit user consent
-          if (!existing.autoPriceUpdateEnabled && !allowOverwriteManual) {
+          // Never roll the stored market valuation back to an older provider observation.
+          if (priceDate < existing.lastPriceUpdateDate) {
             return@withTransaction false
           }
-          if (
-            existing.lastPriceSource == PriceSourceType.MANUAL &&
-            !existing.autoPriceUpdateEnabled &&
-            !allowOverwriteManual
-          ) {
-            return@withTransaction false
-          }
-          if (
-            existing.lastPriceSource == PriceSourceType.MANUAL &&
-            priceDate < existing.lastPriceUpdateDate &&
-            !allowOverwriteManual
-          ) {
+
+          // Global consent is necessary but not sufficient: every holding must
+          // also have its own explicit auto-NAV opt-in. There is no override path.
+          if (!existing.autoPriceUpdateEnabled) {
             return@withTransaction false
           }
 
@@ -658,19 +785,18 @@ class InvestmentRepositoryImpl @Inject constructor(
 
   override suspend fun syncEligibleMarketPrices(
     authenticatedUserId: String,
-    allowOverwriteManual: Boolean,
     forceBypassCooldown: Boolean,
   ): Result<MarketSyncSummary> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         val now = System.currentTimeMillis()
-        val settings = syncPreferencesDataSource.syncSettings.first()
+        val settings = syncPreferencesDataSource.syncSettings(authenticatedUserId).first()
 
-        if (!settings.autoUpdateConsentEnabled && !allowOverwriteManual) {
+        if (!settings.autoUpdateConsentEnabled) {
           val msg = "Automatic updates are off. Manual price entry remains active."
-          syncPreferencesDataSource.recordSyncResult(now, msg)
-          return@runCatching MarketSyncSummary(
+          syncPreferencesDataSource.recordSyncResult(authenticatedUserId, now, msg)
+          return@runCatchingPreservingCancellation MarketSyncSummary(
             updatedCount = 0,
             skippedManualCount = 0,
             unsupportedCount = 0,
@@ -680,24 +806,46 @@ class InvestmentRepositoryImpl @Inject constructor(
           )
         }
 
-        val holdings = investmentDao.getAllHoldingsSync(authenticatedUserId).map { it.toDomain() }
+        // Rotate by persisted last-attempt time, not quote-success time. A failed
+        // holding therefore moves behind never-attempted holdings on the next cycle.
+        val lastQuoteAttemptByHoldingId =
+          syncPreferencesDataSource.quoteAttemptTimes(authenticatedUserId)
+        val holdings =
+          investmentDao.getAllHoldingsSync(authenticatedUserId)
+            .map { it.toDomain() }
+            .sortedWith(
+              compareBy<InvestmentHolding> { lastQuoteAttemptByHoldingId[it.id] ?: 0L }
+                .thenBy { it.lastPriceUpdateDate }
+                .thenBy { it.updatedAt }
+                .thenBy { it.id }
+            )
         var updatedCount = 0
         var skippedManualCount = 0
         var unsupportedCount = 0
         var rateLimitedCount = 0
         var errorCount = 0
+        var retryAfterMillis: Long? = null
         var requestsSent = 0
 
         for (holding in holdings) {
-          val qty = runCatching { BigDecimal(holding.quantityDecimal.trim()) }.getOrDefault(BigDecimal.ZERO)
-          if (qty <= BigDecimal.ZERO) continue
+          val qty =
+            try {
+              BigDecimal(holding.quantityDecimal.trim())
+            } catch (error: NumberFormatException) {
+              throw IllegalStateException("Stored investment quantity is invalid", error)
+            }
+          require(qty >= BigDecimal.ZERO) { "Stored investment quantity cannot be negative" }
+          if (qty.compareTo(BigDecimal.ZERO) == 0) continue
 
-          if (!holding.autoPriceUpdateEnabled && !allowOverwriteManual) {
+          if (!holding.autoPriceUpdateEnabled) {
             skippedManualCount++
             continue
           }
 
-          if (holding.category != InvestmentCategory.MUTUAL_FUNDS) {
+          if (
+            holding.category != InvestmentCategory.MUTUAL_FUNDS ||
+            !holding.currencyCode.equals(INDIA_CURRENCY_CODE, ignoreCase = true)
+          ) {
             unsupportedCount++
             continue
           }
@@ -715,6 +863,7 @@ class InvestmentRepositoryImpl @Inject constructor(
             continue
           }
 
+          syncPreferencesDataSource.recordQuoteAttempt(authenticatedUserId, holding.id)
           requestsSent++
           val quoteResult =
             marketPriceDataSource.fetchLatestQuote(
@@ -729,7 +878,7 @@ class InvestmentRepositoryImpl @Inject constructor(
 
           when (quoteResult) {
             is MarketQuoteFetchResult.Success -> {
-              val applied =
+              val applyResult =
                 applyAutomaticMarketPrice(
                   authenticatedUserId = authenticatedUserId,
                   holdingId = holding.id,
@@ -737,12 +886,21 @@ class InvestmentRepositoryImpl @Inject constructor(
                   priceDate = quoteResult.asOfMillis,
                   source = quoteResult.source,
                   providerLabel = quoteResult.providerLabel,
-                  allowOverwriteManual = allowOverwriteManual,
-                ).getOrDefault(false)
-              if (applied) updatedCount++ else skippedManualCount++
+                )
+              applyResult.fold(
+                onSuccess = { applied ->
+                  if (applied) updatedCount++ else skippedManualCount++
+                },
+                onFailure = {
+                  // A rejected/invalid quote is an error, not a manual-price skip.
+                  // Keep the previous valuation untouched and report the failure count.
+                  errorCount++
+                },
+              )
             }
             is MarketQuoteFetchResult.RateLimited -> {
               rateLimitedCount++
+              retryAfterMillis = quoteResult.retryAfterMillis
               break
             }
             is MarketQuoteFetchResult.UnsupportedCategoryOrIdentifier -> {
@@ -763,7 +921,7 @@ class InvestmentRepositoryImpl @Inject constructor(
             if (rateLimitedCount > 0) append(" • $rateLimitedCount rate-limited")
             if (errorCount > 0) append(" • $errorCount unreachable (manual fallback active)")
           }
-        syncPreferencesDataSource.recordSyncResult(now, statusMsg)
+        syncPreferencesDataSource.recordSyncResult(authenticatedUserId, now, statusMsg)
 
         MarketSyncSummary(
           updatedCount = updatedCount,
@@ -772,16 +930,28 @@ class InvestmentRepositoryImpl @Inject constructor(
           rateLimitedCount = rateLimitedCount,
           errorCount = errorCount,
           message = statusMsg,
+          retryAfterMillis = retryAfterMillis,
         )
       }
     }
+
+  private fun isValidAmfiSchemeCode(value: String?): Boolean =
+    value?.matches(Regex("^[0-9]{5,7}$")) == true
+
+  private fun requireIndiaInvestmentCurrency(currencyCode: String): String {
+    val normalized = currencyCode.trim().uppercase()
+    require(normalized == INDIA_CURRENCY_CODE) {
+      "Investment instruments are currently limited to India and INR."
+    }
+    return normalized
+  }
 
   override suspend fun deleteHolding(
     authenticatedUserId: String,
     holdingId: String,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holdingId.isNotBlank()) { "Holding ID is required" }
 

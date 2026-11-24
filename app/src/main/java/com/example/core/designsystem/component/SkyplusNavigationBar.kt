@@ -3,6 +3,7 @@ package com.example.core.designsystem.component
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
@@ -18,7 +19,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.core.designsystem.theme.OceanSpacing
-import com.example.core.designsystem.theme.OceanTheme
 import com.example.core.designsystem.theme.SkyplusIconSize
 
 /**
@@ -37,7 +37,7 @@ data class SkyplusNavItem(
  * The bar itself is generic: it renders whatever items it is given, so the six planned sections
  * (Home, Transactions, Portfolio, Tools, Reports, Settings) can be adopted one at a time without
  * touching this component again. The active item is tinted with the yellow accent container so the
- * selected state is visible without relying on colour alone (the filled icon differs too).
+ * selected state uses the primary blue indicator and a filled icon, so it is not colour-only.
  */
 @Composable
 fun SkyplusNavigationBar(
@@ -47,9 +47,8 @@ fun SkyplusNavigationBar(
   modifier: Modifier = Modifier,
 ) {
   val colors = MaterialTheme.colorScheme
-  val extended = OceanTheme.colors
   NavigationBar(
-    modifier = modifier,
+    modifier = modifier.height(68.dp),
     containerColor = colors.surface,
     contentColor = colors.onSurfaceVariant,
     tonalElevation = 0.dp,
@@ -77,9 +76,9 @@ fun SkyplusNavigationBar(
         },
         colors =
           NavigationBarItemDefaults.colors(
-            selectedIconColor = colors.onTertiaryContainer,
-            selectedTextColor = colors.onSurface,
-            indicatorColor = extended.accentContainer,
+            selectedIconColor = colors.primary,
+            selectedTextColor = colors.primary,
+            indicatorColor = colors.primaryContainer,
             unselectedIconColor = colors.onSurfaceVariant,
             unselectedTextColor = colors.onSurfaceVariant,
           ),

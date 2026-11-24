@@ -7,6 +7,7 @@ import com.example.domain.model.PriceSourceType
 import com.example.domain.usecase.InvestmentCalculationEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
@@ -125,6 +126,105 @@ class InvestmentCalculationEngineTest {
     engine.parsePositiveDecimal("0", "Units")
   }
 
+  @Test(expected = IllegalArgumentException::class)
+  fun `positive decimal parser rejects exponent notation`() {
+    engine.parsePositiveDecimal("1e999999999", "Units")
+  }
+
+  @Test(expected = IllegalArgumentException::class)
+  fun `positive decimal parser rejects excessive fractional precision`() {
+    engine.parsePositiveDecimal("1.1234567890123", "Price")
+  }
+
+  @Test(expected = IllegalArgumentException::class)
+  fun `nonnegative decimal parser rejects excessive integer precision`() {
+    engine.parseNonNegativeDecimal("1234567890123456789", "Quantity")
+  }
+
+  @Test
+  fun `decimal parser accepts supported fractional investment precision`() {
+    assertEquals(BigDecimal("0.123456789012"), engine.parsePositiveDecimal("0.123456789012", "Units"))
+    assertEquals(BigDecimal.ZERO, engine.parseNonNegativeDecimal("0", "Price"))
+  }
+
+  @Test
+  fun `repeated fractional partial sales conserve every minor unit of cost basis`() {
+    // 100 minor units across 3 units: rounded allocations must still sum exactly to 100.
+    val first = engine.applyWeightedAverageSell(
+      currentQuantityDecimal = "3",
+      currentOpenCostBasisMinor = 100L,
+      currentRealizedPnlMinor = 0L,
+      currentTotalChargesMinor = 0L,
+      sellQuantityDecimal = "1",
+      sellUnitPriceDecimal = "1",
+      chargesMinor = 0L,
+      currentMarketPriceDecimal = "1",
+      currencyCode = "INR",
+    )
+    assertEquals(33L, first.costBasisSoldMinor)
+    assertEquals(67L, first.remainingOpenCostBasisMinor)
+
+    val second = engine.applyWeightedAverageSell(
+      currentQuantityDecimal = first.remainingQuantityDecimal,
+      currentOpenCostBasisMinor = first.remainingOpenCostBasisMinor,
+      currentRealizedPnlMinor = first.newCumulativeRealizedPnlMinor,
+      currentTotalChargesMinor = first.newTotalChargesMinor,
+      sellQuantityDecimal = "1",
+      sellUnitPriceDecimal = "1",
+      chargesMinor = 0L,
+      currentMarketPriceDecimal = "1",
+      currencyCode = "INR",
+    )
+    assertEquals(34L, second.costBasisSoldMinor)
+    assertEquals(33L, second.remainingOpenCostBasisMinor)
+
+    val finalExit = engine.applyWeightedAverageSell(
+      currentQuantityDecimal = second.remainingQuantityDecimal,
+      currentOpenCostBasisMinor = second.remainingOpenCostBasisMinor,
+      currentRealizedPnlMinor = second.newCumulativeRealizedPnlMinor,
+      currentTotalChargesMinor = second.newTotalChargesMinor,
+      sellQuantityDecimal = "1",
+      sellUnitPriceDecimal = "1",
+      chargesMinor = 0L,
+      currentMarketPriceDecimal = "1",
+      currencyCode = "INR",
+    )
+    assertTrue(finalExit.isCompleteExit)
+    assertEquals(33L, finalExit.costBasisSoldMinor)
+    assertEquals(0L, finalExit.remainingOpenCostBasisMinor)
+    assertEquals(100L, first.costBasisSoldMinor + second.costBasisSoldMinor + finalExit.costBasisSoldMinor)
+  }
+
+  @Test(expected = IllegalArgumentException::class)
+  fun `buy rejects negative persisted cost basis invariants`() {
+    engine.applyBuy(
+      currentQuantityDecimal = "1",
+      currentOpenCostBasisMinor = -1L,
+      currentTotalBuyCostMinor = 100L,
+      currentTotalChargesMinor = 0L,
+      buyQuantityDecimal = "1",
+      buyUnitPriceDecimal = "1",
+      chargesMinor = 0L,
+      currentMarketPriceDecimal = "1",
+      currencyCode = "INR",
+    )
+  }
+
+  @Test(expected = IllegalArgumentException::class)
+  fun `buy rejects open cost basis greater than cumulative buy cost`() {
+    engine.applyBuy(
+      currentQuantityDecimal = "1",
+      currentOpenCostBasisMinor = 101L,
+      currentTotalBuyCostMinor = 100L,
+      currentTotalChargesMinor = 0L,
+      buyQuantityDecimal = "1",
+      buyUnitPriceDecimal = "1",
+      chargesMinor = 0L,
+      currentMarketPriceDecimal = "1",
+      currencyCode = "INR",
+    )
+  }
+
   @Test
   fun `multi currency portfolio summaries remain strictly separated and never mix currencies`() {
     val now = 1_750_000_000_000L
@@ -198,7 +298,64 @@ class InvestmentCalculationEngineTest {
       )
 
     assertTrue(engine.evaluateHoldingPerformance(staleStock, now).isPriceStale)
+    assertFalse(engine.evaluateHoldingPerformance(staleStock.copy(lastPriceUpdateDate = 0L), now).isPriceStale)
     assertFalse(engine.evaluateHoldingPerformance(fixedDeposit, now).isPriceStale)
+  }
+
+  @Test
+  fun `unquoted holdings do not produce a fake epoch latest market update date`() {
+    val holding =
+      InvestmentHolding(
+        userId = "u1",
+        name = "Awaiting quote",
+        category = InvestmentCategory.STOCKS,
+        currencyCode = "INR",
+        purchaseDate = 1_750_000_000_000L,
+        quantityDecimal = "1",
+        totalInvestedMinor = 10_000L,
+        totalBuyCostMinor = 10_000L,
+        currentMarketPriceDecimal = "100",
+        currentValuationMinor = 10_000L,
+        lastPriceUpdateDate = 0L,
+      )
+
+    val summary = engine.calculateCurrencySummaries(listOf(holding))["INR"]
+    assertNull(summary?.lastMarketUpdateMillis)
+  }
+
+  @Test
+  fun `growth timeline waits until every holding has an authentic snapshot`() {
+    val t1 = 1_750_000_000_000L
+    val t2 = t1 + 86_400_000L
+    val t3 = t2 + 86_400_000L
+    fun snapshot(holdingId: String, date: Long, valuation: Long, invested: Long) =
+      InvestmentPriceHistory(
+        holdingId = holdingId,
+        userId = "u1",
+        priceDate = date,
+        unitPriceDecimal = "100",
+        valuationMinor = valuation,
+        totalInvestedMinor = invested,
+        realizedPnlMinor = 0L,
+        currencyCode = "INR",
+        source = PriceSourceType.MANUAL,
+        providerLabel = "Manual",
+      )
+
+    val history =
+      listOf(
+        snapshot("holding-a", t1, 10_000L, 10_000L),
+        snapshot("holding-a", t2, 11_000L, 10_000L),
+        snapshot("holding-b", t2, 5_000L, 5_000L),
+        snapshot("holding-b", t3, 6_000L, 5_000L),
+      )
+
+    val points = engine.buildAuthenticGrowthTimeline(history, holdingsCount = 2)
+    assertEquals(2, points.size)
+    assertEquals(t2, points[0].timestampMillis)
+    assertEquals(16_000L, points[0].valuationMinor)
+    assertEquals(t3, points[1].timestampMillis)
+    assertEquals(17_000L, points[1].valuationMinor)
   }
 
   @Test

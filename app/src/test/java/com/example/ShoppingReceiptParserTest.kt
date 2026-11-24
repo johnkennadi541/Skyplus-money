@@ -1,0 +1,54 @@
+package com.example
+
+import com.example.domain.usecase.ShoppingReceiptParser
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ShoppingReceiptParserTest {
+  @Test fun `extracts explicitly labelled grand total and merchant candidate`() {
+    val result = ShoppingReceiptParser.parse("Corner Shop\nDate 2026-11-23\nGrand Total 4.25 KWD")
+    assertEquals("4.25", result.totalDecimal)
+    assertEquals("KWD", result.currencyCodeCandidate)
+    assertEquals("Corner Shop", result.merchantCandidate)
+    assertTrue(result.purchaseDateMillis != null)
+    assertFalse(result.needsReview)
+  }
+
+  @Test fun `recognises a currency code after the receipt amount`() {
+    val result = ShoppingReceiptParser.parse("Corner Shop\nTotal 4.250 KWD")
+    assertEquals("4.25", result.totalDecimal)
+    assertEquals("KWD", result.currencyCodeCandidate)
+  }
+
+  @Test fun `parses symbol amounts without guessing an ISO currency`() {
+    val result = ShoppingReceiptParser.parse("Corner Shop\nTotal " + 36.toChar() + "4.25")
+    assertEquals("4.25", result.totalDecimal)
+    assertNull(result.currencyCodeCandidate)
+    assertTrue(result.needsReview)
+  }
+
+  @Test fun `does not guess when total is ambiguous`() {
+    val result = ShoppingReceiptParser.parse("Corner Shop\nTotal 12.00\nTotal 15.00")
+    assertNull(result.totalDecimal)
+    assertTrue(result.needsReview)
+  }
+
+  @Test fun `missing total stays review only`() {
+    val result = ShoppingReceiptParser.parse("Shop\nMilk 1.500")
+    assertNull(result.totalDecimal)
+    assertTrue(result.needsReview)
+  }
+
+  @Test fun `fingerprint is stable and changes with receipt text`() {
+    val first = ShoppingReceiptParser.parse("Shop\nGrand Total 5.00")
+    val same = ShoppingReceiptParser.parse("Shop\nGrand Total 5.00")
+    val other = ShoppingReceiptParser.parse("Shop\nGrand Total 6.00")
+    assertEquals(first.fingerprint, same.fingerprint)
+    assertNotEquals(first.fingerprint, other.fingerprint)
+    assertEquals(64, first.fingerprint.length)
+  }
+}

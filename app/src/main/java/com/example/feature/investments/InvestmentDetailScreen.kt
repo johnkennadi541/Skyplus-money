@@ -224,6 +224,11 @@ fun InvestmentDetailContent(
               OceanStatusBadge(text = "Stale Price >7d", tone = BadgeTone.WARNING)
             } else if (performance.isFullyExited) {
               OceanStatusBadge(text = "Fully Exited", tone = BadgeTone.GOLD)
+            } else if (holding.lastPriceUpdateDate <= 0L) {
+              OceanStatusBadge(
+                text = holding.lastPriceProviderLabel ?: "Awaiting current price",
+                tone = BadgeTone.WARNING,
+              )
             } else {
               OceanStatusBadge(text = holding.lastPriceSource.displayName, tone = BadgeTone.POSITIVE)
             }
@@ -232,7 +237,18 @@ fun InvestmentDetailContent(
           Spacer(modifier = Modifier.height(OceanSpacing.sm))
 
           DetailMetricRow("Held Units", holding.quantityDecimal)
-          DetailMetricRow("Current Unit Price", "${holding.currentMarketPriceDecimal} $curr (as of ${dateFormatter.format(Date(holding.lastPriceUpdateDate))})")
+          val priceDateLabel =
+            if (holding.lastPriceUpdateDate > 0L) {
+              "as of ${dateFormatter.format(Date(holding.lastPriceUpdateDate))}"
+            } else {
+              holding.lastPriceProviderLabel
+                ?: if (holding.category == InvestmentCategory.MUTUAL_FUNDS && holding.autoPriceUpdateEnabled) {
+                  "awaiting first NAV"
+                } else {
+                  "awaiting current price"
+                }
+            }
+          DetailMetricRow("Current Unit Price", "${holding.currentMarketPriceDecimal} $curr ($priceDateLabel)")
           DetailMetricRow("Avg Cost / Unit", "${performance.averageCostPerUnitDisplay} $curr")
           DetailMetricRow("Open Invested Cost", FormatMoneyUseCase().format(Money.fromMinorUnits(holding.totalInvestedMinor, curr)))
           DetailMetricRow("Total Buy Capital", FormatMoneyUseCase().format(Money.fromMinorUnits(holding.totalBuyCostMinor, curr)))
@@ -275,7 +291,7 @@ fun InvestmentDetailContent(
                   fontWeight = FontWeight.Bold,
                 )
                 Text(
-                  text = "Uses public MFapi.in / AMFI India EOD feed for scheme code '${holding.symbolOrTicker ?: "not set"}'. Never overwrites manual NAV when disabled.",
+                  text = "Uses the third-party MFapi.in API for AMFI-sourced EOD NAV for scheme code '${holding.symbolOrTicker ?: "not set"}'. Never overwrites manual NAV when disabled.",
                   style = MaterialTheme.typography.bodySmall,
                   color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -98,7 +98,7 @@ fun InvestmentsScreen(
     onSelectCategory = viewModel::selectCategory,
     onToggleAutoConsent = viewModel::setAutoUpdateConsent,
     onToggleWifiOnly = viewModel::setSyncOnlyOnWifi,
-    onSyncNow = { viewModel.syncMarketPricesNow(allowOverwriteManual = false) },
+    onSyncNow = { viewModel.syncMarketPricesNow() },
     onDismissMessage = viewModel::dismissMessage,
     onNavigateBack = onNavigateBack,
     onOpenHoldingDetail = onOpenHoldingDetail,
@@ -172,17 +172,17 @@ fun InvestmentsContent(
   var showSyncSettingsDialog by remember { mutableStateOf(false) }
   var priceUpdateTarget by remember { mutableStateOf<InvestmentHolding?>(null) }
 
+  // New investment instruments are India-only. Existing legacy currencies remain
+  // filterable so older records are visible, but account/global currencies are not offered.
   val availableCurrencies =
-    remember(performances, accounts) {
-      val fromHoldings = performances.map { it.holding.currencyCode }
-      val fromAccounts = accounts.map { it.currencyCode }
-      (fromHoldings + fromAccounts + listOf("INR", "USD", "EUR", "GBP")).distinct()
+    remember(performances) {
+      (performances.map { it.holding.currencyCode } + listOf("INR")).distinct()
     }
 
   val activeCurrency =
     selectedCurrency
       ?: performances.firstOrNull()?.holding?.currencyCode
-      ?: accounts.firstOrNull()?.currencyCode
+      ?: "INR"
       ?: "INR"
 
   val filteredPerformances =
@@ -323,6 +323,12 @@ fun InvestmentsContent(
         val absoluteReturn = activeSummary?.absoluteReturnMinor ?: 0L
         val returnPct = activeSummary?.returnPercent?.toPlainString() ?: "0.00"
         val staleCount = activeSummary?.staleHoldingCount ?: 0
+        val awaitingPriceCount =
+          performances.count { performance ->
+            performance.holding.currencyCode.equals(activeCurrency, ignoreCase = true) &&
+              performance.holding.lastPriceUpdateDate <= 0L &&
+              !performance.isFullyExited
+          }
 
         OceanCard(modifier = Modifier.fillMaxWidth().testTag("portfolio_summary_card")) {
           Row(
@@ -331,7 +337,9 @@ fun InvestmentsContent(
             verticalAlignment = Alignment.CenterVertically,
           ) {
             Text(
-              text = "Portfolio Valuation ($activeCurrency)",
+              text =
+                if (awaitingPriceCount > 0) "Estimated Valuation ($activeCurrency)"
+                else "Portfolio Valuation ($activeCurrency)",
               style = MaterialTheme.typography.labelLarge,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -347,6 +355,15 @@ fun InvestmentsContent(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
           )
+          if (awaitingPriceCount > 0) {
+            Spacer(modifier = Modifier.height(OceanSpacing.xxs))
+            Text(
+              text = "$awaitingPriceCount holding(s) use purchase-price estimates until a current price is entered.",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.testTag("awaiting_price_summary_note"),
+            )
+          }
           Spacer(modifier = Modifier.height(OceanSpacing.xs))
           Row(
             modifier = Modifier.fillMaxWidth(),
@@ -487,8 +504,8 @@ fun InvestmentsContent(
   if (showCreateDialog) {
     InvestmentFormDialog(
       existingHolding = null,
-      defaultCurrency = activeCurrency,
-      availableCurrencies = availableCurrencies,
+      defaultCurrency = "INR",
+      availableCurrencies = listOf("INR"),
       calculationEngine = calculationEngine,
       onDismiss = { showCreateDialog = false },
       onCreateSubmit = { name, cat, sym, isin, broker, curr, date, qty, buyPrice, charges, mktPrice, autoOptIn, notes ->

@@ -67,6 +67,8 @@ class CreditCardDatabaseAndRepoTest {
       CreditCardRepositoryImpl(
         database = database,
         creditCardDao = database.creditCardDao(),
+        statementDao = database.creditCardStatementDao(),
+        rewardEventDao = database.creditCardRewardEventDao(),
         accountDao = database.financialAccountDao(),
         dispatchers = dispatchers,
       )
@@ -157,6 +159,15 @@ class CreditCardDatabaseAndRepoTest {
   }
 
   @Test
+  fun `inactive card status is persisted and preserved on reload`() = runTest {
+    val account = createAccount(userA, "acc_card_inactive")
+    val created = cardRepository.createCard(userA, card(userA, account.id).copy(isActive = false)).getOrThrow()
+
+    assertFalse(created.isActive)
+    assertFalse(cardRepository.getCard(userA, created.id)!!.isActive)
+  }
+
+  @Test
   fun `a second card for the same account is rejected`() = runTest {
     val account = createAccount(userA, "acc_card_2")
     cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
@@ -226,13 +237,13 @@ class CreditCardDatabaseAndRepoTest {
 
     // accountId is immutable by design, so an attempt to re-point the card cannot collide with
     // the other account's card and cannot silently steal it.
-    cardRepository
-      .updateCard(userA, created.copy(accountId = accountB.id, creditLimitMinor = 500_000L))
-      .getOrThrow()
+    val moveAttempt =
+      cardRepository.updateCard(userA, created.copy(accountId = accountB.id, creditLimitMinor = 500_000L))
 
+    assertTrue(moveAttempt.isFailure)
     val reloaded = cardRepository.getCard(userA, created.id)
     assertEquals(accountA.id, reloaded?.accountId)
-    assertEquals(500_000L, reloaded?.creditLimitMinor)
+    assertEquals(100_000L, reloaded?.creditLimitMinor)
     assertEquals(2, cardRepository.observeCards(userA).first().size)
   }
 
@@ -285,6 +296,65 @@ class CreditCardDatabaseAndRepoTest {
 
     assertEquals(account.id, second.accountId)
     assertEquals(1, cardRepository.observeCards(userA).first().size)
+  }
+
+  @Test
+  fun `statement history is scoped to the owning user and card`() = runTest {
+    val account = createAccount(userA, "acc_card_statement")
+    val created = cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
+    val statement = com.example.domain.model.CreditCardStatement(
+      userId = userA,
+      cardId = created.id,
+      currencyCode = "INR",
+      statementDate = 1_700_000_000_000L,
+      dueDate = 1_700_100_000_000L,
+      statementBalanceMinor = 50_000L,
+      minimumDueMinor = 5_000L,
+    )
+
+    cardRepository.createStatement(userA, statement).getOrThrow()
+
+    assertEquals(1, cardRepository.observeStatements(userA, created.id).first().size)
+    assertTrue(cardRepository.observeStatements(userB, created.id).first().isEmpty())
+    assertTrue(cardRepository.createStatement(userB, statement.copy(id = "foreign-statement")).isFailure)
+  }
+
+  @Test
+  fun `reward points are immutable ledger events and cannot be over-redeemed`() = runTest {
+    val account = createAccount(userA, "acc_card_rewards")
+    val created = cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
+    val earn = com.example.domain.model.CreditCardRewardEvent(
+      userId = userA,
+      cardId = created.id,
+      eventDate = 1_700_000_000_000L,
+      eventType = com.example.domain.model.CreditCardRewardEventType.EARN,
+      pointsDelta = 1_000L,
+      currencyCode = "INR",
+      description = "Welcome points",
+    )
+    cardRepository.addRewardEvent(userA, earn).getOrThrow()
+
+    assertEquals(1_000L, cardRepository.getRewardPointsBalance(userA, created.id))
+    val overRedeem = earn.copy(
+      id = "over-redeem",
+      eventType = com.example.domain.model.CreditCardRewardEventType.REDEEM,
+      pointsDelta = -1_001L,
+      description = "Too many points",
+    )
+    assertTrue(cardRepository.addRewardEvent(userA, overRedeem).isFailure)
+    assertEquals(1_000L, cardRepository.getRewardPointsBalance(userA, created.id))
+    assertEquals(1, cardRepository.observeRewardEvents(userA, created.id).first().size)
+  }
+
+  @Test
+  fun `freeze status updates without changing ledger account or card balance`() = runTest {
+    val account = createAccount(userA, "acc_card_freeze", balanceMinor = -25_000L)
+    val created = cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
+
+    cardRepository.setCardFrozen(userA, created.id, true).getOrThrow()
+
+    assertTrue(cardRepository.getCard(userA, created.id)!!.isFrozen)
+    assertEquals(-25_000L, accountRepository.getAccountById(userA, account.id)!!.currentBalanceMinor)
   }
 
   @Test

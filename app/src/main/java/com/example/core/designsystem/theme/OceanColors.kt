@@ -5,12 +5,9 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 // ============================================================================================
-// SKYPLUS MONEY palette — Stage 1
-//
-// Navy foundation, teal secondary, YELLOW accent. Gold is gone: the previous #D4AF37 gold read
-// as luxury branding and is explicitly not part of this identity. The accent is #FACC15 yellow
-// with a deep amber (#A16207) reserved for light-mode text and icons where pure yellow would
-// fail contrast on white.
+// SKYPLUS MONEY — balanced Google-inspired palette.
+// Blue is primary; red, yellow and green are supporting/semantic accents.
+// This is an independent SKYPLUS palette, not a reproduction of Google's brand identity.
 // ============================================================================================
 
 // Brand & structural navy
@@ -21,8 +18,8 @@ val SubtleOceanBlueElevated = Color(0xFF143252)
 val OceanBorderBlue = Color(0xFF1E446B)
 
 val DeepOceanBlue = Color(0xFF0B4F7C)
-val OceanPrimaryLightMode = Color(0xFF0B4A74)
-val OceanPrimaryDarkMode = Color(0xFF4CA8E0)
+val OceanPrimaryLightMode = Color(0xFF4285F4) // Google-inspired blue
+val OceanPrimaryDarkMode = Color(0xFF8AB4F8) // accessible blue on dark surfaces
 
 val OceanTeal = Color(0xFF0D9488)
 val OceanTealBright = Color(0xFF2DD4BF)
@@ -122,11 +119,11 @@ val DarkSkyplusChartPalette =
   SkyplusChartPalette(
     series =
       listOf(
-        SkyplusYellow,
-        OceanTealBright,
-        Color(0xFF60A5FA),
-        Color(0xFFA78BFA),
-        Color(0xFFF472B6),
+        Color(0xFF8AB4F8),
+        Color(0xFFF28B82),
+        SkyplusYellowBright,
+        Color(0xFF81C995),
+        Color(0xFFC58AF9),
       ),
     gridLine = Color(0xFF1E446B).copy(alpha = 0.55f),
     axisLabel = OceanTextMutedDark,
@@ -138,11 +135,11 @@ val LightSkyplusChartPalette =
   SkyplusChartPalette(
     series =
       listOf(
-        SkyplusYellowDeep,
-        OceanTeal,
-        Color(0xFF2563EB),
-        Color(0xFF7C3AED),
-        Color(0xFFDB2777),
+        Color(0xFF4285F4),
+        Color(0xFFEA4335),
+        Color(0xFFF9AB00),
+        Color(0xFF34A853),
+        Color(0xFF7E57C2),
       ),
     gridLine = Color(0xFFCBDCEB),
     axisLabel = OceanTextMutedLight,

@@ -6,7 +6,6 @@ import com.example.domain.model.ParsedFinancialMessage
 import com.example.domain.model.TransactionStatus
 import com.example.domain.model.TransactionType
 import java.math.BigDecimal
-import java.math.RoundingMode
 import java.util.regex.Pattern
 
 object SmartTransactionParser {
@@ -19,10 +18,19 @@ object SmartTransactionParser {
 
   private val LONG_DIGITS_PATTERN = Regex("[0-9]{6,}")
 
-  // Currencies: INR, USD, EUR, GBP, KWD, AED, SAR, QAR, BHD, OMR
+  // Build the code matcher from the Android ISO 4217 registry so notification
+  // parsing follows the same full currency support as the rest of the finance app.
+  private val SUPPORTED_CURRENCY_CODES_PATTERN =
+    java.util.Currency.getAvailableCurrencies()
+      .map { it.currencyCode }
+      .filter { Money.isSupportedCurrency(it) }
+      .distinct()
+      .sortedByDescending { it.length }
+      .joinToString("|")
+
   private val AMOUNT_PATTERN =
     Pattern.compile(
-      "(?:(?:Rs\\.?|INR|USD|EUR|GBP|\\$|€|£|KWD|AED|SAR|QAR|BHD|OMR)\\s*([0-9,]+(?:\\.[0-9]{1,3})?))|(?:([0-9,]+(?:\\.[0-9]{1,3})?)\\s*(?:INR|USD|EUR|GBP|KWD|AED|SAR|QAR|BHD|OMR))",
+      "(?:(?:₹|Rs\\.?|€|£|(?:$SUPPORTED_CURRENCY_CODES_PATTERN)\\b)\\s*([0-9,]+(?:\\.[0-9]{1,4})?))|(?:([0-9,]+(?:\\.[0-9]{1,4})?)\\s*(?:$SUPPORTED_CURRENCY_CODES_PATTERN)\\b)",
       Pattern.CASE_INSENSITIVE,
     )
 
@@ -54,7 +62,32 @@ object SmartTransactionParser {
   private val CREDIT_WORD_PATTERN = Pattern.compile("\\bcr\\b", Pattern.CASE_INSENSITIVE)
 
   private val PENDING_KEYWORDS =
-    listOf("pending", "processing", "in progress", "awaiting confirmation")
+    listOf("pending", "processing", "in progress", "awaiting confirmation", "initiated", "requested", "request received", "under process")
+
+  private val COMPLETED_KEYWORDS =
+    listOf(
+      "debited",
+      "credited",
+      "spent",
+      "paid",
+      "sent to",
+      "withdrawn",
+      "atm withdrawal",
+      "purchase of",
+      "purchase at",
+      "received",
+      "deposited",
+      "salary",
+      "added to wallet",
+      "success",
+      "successful",
+      "successfully",
+      "completed",
+      "reversed",
+      "refund credited",
+      "cashback credited",
+      "transferred to",
+    )
 
   private val FAILED_KEYWORDS =
     listOf("failed", "declined", "unsuccessful", "timed out")
@@ -109,42 +142,53 @@ object SmartTransactionParser {
 
     val rawAmountStr = amountMatcher.group(1) ?: amountMatcher.group(2) ?: return null
     val cleanedAmount = rawAmountStr.replace(",", "").trim()
-    val bigDecimalAmount = runCatching { BigDecimal(cleanedAmount) }.getOrNull() ?: return null
-
-    val matchedSubstring = amountMatcher.group(0)?.uppercase().orEmpty()
-    val currencyCode =
-      when {
-        matchedSubstring.contains("KWD") -> "KWD"
-        matchedSubstring.contains("AED") -> "AED"
-        matchedSubstring.contains("SAR") -> "SAR"
-        matchedSubstring.contains("QAR") -> "QAR"
-        matchedSubstring.contains("BHD") -> "BHD"
-        matchedSubstring.contains("OMR") -> "OMR"
-        matchedSubstring.contains("$") || matchedSubstring.contains("USD") -> "USD"
-        matchedSubstring.contains("€") || matchedSubstring.contains("EUR") -> "EUR"
-        matchedSubstring.contains("£") || matchedSubstring.contains("GBP") -> "GBP"
-        else -> "INR"
+    val bigDecimalAmount =
+      try {
+        BigDecimal(cleanedAmount)
+      } catch (_: NumberFormatException) {
+        return null
       }
 
+    val matchedSubstring = amountMatcher.group(0)?.uppercase().orEmpty()
+    val codeMatcher = Pattern.compile("\\b[A-Z]{3}\\b").matcher(matchedSubstring)
+    val currencyCode =
+      when {
+        codeMatcher.find() -> codeMatcher.group()
+        matchedSubstring.contains("₹") || matchedSubstring.contains("RS") -> "INR"
+        matchedSubstring.contains("€") -> "EUR"
+        matchedSubstring.contains("£") -> "GBP"
+        else -> return null
+      }
+    if (!Money.isSupportedCurrency(currencyCode)) return null
+
     val fractionDigits = Money.resolveFractionDigits(currencyCode)
+    // Do not silently round a notification amount to the currency's minor-unit scale.
+    if (bigDecimalAmount.stripTrailingZeros().scale().coerceAtLeast(0) > fractionDigits) return null
     val amountMinor =
-      runCatching {
-        bigDecimalAmount
-          .setScale(fractionDigits, RoundingMode.HALF_EVEN)
-          .movePointRight(fractionDigits)
-          .longValueExact()
-      }.getOrNull() ?: return null
+      try {
+        bigDecimalAmount.movePointRight(fractionDigits).longValueExact()
+      } catch (_: ArithmeticException) {
+        return null
+      }
 
     if (amountMinor <= 0L) return null
 
     val lowerText = text.lowercase()
     val confidenceReasons = mutableListOf<String>()
     var confidenceScore = 0.35f // Rule 1: Valid amount + currency parsed
-    confidenceReasons.add("Valid amount ($cleanedAmount $currencyCode) parsed")
+    confidenceReasons.add("Valid amount and currency parsed")
 
     // Status detection
     val isFailed = FAILED_KEYWORDS.any { lowerText.contains(it) }
-    val isPending = !isFailed && PENDING_KEYWORDS.any { lowerText.contains(it) }
+    val hasCompletionIndicator =
+      COMPLETED_KEYWORDS.any { lowerText.contains(it) } ||
+        DEBIT_WORD_PATTERN.matcher(text).find() ||
+        CREDIT_WORD_PATTERN.matcher(text).find()
+    // Never assume a notification represents a completed transaction merely because
+    // it contains an amount. Unconfirmed/request-style messages remain non-postable.
+    val isPending =
+      !isFailed &&
+        (PENDING_KEYWORDS.any { lowerText.contains(it) } || !hasCompletionIndicator)
     val status =
       when {
         isFailed -> {
@@ -212,7 +256,7 @@ object SmartTransactionParser {
     val accountLast4Hint =
       if (accountMatcher.find()) {
         confidenceScore += 0.15f
-        confidenceReasons.add("Account hint last 4 detected: ${accountMatcher.group(1)}")
+        confidenceReasons.add("Account hint detected")
         accountMatcher.group(1)
       } else null
 
@@ -221,7 +265,7 @@ object SmartTransactionParser {
     val referenceId =
       if (refMatcher.find()) {
         confidenceScore += 0.10f
-        confidenceReasons.add("Reference ID detected: ${refMatcher.group(1)}")
+        confidenceReasons.add("Reference ID detected")
         refMatcher.group(1)
       } else null
 
@@ -239,7 +283,7 @@ object SmartTransactionParser {
         ) {
           merchantOrPayee = candidate
           confidenceScore += 0.10f
-          confidenceReasons.add("Merchant/Payee identified: $candidate")
+          confidenceReasons.add("Merchant/Payee identified")
           break
         }
       }

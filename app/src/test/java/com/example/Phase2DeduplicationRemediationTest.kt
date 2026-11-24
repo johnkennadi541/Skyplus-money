@@ -24,6 +24,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -121,6 +122,111 @@ class Phase2DeduplicationRemediationTest {
   @After
   fun tearDown() {
     database.close()
+  }
+
+  @Test
+  fun `does not guess the only same-currency account when SMS has no account reference`() = runTest {
+    accountRepo.createAccount(
+      uid,
+      FinancialAccount(
+        id = "acc_kwd",
+        userId = uid,
+        name = "KWD Bank",
+        type = AccountType.BANK,
+        currencyCode = "KWD",
+        initialBalanceMinor = 100_000L,
+        currentBalanceMinor = 100_000L,
+        accountNumberLast4 = "5555",
+      ),
+    )
+    val parsed = ParsedFinancialMessage(
+      amountMinor = 1_250L,
+      currencyCode = "KWD",
+      type = TransactionType.EXPENSE,
+      status = TransactionStatus.COMPLETED,
+      merchantOrPayee = "Market",
+      accountLast4Hint = null,
+      referenceId = "KWDREF12345",
+      confidenceScore = 0.95f,
+      confidenceLevel = DetectionConfidence.HIGH,
+      confidenceReasons = listOf("test"),
+      timestamp = 1_700_000_000_000L,
+    )
+
+    val event = detectionRepo.processIncomingEvent(uid, "com.android.messaging", "Bank", parsed).getOrThrow()
+
+    assertEquals(DetectionEventStatus.IN_REVIEW, event.status)
+    assertEquals(100_000L, accountRepo.getAccountById(uid, "acc_kwd")!!.currentBalanceMinor)
+  }
+
+  @Test
+  fun `duplicate last four across accounts is ambiguous and never auto-posted`() = runTest {
+    accountRepo.createAccount(
+      uid,
+      FinancialAccount(
+        id = "acc_3",
+        userId = uid,
+        name = "Other Bank 4321",
+        type = AccountType.BANK,
+        currencyCode = "INR",
+        initialBalanceMinor = 300_000L,
+        currentBalanceMinor = 300_000L,
+        accountNumberLast4 = "4321",
+      ),
+    )
+    val parsed = ParsedFinancialMessage(
+      amountMinor = 5_000L,
+      currencyCode = "INR",
+      type = TransactionType.EXPENSE,
+      status = TransactionStatus.COMPLETED,
+      merchantOrPayee = "Cafe",
+      accountLast4Hint = "4321",
+      referenceId = "AMBIG123456",
+      confidenceScore = 0.99f,
+      confidenceLevel = DetectionConfidence.HIGH,
+      confidenceReasons = listOf("test"),
+      timestamp = 1_700_000_000_000L,
+    )
+
+    val event = detectionRepo.processIncomingEvent(uid, "com.android.messaging", "Bank", parsed).getOrThrow()
+
+    assertEquals(DetectionEventStatus.IN_REVIEW, event.status)
+    assertEquals(500_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
+    assertEquals(300_000L, accountRepo.getAccountById(uid, "acc_3")!!.currentBalanceMinor)
+  }
+
+  @Test
+  fun `transfer detections are not posted as one-sided automatic ledger entries`() = runTest {
+    val parsed = ParsedFinancialMessage(
+      amountMinor = 10_000L,
+      currencyCode = "INR",
+      type = TransactionType.TRANSFER,
+      status = TransactionStatus.COMPLETED,
+      merchantOrPayee = "Own Account",
+      accountLast4Hint = "4321",
+      referenceId = "TRF12345678",
+      confidenceScore = 0.99f,
+      confidenceLevel = DetectionConfidence.HIGH,
+      confidenceReasons = listOf("test"),
+      timestamp = 1_700_000_000_000L,
+    )
+
+    val event = detectionRepo.processIncomingEvent(uid, "com.android.messaging", "Bank", parsed).getOrThrow()
+
+    assertEquals(DetectionEventStatus.IN_REVIEW, event.status)
+    assertEquals(500_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
+
+    val oneSidedApproval = detectionRepo.approveReviewEvent(
+      userId = uid,
+      eventId = event.id,
+      selectedAccountId = "acc_1",
+      category = "Transfer",
+      merchant = "Own Account",
+      correctedType = TransactionType.TRANSFER,
+    )
+    assertTrue(oneSidedApproval.isFailure)
+    assertEquals(500_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
+    assertEquals(DetectionEventStatus.IN_REVIEW, detectionRepo.getEventById(uid, event.id)!!.status)
   }
 
   @Test

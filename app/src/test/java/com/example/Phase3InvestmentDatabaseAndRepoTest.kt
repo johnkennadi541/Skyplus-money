@@ -12,6 +12,7 @@ import com.example.data.local.db.DatabaseMigrations
 import com.example.data.remote.AmfiMfApiMarketPriceDataSource
 import com.example.data.repository.InvestmentRepositoryImpl
 import com.example.domain.model.InvestmentCategory
+import com.example.domain.model.InvestmentTransactionType
 import com.example.domain.model.PriceSourceType
 import com.example.domain.repository.MarketPriceDataSource
 import com.example.domain.repository.MarketQuoteFetchResult
@@ -27,7 +28,9 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
+import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.Buffer
 import okio.Timeout
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -102,6 +105,377 @@ class Phase3InvestmentDatabaseAndRepoTest {
     }
 
   @Test
+  fun `first opted in mutual fund NAV can be older than purchase day`() = runTest {
+    val uid = "uid_first_nav"
+    syncPreferences.setAutoUpdateConsent(uid, true)
+    val repo = buildRepo(
+      object : MarketPriceDataSource {
+        override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult =
+          MarketQuoteFetchResult.UnsupportedCategoryOrIdentifier("not used")
+      }
+    )
+    val now = System.currentTimeMillis()
+    val holding =
+      repo.createHoldingWithInitialBuy(
+        authenticatedUserId = uid,
+        name = "Test Mutual Fund",
+        category = InvestmentCategory.MUTUAL_FUNDS,
+        symbolOrTicker = "119598",
+        isin = null,
+        brokerOrPlatform = null,
+        currencyCode = "INR",
+        purchaseDate = now,
+        quantityDecimal = "1",
+        purchasePriceDecimal = "100",
+        chargesMinor = 0L,
+        currentMarketPriceDecimal = "100",
+        autoPriceUpdateEnabled = true,
+        notes = null,
+      ).getOrThrow()
+
+    val applied = repo.applyAutomaticMarketPrice(
+      authenticatedUserId = uid,
+      holdingId = holding.id,
+      newUnitPriceDecimal = "101",
+      priceDate = now - 86_400_000L,
+      source = PriceSourceType.MFAPI_AMFI_EOD,
+      providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
+    ).getOrThrow()
+
+    assertTrue(applied)
+    assertEquals("101", repo.getHoldingById(uid, holding.id)?.currentMarketPriceDecimal)
+  }
+
+  @Test
+  fun `missing initial market price is not recorded as a fresh quote or price history point`() = runTest {
+    val uid = "uid_awaiting_market_price"
+    val repo = buildRepo(
+      object : MarketPriceDataSource {
+        override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult =
+          MarketQuoteFetchResult.UnsupportedCategoryOrIdentifier("manual only")
+      }
+    )
+
+    val holding = repo.createHoldingWithInitialBuy(
+      authenticatedUserId = uid,
+      name = "Manual-only Equity",
+      category = InvestmentCategory.STOCKS,
+      symbolOrTicker = "TEST",
+      isin = null,
+      brokerOrPlatform = null,
+      currencyCode = "INR",
+      purchaseDate = System.currentTimeMillis(),
+      quantityDecimal = "2",
+      purchasePriceDecimal = "100",
+      chargesMinor = 0L,
+      currentMarketPriceDecimal = null,
+      autoPriceUpdateEnabled = false,
+      notes = null,
+    ).getOrThrow()
+
+    assertEquals("100", holding.currentMarketPriceDecimal) // Cost-price fallback only.
+    assertEquals(0L, holding.lastPriceUpdateDate)
+    assertEquals("Awaiting current price", holding.lastPriceProviderLabel)
+    assertTrue(repo.getPriceHistoryForHolding(uid, holding.id).first().isEmpty())
+    assertEquals(1, repo.getTransactionsForHolding(uid, holding.id).first().size)
+  }
+
+  @Test
+  fun `market sync rotates through holdings beyond the five request cycle cap`() = runTest {
+    val uid = "uid_market_rotation"
+    syncPreferences.setAutoUpdateConsent(uid, true)
+    var fetchCount = 0
+    val repo = buildRepo(
+      object : MarketPriceDataSource {
+        override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult {
+          fetchCount++
+          return MarketQuoteFetchResult.Success(
+            unitPriceDecimal = "105.00",
+            asOfMillis = System.currentTimeMillis(),
+            source = PriceSourceType.MFAPI_AMFI_EOD,
+            providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
+          )
+        }
+      }
+    )
+
+    val created = (1..6).map { index ->
+      repo.createHoldingWithInitialBuy(
+        authenticatedUserId = uid,
+        name = "Fund $index",
+        category = InvestmentCategory.MUTUAL_FUNDS,
+        symbolOrTicker = (12000 + index).toString(),
+        isin = null,
+        brokerOrPlatform = null,
+        currencyCode = "INR",
+        purchaseDate = System.currentTimeMillis() - 10_000L,
+        quantityDecimal = "1",
+        purchasePriceDecimal = "100",
+        chargesMinor = 0L,
+        currentMarketPriceDecimal = null,
+        autoPriceUpdateEnabled = true,
+        notes = null,
+      ).getOrThrow()
+    }
+
+    val firstCycle = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = true).getOrThrow()
+    assertEquals(5, firstCycle.updatedCount)
+    assertEquals(5, fetchCount)
+
+    // A second cycle must prioritize the one never-quoted holding instead of repeating
+    // the first five holdings that now have a fresh EOD quote.
+    val secondCycle = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = false).getOrThrow()
+    assertEquals(1, secondCycle.updatedCount)
+    assertEquals(6, fetchCount)
+    assertTrue(created.all { repo.getHoldingById(uid, it.id)?.lastPriceSource == PriceSourceType.MFAPI_AMFI_EOD })
+  }
+
+  @Test
+  fun `failed NAV quotes rotate fairly instead of monopolizing the five request cap`() = runTest {
+    val uid = "uid_failed_quote_rotation"
+    syncPreferences.setAutoUpdateConsent(uid, true)
+    val requestedHoldingIds = mutableListOf<String>()
+    val repo = buildRepo(
+      object : MarketPriceDataSource {
+        override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult {
+          requestedHoldingIds += request.holdingId
+          return MarketQuoteFetchResult.NetworkError("temporary offline")
+        }
+      }
+    )
+    val created = (1..6).map { index ->
+      repo.createHoldingWithInitialBuy(
+        authenticatedUserId = uid,
+        name = "Failed Fund $index",
+        category = InvestmentCategory.MUTUAL_FUNDS,
+        symbolOrTicker = (13000 + index).toString(),
+        isin = null,
+        brokerOrPlatform = null,
+        currencyCode = "INR",
+        purchaseDate = System.currentTimeMillis() - 10_000L,
+        quantityDecimal = "1",
+        purchasePriceDecimal = "100",
+        chargesMinor = 0L,
+        currentMarketPriceDecimal = null,
+        autoPriceUpdateEnabled = true,
+        notes = null,
+      ).getOrThrow()
+    }
+
+    val firstCycle = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = true).getOrThrow()
+    assertEquals(5, firstCycle.errorCount)
+    assertEquals(5, requestedHoldingIds.take(5).toSet().size)
+    val neverAttemptedHolding = created.single { it.id !in requestedHoldingIds.take(5) }
+
+    val secondCycle = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = true).getOrThrow()
+    assertEquals(5, secondCycle.errorCount)
+    assertEquals(
+      "The never-attempted sixth holding must be tried before previously failed holdings",
+      neverAttemptedHolding.id,
+      requestedHoldingIds[5],
+    )
+  }
+
+  @Test
+  fun `rate limit retry after is propagated to the worker summary`() = runTest {
+    val uid = "uid_retry_after_summary"
+    syncPreferences.setAutoUpdateConsent(uid, true)
+    val repo = buildRepo(
+      object : MarketPriceDataSource {
+        override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult =
+          MarketQuoteFetchResult.RateLimited(
+            retryAfterMillis = 120_000L,
+            message = "Provider rate limit",
+          )
+      }
+    )
+    repo.createHoldingWithInitialBuy(
+      authenticatedUserId = uid,
+      name = "Rate limited fund",
+      category = InvestmentCategory.MUTUAL_FUNDS,
+      symbolOrTicker = "140001",
+      isin = null,
+      brokerOrPlatform = null,
+      currencyCode = "INR",
+      purchaseDate = System.currentTimeMillis() - 10_000L,
+      quantityDecimal = "1",
+      purchasePriceDecimal = "100",
+      chargesMinor = 0L,
+      currentMarketPriceDecimal = null,
+      autoPriceUpdateEnabled = true,
+      notes = null,
+    ).getOrThrow()
+
+    val summary = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = true).getOrThrow()
+    assertEquals(1, summary.rateLimitedCount)
+    assertEquals(120_000L, summary.retryAfterMillis)
+  }
+  @Test
+  fun `new investment holdings reject non INR currencies`() = runTest {
+    val repo = buildRepo(
+      object : MarketPriceDataSource {
+        override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult =
+          MarketQuoteFetchResult.UnsupportedCategoryOrIdentifier("manual only")
+      }
+    )
+    val result =
+      repo.createHoldingWithInitialBuy(
+        authenticatedUserId = "uid_india_only",
+        name = "Non-India Asset",
+        category = InvestmentCategory.STOCKS,
+        symbolOrTicker = "ABC",
+        isin = null,
+        brokerOrPlatform = null,
+        currencyCode = "USD",
+        purchaseDate = System.currentTimeMillis(),
+        quantityDecimal = "1",
+        purchasePriceDecimal = "10",
+        chargesMinor = 0L,
+        currentMarketPriceDecimal = null,
+        autoPriceUpdateEnabled = false,
+        notes = null,
+      )
+
+    assertTrue(result.isFailure)
+    assertTrue(db.investmentDao().getAllHoldingsSync("uid_india_only").isEmpty())
+  }
+
+  @Test
+  fun `market sync preferences are isolated by authenticated UID`() = runTest {
+    syncPreferences.setAutoUpdateConsent("uid_market_a", true)
+    syncPreferences.setSyncOnlyOnWifi("uid_market_a", false)
+
+    val userA = syncPreferences.syncSettings("uid_market_a").first()
+    val userB = syncPreferences.syncSettings("uid_market_b").first()
+
+    assertTrue(userA.autoUpdateConsentEnabled)
+    assertFalse(userB.autoUpdateConsentEnabled)
+    assertFalse(userA.syncOnlyOnWifi)
+    assertTrue(userB.syncOnlyOnWifi)
+  }
+
+  @Test
+  fun `market feed rejects oversized unknown length response without parsing it`() = runTest {
+    val oversizedJson = """{"status":"SUCCESS","data":[{"date":"01-01-2026","nav":"100.00"}]}""" +
+      " ".repeat(70 * 1024)
+    val provider =
+      AmfiMfApiMarketPriceDataSource(
+        fakeCallFactory { request ->
+          Response.Builder()
+            .request(request)
+            .protocol(Protocol.HTTP_1_1)
+            .code(200)
+            .message("OK")
+            .body(
+              object : ResponseBody() {
+                override fun contentType() = "application/json".toMediaType()
+                override fun contentLength(): Long = -1L
+                override fun source() = Buffer().writeUtf8(oversizedJson)
+              }
+            )
+            .build()
+        },
+        testDispatchers,
+      )
+
+    val result =
+      provider.fetchLatestQuote(
+        MarketQuoteRequest("holding_size_test", InvestmentCategory.MUTUAL_FUNDS, "12345", null, "INR")
+      )
+
+    assertTrue(
+      "Oversized response with unknown content length must be rejected",
+      result is MarketQuoteFetchResult.InvalidResponse,
+    )
+  }
+
+  @Test
+  fun `automatic NAV requires both global and per holding opt in`() = runTest {
+    val uid = "uid_opt_in_guard"
+    syncPreferences.setAutoUpdateConsent(uid, false)
+    // A different Google account's consent must not authorize this user's requests.
+    syncPreferences.setAutoUpdateConsent("uid_other_account", true)
+    var fetchCount = 0
+    val dataSource =
+      object : MarketPriceDataSource {
+        override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult {
+          fetchCount++
+          return MarketQuoteFetchResult.Success(
+            unitPriceDecimal = "125.00",
+            asOfMillis = System.currentTimeMillis(),
+            source = PriceSourceType.MFAPI_AMFI_EOD,
+            providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
+            instrumentName = "Test Fund",
+          )
+        }
+      }
+    val repo = buildRepo(dataSource)
+    val holding =
+      repo.createHoldingWithInitialBuy(
+        authenticatedUserId = uid,
+        name = "Test Mutual Fund",
+        category = InvestmentCategory.MUTUAL_FUNDS,
+        symbolOrTicker = "12345",
+        isin = null,
+        brokerOrPlatform = null,
+        currencyCode = "INR",
+        purchaseDate = 1_750_000_000_000L,
+        quantityDecimal = "2",
+        purchasePriceDecimal = "100.00",
+        chargesMinor = 0L,
+        currentMarketPriceDecimal = "110.00",
+        autoPriceUpdateEnabled = false,
+        notes = null,
+      ).getOrThrow()
+
+    // Global consent OFF blocks all requests, even if another account opted in.
+    val globalOff = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = true).getOrThrow()
+    assertEquals(0, fetchCount)
+    assertEquals(0, globalOff.updatedCount)
+
+    // Global consent alone is not enough: this holding has not been opted in.
+    repo.setAutoUpdateConsent(uid, true)
+    val holdingOff = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = true).getOrThrow()
+    assertEquals(0, fetchCount)
+    assertEquals(0, holdingOff.updatedCount)
+    assertEquals("110", repo.getHoldingById(uid, holding.id)?.currentMarketPriceDecimal)
+
+    // Direct repository calls cannot bypass the per-holding consent either.
+    val directApplyWithoutHoldingConsent =
+      repo.applyAutomaticMarketPrice(
+        authenticatedUserId = uid,
+        holdingId = holding.id,
+        newUnitPriceDecimal = "125.00",
+        priceDate = System.currentTimeMillis(),
+        source = PriceSourceType.MFAPI_AMFI_EOD,
+        providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
+      ).getOrThrow()
+    assertFalse(directApplyWithoutHoldingConsent)
+    assertEquals("110", repo.getHoldingById(uid, holding.id)?.currentMarketPriceDecimal)
+
+    // Only after the user explicitly opts in this holding may the quote update it.
+    repo.setHoldingAutoPriceUpdate(uid, holding.id, true).getOrThrow()
+    val optedIn = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = true).getOrThrow()
+    assertEquals(1, fetchCount)
+    assertEquals(1, optedIn.updatedCount)
+    assertEquals("125", repo.getHoldingById(uid, holding.id)?.currentMarketPriceDecimal)
+
+    // Revoking global consent blocks direct quote application even after per-holding opt-in.
+    repo.setAutoUpdateConsent(uid, false)
+    val blockedAfterGlobalOptOut =
+      repo.applyAutomaticMarketPrice(
+        authenticatedUserId = uid,
+        holdingId = holding.id,
+        newUnitPriceDecimal = "130.00",
+        priceDate = System.currentTimeMillis(),
+        source = PriceSourceType.MFAPI_AMFI_EOD,
+        providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
+      )
+    assertTrue(blockedAfterGlobalOptOut.isFailure)
+    assertEquals("125", repo.getHoldingById(uid, holding.id)?.currentMarketPriceDecimal)
+  }
+
+  @Test
   fun `create edit additional buy partial sell complete sell and delete persist accurately`() = runTest {
     val repo = buildRepo(AmfiMfApiMarketPriceDataSource(fakeCallFactory { throw IOException("offline") }, testDispatchers))
 
@@ -126,6 +500,7 @@ class Phase3InvestmentDatabaseAndRepoTest {
     assertFalse("Non-MF holding must never enable auto-sync", created.autoPriceUpdateEnabled)
     assertEquals(15050_00L, created.totalInvestedMinor)
     assertEquals(16000_00L, created.currentValuationMinor)
+    assertEquals(1, repo.getPriceHistoryForHolding("uid_inv_1", created.id).first().size)
 
     // Edit metadata
     repo.updateHoldingMetadata(
@@ -147,6 +522,11 @@ class Phase3InvestmentDatabaseAndRepoTest {
     val afterBuy = repo.getHoldingById("uid_inv_1", created.id)!!
     assertEquals("20", afterBuy.quantityDecimal)
     assertEquals(32100_00L, afterBuy.totalInvestedMinor)
+    // A BUY creates a portfolio valuation snapshot from the last known quote,
+    // but does not claim that a new market quote was received.
+    val historyAfterBuy = repo.getPriceHistoryForHolding("uid_inv_1", created.id).first()
+    assertEquals(2, historyAfterBuy.size)
+    assertEquals("Portfolio snapshot after BUY", historyAfterBuy.first().providerLabel)
 
     // Partial sell: 5 units @ 1800, 0 charges => WAC cost = 32100 * 5/20 = 8025, realized = 9000 - 8025 = +975
     val sellTx =
@@ -164,12 +544,147 @@ class Phase3InvestmentDatabaseAndRepoTest {
     assertEquals("15", afterPartialSell.quantityDecimal)
     assertEquals(24075_00L, afterPartialSell.totalInvestedMinor)
     assertEquals(975_00L, afterPartialSell.realizedPnlMinor)
+    // A SELL records the changed portfolio valuation without changing quote provenance.
+    val historyAfterSell = repo.getPriceHistoryForHolding("uid_inv_1", created.id).first()
+    assertEquals(3, historyAfterSell.size)
+    assertEquals("Portfolio snapshot after SELL", historyAfterSell.first().providerLabel)
 
     // Delete holding cascades transactions and history
     repo.deleteHolding("uid_inv_1", created.id).getOrThrow()
     assertNull(repo.getHoldingById("uid_inv_1", created.id))
     assertTrue(repo.getTransactionsForHolding("uid_inv_1", created.id).first().isEmpty())
     assertTrue(repo.getPriceHistoryForHolding("uid_inv_1", created.id).first().isEmpty())
+  }
+
+  @Test
+  fun `complete sale closes holding and a later new buy reopens it without changing old ledger rows`() = runTest {
+    val repo = buildRepo(
+      AmfiMfApiMarketPriceDataSource(fakeCallFactory { throw IOException("offline") }, testDispatchers)
+    )
+    val uid = "uid_complete_exit"
+    val purchaseDate = System.currentTimeMillis() - 5_000L
+    val holding = repo.createHoldingWithInitialBuy(
+      authenticatedUserId = uid,
+      name = "Complete Exit Test",
+      category = InvestmentCategory.STOCKS,
+      symbolOrTicker = "EXIT",
+      isin = null,
+      brokerOrPlatform = null,
+      currencyCode = "INR",
+      purchaseDate = purchaseDate,
+      quantityDecimal = "10",
+      purchasePriceDecimal = "100",
+      chargesMinor = 1_000L,
+      currentMarketPriceDecimal = "105",
+      autoPriceUpdateEnabled = false,
+      notes = null,
+    ).getOrThrow()
+
+    val sellDate = purchaseDate + 1_000L
+    val sale = repo.recordSale(
+      authenticatedUserId = uid,
+      holdingId = holding.id,
+      transactionDate = sellDate,
+      quantityDecimal = "10",
+      unitPriceDecimal = "110",
+      chargesMinor = 500L,
+      notes = "Full exit",
+    ).getOrThrow()
+
+    assertEquals(110_000L, sale.grossAmountMinor)
+    assertEquals(109_500L, sale.netAmountMinor)
+    assertEquals(101_000L, sale.costBasisAllocatedMinor)
+    assertEquals(8_500L, sale.realizedPnlMinor)
+
+    val exited = repo.getHoldingById(uid, holding.id)!!
+    assertEquals("0", exited.quantityDecimal)
+    assertEquals(0L, exited.totalInvestedMinor)
+    assertEquals(0L, exited.currentValuationMinor)
+    assertEquals(8_500L, exited.realizedPnlMinor)
+    assertEquals(101_000L, exited.totalBuyCostMinor)
+
+    assertTrue(
+      "A further sale after complete exit must be rejected",
+      repo.recordSale(uid, holding.id, sellDate, "1", "110", 0L, null).isFailure,
+    )
+
+    // A later BUY is a new position; historical realized P&L and original ledger rows remain.
+    repo.recordAdditionalPurchase(uid, holding.id, sellDate, "1", "120", 0L, "Re-entry").getOrThrow()
+    val reopened = repo.getHoldingById(uid, holding.id)!!
+    assertEquals("1", reopened.quantityDecimal)
+    assertEquals(12_000L, reopened.totalInvestedMinor)
+    assertEquals(113_000L, reopened.totalBuyCostMinor)
+    assertEquals(8_500L, reopened.realizedPnlMinor)
+
+    val ledger = repo.getTransactionsForHolding(uid, holding.id).first()
+    assertEquals(3, ledger.size)
+    assertEquals(InvestmentTransactionType.BUY, ledger.first { it.notes == "Initial purchase" }.type)
+    assertEquals(InvestmentTransactionType.SELL, ledger.first { it.notes == "Full exit" }.type)
+    assertEquals(InvestmentTransactionType.BUY, ledger.first { it.notes == "Re-entry" }.type)
+  }
+
+  @Test
+  fun `buy and sell transactions reject dates earlier than latest recorded transaction`() = runTest {
+    val repo = buildRepo(AmfiMfApiMarketPriceDataSource(fakeCallFactory { throw IOException("offline") }, testDispatchers))
+    val uid = "uid_transaction_order"
+    val purchaseDate = 1_750_000_000_000L
+    val holding = repo.createHoldingWithInitialBuy(
+      authenticatedUserId = uid, name = "Chronology Test Fund", category = InvestmentCategory.STOCKS,
+      symbolOrTicker = "TEST", isin = null, brokerOrPlatform = null, currencyCode = "INR",
+      purchaseDate = purchaseDate, quantityDecimal = "10", purchasePriceDecimal = "100",
+      chargesMinor = 0L, currentMarketPriceDecimal = "100", autoPriceUpdateEnabled = false, notes = null,
+    ).getOrThrow()
+    val latestTradeDate = purchaseDate + 86_400_000L
+    repo.recordAdditionalPurchase(uid, holding.id, latestTradeDate, "5", "110", 0L, null).getOrThrow()
+    val backdatedBuy = repo.recordAdditionalPurchase(uid, holding.id, latestTradeDate - 1L, "1", "105", 0L, null)
+    val backdatedSell = repo.recordSale(uid, holding.id, latestTradeDate - 1L, "1", "120", 0L, null)
+    assertTrue("Backdated buy must be rejected to preserve WAC chronology", backdatedBuy.isFailure)
+    assertTrue("Backdated sell must be rejected to preserve WAC chronology", backdatedSell.isFailure)
+    assertEquals("15", repo.getHoldingById(uid, holding.id)?.quantityDecimal)
+    assertEquals(2, repo.getTransactionsForHolding(uid, holding.id).first().size)
+  }
+  @Test
+  fun `rejected automatic quote is counted as an error not a manual skip`() = runTest {
+    val uid = "uid_invalid_quote_source"
+    syncPreferences.setAutoUpdateConsent(uid, true)
+    val repo =
+      buildRepo(
+        object : MarketPriceDataSource {
+          override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult =
+            MarketQuoteFetchResult.Success(
+              unitPriceDecimal = "125.00",
+              asOfMillis = System.currentTimeMillis(),
+              // A provider must never be able to label a quote as a manual price.
+              source = PriceSourceType.MANUAL,
+              providerLabel = "Unapproved source",
+            )
+        }
+      )
+    val now = System.currentTimeMillis()
+    val holding =
+      repo.createHoldingWithInitialBuy(
+        authenticatedUserId = uid,
+        name = "Guarded Mutual Fund",
+        category = InvestmentCategory.MUTUAL_FUNDS,
+        symbolOrTicker = "119598",
+        isin = null,
+        brokerOrPlatform = null,
+        currencyCode = "INR",
+        purchaseDate = now,
+        quantityDecimal = "10",
+        purchasePriceDecimal = "100.00",
+        chargesMinor = 0L,
+        currentMarketPriceDecimal = "100.00",
+        autoPriceUpdateEnabled = true,
+        notes = null,
+      ).getOrThrow()
+
+    val summary = repo.syncEligibleMarketPrices(uid, forceBypassCooldown = true).getOrThrow()
+
+    assertEquals(0, summary.updatedCount)
+    assertEquals(0, summary.skippedManualCount)
+    assertEquals(1, summary.errorCount)
+    assertEquals("100", repo.getHoldingById(uid, holding.id)?.currentMarketPriceDecimal)
   }
 
   @Test
@@ -180,7 +695,7 @@ class Phase3InvestmentDatabaseAndRepoTest {
           override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult =
             MarketQuoteFetchResult.Success(
               unitPriceDecimal = "220.00",
-              asOfMillis = 1_755_000_000_000L,
+              asOfMillis = System.currentTimeMillis(),
               source = PriceSourceType.MFAPI_AMFI_EOD,
               providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
             )
@@ -210,14 +725,29 @@ class Phase3InvestmentDatabaseAndRepoTest {
       authenticatedUserId = "uid_man",
       holdingId = mfHolding.id,
       newUnitPriceDecimal = "95.50",
-      priceDate = 1_751_000_000_000L,
+      priceDate = System.currentTimeMillis(),
     ).getOrThrow()
     assertEquals(9550_00L, repo.getHoldingById("uid_man", mfHolding.id)?.currentValuationMinor)
 
-    // Default global auto-consent is OFF
-    assertFalse(syncPreferences.syncSettings.first().autoUpdateConsentEnabled)
+    // A manual observation older than the latest accepted observation must not roll
+    // the current valuation or its freshness watermark backwards.
+    val backdatedManualPrice =
+      repo.updateManualMarketPrice(
+        authenticatedUserId = "uid_man",
+        holdingId = mfHolding.id,
+        newUnitPriceDecimal = "80.00",
+        priceDate = 1_750_500_000_000L,
+      )
+    assertTrue("Backdated manual price must be rejected", backdatedManualPrice.isFailure)
+    assertEquals("95.5", repo.getHoldingById("uid_man", mfHolding.id)?.currentMarketPriceDecimal)
+    assertEquals(2, repo.getPriceHistoryForHolding("uid_man", mfHolding.id).first().size)
 
-    // Attempting auto-apply without holding opt-in or allowOverwriteManual MUST NOT overwrite manual price
+    // Reset persisted DataStore state so this test is isolated from earlier tests.
+    // The preference store is application-scoped and can survive between Robolectric tests.
+    repo.setAutoUpdateConsent("uid_man", false)
+    assertFalse(syncPreferences.syncSettings("uid_man").first().autoUpdateConsentEnabled)
+
+    // Attempting auto-apply without holding opt-in must not overwrite manual price
     val overwrittenWhenDisabled =
       repo.applyAutomaticMarketPrice(
         authenticatedUserId = "uid_man",
@@ -226,13 +756,12 @@ class Phase3InvestmentDatabaseAndRepoTest {
         priceDate = 1_755_000_000_000L,
         source = PriceSourceType.MFAPI_AMFI_EOD,
         providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
-        allowOverwriteManual = false,
-      ).getOrThrow()
-    assertFalse(overwrittenWhenDisabled)
+        )
+    assertTrue("Direct quote application must also enforce global opt-in", overwrittenWhenDisabled.isFailure)
     assertEquals("95.5", repo.getHoldingById("uid_man", mfHolding.id)?.currentMarketPriceDecimal)
 
     // Now user explicitly opts in globally AND per holding -> sync succeeds cleanly!
-    repo.setAutoUpdateConsent(true)
+    repo.setAutoUpdateConsent("uid_man", true)
     repo.setHoldingAutoPriceUpdate("uid_man", mfHolding.id, true).getOrThrow()
     val summary = repo.syncEligibleMarketPrices("uid_man", forceBypassCooldown = true).getOrThrow()
     assertEquals(1, summary.updatedCount)
@@ -244,12 +773,131 @@ class Phase3InvestmentDatabaseAndRepoTest {
   }
 
   @Test
+  fun `buy cost basis is immutable to metadata edits and older or failed quotes preserve last valuation`() = runTest {
+    val repo =
+      buildRepo(
+        object : MarketPriceDataSource {
+          override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult =
+            MarketQuoteFetchResult.NetworkError("offline")
+        }
+      )
+
+    val created =
+      repo.createHoldingWithInitialBuy(
+        authenticatedUserId = "uid_quote_guard",
+        name = "Index Fund",
+        category = InvestmentCategory.MUTUAL_FUNDS,
+        symbolOrTicker = "119598",
+        isin = null,
+        brokerOrPlatform = "Broker",
+        currencyCode = "INR",
+        purchaseDate = 1_750_000_000_000L,
+        quantityDecimal = "10",
+        purchasePriceDecimal = "100.00",
+        chargesMinor = 25L,
+        currentMarketPriceDecimal = "105.00",
+        autoPriceUpdateEnabled = false,
+        notes = null,
+      ).getOrThrow()
+
+    val originalBuy = repo.getTransactionsForHolding("uid_quote_guard", created.id).first().single()
+    val originalCostBasis = created.totalInvestedMinor
+
+    assertTrue(
+      "Metadata editing must not rewrite the recorded purchase date",
+      repo.updateHoldingMetadata(
+        "uid_quote_guard",
+        created.copy(purchaseDate = created.purchaseDate + 86_400_000L),
+      ).isFailure,
+    )
+    assertTrue(
+      "Metadata editing must not change the holding currency",
+      repo.updateHoldingMetadata(
+        "uid_quote_guard",
+        created.copy(currencyCode = "USD"),
+      ).isFailure,
+    )
+    assertTrue(
+      "Metadata editing must not change the instrument category",
+      repo.updateHoldingMetadata(
+        "uid_quote_guard",
+        created.copy(category = InvestmentCategory.STOCKS),
+      ).isFailure,
+    )
+    assertTrue(
+      "Metadata editing must not change the AMFI scheme code after purchase",
+      repo.updateHoldingMetadata(
+        "uid_quote_guard",
+        created.copy(symbolOrTicker = "119599"),
+      ).isFailure,
+    )
+    assertTrue(
+      "Metadata editing must not change the ISIN after purchase",
+      repo.updateHoldingMetadata(
+        "uid_quote_guard",
+        created.copy(isin = "INE123456789"),
+      ).isFailure,
+    )
+
+    repo.setAutoUpdateConsent("uid_quote_guard", true)
+    repo.setHoldingAutoPriceUpdate("uid_quote_guard", created.id, true).getOrThrow()
+    val currentQuoteDate = System.currentTimeMillis()
+    repo.updateManualMarketPrice(
+      authenticatedUserId = "uid_quote_guard",
+      holdingId = created.id,
+      newUnitPriceDecimal = "110.00",
+      priceDate = currentQuoteDate,
+    ).getOrThrow()
+    val rejectedOlderQuote =
+      repo.applyAutomaticMarketPrice(
+        authenticatedUserId = "uid_quote_guard",
+        holdingId = created.id,
+        newUnitPriceDecimal = "90.00",
+        priceDate = currentQuoteDate - 86_400_000L,
+        source = PriceSourceType.MFAPI_AMFI_EOD,
+        providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
+        ).getOrThrow()
+    assertFalse("Older quote must not roll back the current valuation", rejectedOlderQuote)
+
+    val futureQuote =
+      repo.applyAutomaticMarketPrice(
+        authenticatedUserId = "uid_quote_guard",
+        holdingId = created.id,
+        newUnitPriceDecimal = "999.00",
+        priceDate = System.currentTimeMillis() + 86_400_000L,
+        source = PriceSourceType.MFAPI_AMFI_EOD,
+        providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
+        )
+    assertTrue("Future-dated provider quote must be rejected", futureQuote.isFailure)
+
+    val beforeOfflineSync = repo.getHoldingById("uid_quote_guard", created.id)!!
+    val sync = repo.syncEligibleMarketPrices("uid_quote_guard", forceBypassCooldown = true).getOrThrow()
+    val afterOfflineSync = repo.getHoldingById("uid_quote_guard", created.id)!!
+
+    assertEquals(1, sync.errorCount)
+    assertEquals(beforeOfflineSync.currentMarketPriceDecimal, afterOfflineSync.currentMarketPriceDecimal)
+    assertEquals(beforeOfflineSync.currentValuationMinor, afterOfflineSync.currentValuationMinor)
+    assertEquals(originalCostBasis, afterOfflineSync.totalInvestedMinor)
+    val buyAfterSync = repo.getTransactionsForHolding("uid_quote_guard", created.id).first().single()
+    assertEquals(originalBuy.unitPriceDecimal, buyAfterSync.unitPriceDecimal)
+    assertEquals(originalBuy.transactionDate, buyAfterSync.transactionDate)
+  }
+
+  @Test
   fun `amfi mfapi provider handles success 429 rate limit http error malformed json unsupported category and offline cleanly`() = runTest {
     val validJson =
       """
       {
         "meta": {"scheme_name": "Parag Parikh Flexi Cap Fund", "fund_house": "PPFAS Mutual Fund"},
         "data": [{"date": "18-11-2026", "nav": "84.5678"}],
+        "status": "SUCCESS"
+      }
+      """.trimIndent()
+    val invalidDateJson =
+      """
+      {
+        "meta": {"scheme_name": "Parag Parikh Flexi Cap Fund"},
+        "data": [{"date": "31-02-2026", "nav": "84.5678"}],
         "status": "SUCCESS"
       }
       """.trimIndent()
@@ -284,6 +932,14 @@ class Phase3InvestmentDatabaseAndRepoTest {
               .message("OK")
               .body("{bad_json".toResponseBody("application/json".toMediaType()))
               .build()
+          "INVALID_DATE" ->
+            Response.Builder()
+              .request(req)
+              .protocol(Protocol.HTTP_1_1)
+              .code(200)
+              .message("OK")
+              .body(invalidDateJson.toResponseBody("application/json".toMediaType()))
+              .build()
           else ->
             Response.Builder()
               .request(req)
@@ -312,12 +968,24 @@ class Phase3InvestmentDatabaseAndRepoTest {
     assertTrue(badCodeRes is MarketQuoteFetchResult.UnsupportedCategoryOrIdentifier)
 
     val validReq = MarketQuoteRequest("h_mf", InvestmentCategory.MUTUAL_FUNDS, "122639", null, "INR")
+    val wrongCurrencyReq = MarketQuoteRequest("h_mf_usd", InvestmentCategory.MUTUAL_FUNDS, "122639", null, "USD")
+    assertTrue(
+      "An INR NAV must never be applied to a non-INR holding",
+      provider.fetchLatestQuote(wrongCurrencyReq) is MarketQuoteFetchResult.UnsupportedCategoryOrIdentifier,
+    )
 
     mode = "SUCCESS"
     val success = provider.fetchLatestQuote(validReq) as MarketQuoteFetchResult.Success
     assertEquals("84.5678", success.unitPriceDecimal)
     assertEquals(PriceSourceType.MFAPI_AMFI_EOD, success.source)
     assertEquals("Parag Parikh Flexi Cap Fund", success.instrumentName)
+    assertTrue("AMFI EOD quote timestamp must not be future-dated", success.asOfMillis <= System.currentTimeMillis())
+
+    mode = "INVALID_DATE"
+    assertTrue(
+      "An invalid NAV date must not be stamped with the current time",
+      provider.fetchLatestQuote(validReq) is MarketQuoteFetchResult.InvalidResponse,
+    )
 
     mode = "RATE_LIMIT"
     val rateLimited = provider.fetchLatestQuote(validReq) as MarketQuoteFetchResult.RateLimited
@@ -331,6 +999,43 @@ class Phase3InvestmentDatabaseAndRepoTest {
 
     mode = "OFFLINE"
     assertTrue(provider.fetchLatestQuote(validReq) is MarketQuoteFetchResult.NetworkError)
+
+    // Provider payload validation: never accept zero/negative NAV, impossible/future
+    // dates, or a SUCCESS response with no NAV observations.
+    val zeroNav = provider.parseMfApiResponse(
+      """{"status":"SUCCESS","data":[{"date":"18-11-2026","nav":"0"}]}"""
+    )
+    assertTrue(zeroNav is MarketQuoteFetchResult.InvalidResponse)
+
+    val negativeNav = provider.parseMfApiResponse(
+      """{"status":"SUCCESS","data":[{"date":"18-11-2026","nav":"-1"}]}"""
+    )
+    assertTrue(negativeNav is MarketQuoteFetchResult.InvalidResponse)
+
+    val impossibleDate = provider.parseMfApiResponse(
+      """{"status":"SUCCESS","data":[{"date":"31-02-2026","nav":"100"}]}"""
+    )
+    assertTrue(impossibleDate is MarketQuoteFetchResult.InvalidResponse)
+
+    val futureDate = provider.parseMfApiResponse(
+      """{"status":"SUCCESS","data":[{"date":"31-12-9999","nav":"100"}]}"""
+    )
+    assertTrue(futureDate is MarketQuoteFetchResult.InvalidResponse)
+
+    val emptyData = provider.parseMfApiResponse(
+      """{"status":"SUCCESS","data":[]}"""
+    )
+    assertTrue(emptyData is MarketQuoteFetchResult.InvalidResponse)
+
+    val exponentNav = provider.parseMfApiResponse(
+      """{"status":"SUCCESS","data":[{"date":"18-11-2026","nav":"1e999999999"}]}"""
+    )
+    assertTrue(exponentNav is MarketQuoteFetchResult.InvalidResponse)
+
+    val excessivePrecisionNav = provider.parseMfApiResponse(
+      """{"status":"SUCCESS","data":[{"date":"18-11-2026","nav":"1234567890123.12345678901"}]}"""
+    )
+    assertTrue(excessivePrecisionNav is MarketQuoteFetchResult.InvalidResponse)
   }
 
   @Test
@@ -525,6 +1230,8 @@ class Phase3InvestmentDatabaseAndRepoTest {
           DatabaseMigrations.MIGRATION_6_7,
           DatabaseMigrations.MIGRATION_7_8,
           DatabaseMigrations.MIGRATION_8_9,
+          DatabaseMigrations.MIGRATION_9_10,
+          DatabaseMigrations.MIGRATION_10_11,
         )
         .build()
 

@@ -208,6 +208,59 @@ class Phase2SecurityRemediationTest {
   }
 
   @Test
+  fun `round trip verification buffer is zeroed after passphrase comparison`() {
+    val prefs = context.getSharedPreferences("passphrase_zero_${System.nanoTime()}", Context.MODE_PRIVATE)
+    val dbFile = File(context.cacheDir, "zero_key_${System.nanoTime()}.db")
+    var verificationBuffer: ByteArray? = null
+    val observingBackend =
+      object : KeyWrappingBackend {
+        override fun encrypt(raw: ByteArray): Pair<String, String> = simpleBackend.encrypt(raw)
+        override fun decrypt(encryptedBase64: String, ivBase64: String): ByteArray {
+          return simpleBackend.decrypt(encryptedBase64, ivBase64).also { verificationBuffer = it }
+        }
+      }
+
+    val returnedPassphrase =
+      DatabasePassphraseProvider(context, observingBackend, prefs) { dbFile }.getOrCreatePassphrase()
+
+    assertEquals(32, returnedPassphrase.size)
+    assertNotNull(verificationBuffer)
+    assertTrue("Temporary verification copy must be zeroed", verificationBuffer!!.all { it == 0.toByte() })
+    assertTrue("Returned passphrase remains owned by the SQLCipher caller", returnedPassphrase.any { it != 0.toByte() })
+    returnedPassphrase.fill(0)
+  }
+
+  @Test
+  fun `invalid decrypted passphrase buffer is zeroed before failure`() {
+    val prefs = context.getSharedPreferences("invalid_key_length_${System.nanoTime()}", Context.MODE_PRIVATE)
+    prefs.edit()
+      .putString(DatabasePassphraseProvider.KEY_ENCRYPTED_PASSPHRASE, "wrapped")
+      .putString(DatabasePassphraseProvider.KEY_IV, "iv")
+      .commit()
+    val invalidPlaintext = ByteArray(16) { 7 }
+    val invalidLengthBackend =
+      object : KeyWrappingBackend {
+        override fun encrypt(raw: ByteArray): Pair<String, String> = simpleBackend.encrypt(raw)
+        override fun decrypt(encryptedBase64: String, ivBase64: String): ByteArray = invalidPlaintext
+      }
+    val provider = DatabasePassphraseProvider(
+      context,
+      invalidLengthBackend,
+      prefs,
+    ) { File(context.cacheDir, "unused_${System.nanoTime()}.db") }
+
+    var caught: DatabaseSecurityException? = null
+    try {
+      provider.getOrCreatePassphrase()
+    } catch (error: DatabaseSecurityException) {
+      caught = error
+    }
+
+    assertEquals(PassphraseFailureReason.KEY_CORRUPTED, caught?.reason)
+    assertTrue("Rejected decrypted passphrase must be zeroed", invalidPlaintext.all { it == 0.toByte() })
+  }
+
+  @Test
   fun `temporary Keystore decrypt failure preserves wrapped key and recovers on retry`() {
     val prefs = context.getSharedPreferences("keystore_temp_fail_${System.nanoTime()}", Context.MODE_PRIVATE)
     val dbFile = File(context.cacheDir, "existing_db_${System.nanoTime()}.db")
@@ -295,6 +348,27 @@ class Phase2SecurityRemediationTest {
   }
 
   @Test
+  fun `nonempty database sidecar without key refuses passphrase regeneration`() {
+    val prefs = context.getSharedPreferences("missing_sidecar_key_${System.nanoTime()}", Context.MODE_PRIVATE)
+    val dbFile = File(context.cacheDir, "missing_main_db_${System.nanoTime()}.db")
+    val sidecarFile = File("${dbFile.path}-wal").apply { writeText("sidecar data") }
+    try {
+      val provider = DatabasePassphraseProvider(context, simpleBackend, prefs) { dbFile }
+      var caught: DatabaseSecurityException? = null
+      try {
+        provider.getOrCreatePassphrase()
+      } catch (error: DatabaseSecurityException) {
+        caught = error
+      }
+      assertEquals(PassphraseFailureReason.MISSING_KEY_FOR_EXISTING_DATABASE, caught?.reason)
+      assertNull(prefs.getString(DatabasePassphraseProvider.KEY_ENCRYPTED_PASSPHRASE, null))
+    } finally {
+      sidecarFile.delete()
+      dbFile.delete()
+    }
+  }
+
+  @Test
   fun `security monitor tracks fail-closed state and recovers when retry succeeds`() {
     val monitor = DatabaseSecurityMonitor()
     var shouldFail = true
@@ -322,6 +396,90 @@ class Phase2SecurityRemediationTest {
   }
 
   // --- Requirement 7.6: Logout / account-switch state isolation & DAO UID predicates ---
+
+  @Test
+  fun `duplicate account mapping rules never choose an arbitrary account`() = runTest {
+    val uid = "uid_duplicate_mapping"
+    val accounts = listOf(
+      FinancialAccount(
+        id = "acc_dup_a",
+        userId = uid,
+        name = "Bank A",
+        type = AccountType.BANK,
+        currencyCode = "INR",
+        initialBalanceMinor = 100_000L,
+        currentBalanceMinor = 100_000L,
+        accountNumberLast4 = "4321",
+      ),
+      FinancialAccount(
+        id = "acc_dup_b",
+        userId = uid,
+        name = "Bank B",
+        type = AccountType.BANK,
+        currencyCode = "INR",
+        initialBalanceMinor = 200_000L,
+        currentBalanceMinor = 200_000L,
+        accountNumberLast4 = "4321",
+      ),
+    )
+    accounts.forEach { accountRepo.createAccount(uid, it) }
+    detectionRepo.updateDetectionSettings(
+      uid,
+      DetectionSettings(
+        userId = uid,
+        isNotificationDetectionEnabled = true,
+        isAutoSaveHighConfidenceEnabled = true,
+      ),
+    )
+    database.accountMappingRuleDao().insertRule(
+      AccountMappingRuleEntity(
+        id = "rule_dup_a",
+        userId = uid,
+        accountId = "acc_dup_a",
+        matchPattern = "4321",
+        institutionHint = null,
+        isAutoMapped = false,
+        createdAt = 1L,
+      )
+    )
+    database.accountMappingRuleDao().insertRule(
+      AccountMappingRuleEntity(
+        id = "rule_dup_b",
+        userId = uid,
+        accountId = "acc_dup_b",
+        matchPattern = "4321",
+        institutionHint = null,
+        isAutoMapped = false,
+        createdAt = 2L,
+      )
+    )
+
+    val parsed = SmartTransactionParser.parse(
+      "Rs. 250.00 debited from A/c XX4321 paid to Swiggy Ref 5566778899",
+      "com.android.messaging",
+      1_700_000_000_000L,
+    )!!
+    val event = detectionRepo.processIncomingEvent(uid, "com.android.messaging", "Bank SMS", parsed).getOrThrow()
+
+    assertEquals(DetectionEventStatus.IN_REVIEW, event.status)
+    assertEquals(100_000L, accountRepo.getAccountById(uid, "acc_dup_a")!!.currentBalanceMinor)
+    assertEquals(200_000L, accountRepo.getAccountById(uid, "acc_dup_b")!!.currentBalanceMinor)
+    assertTrue(
+      "The API must reject a second rule for the same account reference",
+      detectionRepo.addAccountMappingRule(
+        uid,
+        AccountMappingRule(
+          id = "rule_dup_c",
+          userId = uid,
+          accountId = "acc_dup_a",
+          matchPattern = "4321",
+          institutionHint = null,
+          isAutoMapped = false,
+          createdAt = 3L,
+        ),
+      ).isFailure,
+    )
+  }
 
   @Test
   fun `logout and account switch isolate auto-saved notices and DAOs enforce UID predicates`() = runTest {

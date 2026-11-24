@@ -15,7 +15,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Calculate
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
@@ -50,6 +54,7 @@ import com.example.domain.model.Money
 import com.example.domain.model.ProviderSupportLevel
 import com.example.domain.usecase.FormatMoneyUseCase
 import com.example.domain.usecase.InvestmentCalculationEngine
+import com.example.feature.calculator.SmartCalculatorAmountDialog
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.text.SimpleDateFormat
@@ -122,6 +127,7 @@ fun InvestmentFormDialog(
   }
   var notes by remember(existingHolding) { mutableStateOf(existingHolding?.notes ?: "") }
   var validationError by remember { mutableStateOf<String?>(null) }
+  var calculatorTarget by remember { mutableStateOf<String?>(null) }
 
   AlertDialog(
     onDismissRequest = onDismiss,
@@ -151,6 +157,7 @@ fun InvestmentFormDialog(
           InvestmentCategory.entries.forEach { category ->
             FilterChip(
               selected = selectedCategory == category,
+              enabled = !isEditing,
               onClick = {
                 selectedCategory = category
                 if (category != InvestmentCategory.MUTUAL_FUNDS) {
@@ -190,6 +197,7 @@ fun InvestmentFormDialog(
               null
             },
           singleLine = true,
+          enabled = !isEditing,
           modifier = Modifier.fillMaxWidth().testTag("investment_symbol_input"),
         )
 
@@ -202,6 +210,7 @@ fun InvestmentFormDialog(
             onValueChange = { isin = it },
             label = { Text("ISIN (optional)") },
             singleLine = true,
+            enabled = !isEditing,
             modifier = Modifier.weight(1f).testTag("investment_isin_input"),
           )
           OutlinedTextField(
@@ -236,6 +245,7 @@ fun InvestmentFormDialog(
           onValueChange = { dateText = it },
           label = { Text("Purchase Date (YYYY-MM-DD) *") },
           singleLine = true,
+          enabled = !isEditing,
           modifier = Modifier.fillMaxWidth().testTag("investment_date_input"),
         )
 
@@ -258,6 +268,11 @@ fun InvestmentFormDialog(
               label = { Text("Buy Price *") },
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
               singleLine = true,
+              trailingIcon = {
+                IconButton(onClick = { calculatorTarget = "buy" }, modifier = Modifier.testTag("investment_buy_price_calculator_button")) {
+                  Icon(Icons.Rounded.Calculate, contentDescription = "Calculate buy price")
+                }
+              },
               modifier = Modifier.weight(1f).testTag("investment_buy_price_input"),
             )
           }
@@ -272,6 +287,11 @@ fun InvestmentFormDialog(
               label = { Text("Charges ($selectedCurrency)") },
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
               singleLine = true,
+              trailingIcon = {
+                IconButton(onClick = { calculatorTarget = "charges" }, modifier = Modifier.testTag("investment_charges_calculator_button")) {
+                  Icon(Icons.Rounded.Calculate, contentDescription = "Calculate investment charges")
+                }
+              },
               modifier = Modifier.weight(1f).testTag("investment_charges_input"),
             )
             OutlinedTextField(
@@ -280,6 +300,11 @@ fun InvestmentFormDialog(
               label = { Text("Market Price (opt)") },
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
               singleLine = true,
+              trailingIcon = {
+                IconButton(onClick = { calculatorTarget = "market" }, modifier = Modifier.testTag("investment_market_price_calculator_button")) {
+                  Icon(Icons.Rounded.Calculate, contentDescription = "Calculate market price")
+                }
+              },
               modifier = Modifier.weight(1f).testTag("investment_market_price_input"),
             )
           }
@@ -311,6 +336,27 @@ fun InvestmentFormDialog(
           maxLines = 2,
           modifier = Modifier.fillMaxWidth().testTag("investment_notes_input"),
         )
+
+        calculatorTarget?.let { target ->
+          val initialExpression = when (target) {
+            "buy" -> purchasePriceText
+            "charges" -> chargesText
+            else -> currentMarketPriceText
+          }
+          SmartCalculatorAmountDialog(
+            initialExpression = initialExpression,
+            decimalScale = Money.resolveFractionDigits(selectedCurrency),
+            onApply = { calculatedAmount ->
+              when (target) {
+                "buy" -> purchasePriceText = calculatedAmount
+                "charges" -> chargesText = calculatedAmount
+                else -> currentMarketPriceText = calculatedAmount
+              }
+              calculatorTarget = null
+            },
+            onDismiss = { calculatorTarget = null },
+          )
+        }
 
         if (validationError != null) {
           Text(
@@ -425,10 +471,19 @@ fun RecordTradeDialog(
   var tradeType by remember(initialType) { mutableStateOf(initialType) }
   var dateText by remember { mutableStateOf(formatDateIso(System.currentTimeMillis())) }
   var quantityText by remember { mutableStateOf("") }
-  var unitPriceText by remember(holding) { mutableStateOf(holding.currentMarketPriceDecimal) }
+  // Do not prefill a purchase-price fallback as though it were a current quote.
+  val quoteAgeMillis = System.currentTimeMillis() - holding.lastPriceUpdateDate
+  val hasFreshQuote =
+    holding.lastPriceUpdateDate > 0L &&
+      quoteAgeMillis >= 0L &&
+      quoteAgeMillis <= InvestmentCalculationEngine.STALE_PRICE_THRESHOLD_MILLIS
+  var unitPriceText by remember(holding) {
+    mutableStateOf(if (hasFreshQuote) holding.currentMarketPriceDecimal else "")
+  }
   var chargesText by remember { mutableStateOf("0") }
   var notes by remember { mutableStateOf("") }
   var validationError by remember { mutableStateOf<String?>(null) }
+  var calculatorTarget by remember { mutableStateOf<String?>(null) }
 
   val livePreview =
     remember(tradeType, quantityText, unitPriceText, chargesText) {
@@ -528,6 +583,11 @@ fun RecordTradeDialog(
             label = { Text("Unit Price *") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
+            trailingIcon = {
+              IconButton(onClick = { calculatorTarget = "price" }, modifier = Modifier.testTag("trade_price_calculator_button")) {
+                Icon(Icons.Rounded.Calculate, contentDescription = "Calculate unit price")
+              }
+            },
             modifier = Modifier.weight(1f).testTag("trade_price_input"),
           )
         }
@@ -538,6 +598,11 @@ fun RecordTradeDialog(
           label = { Text("Transaction Charges (${holding.currencyCode})") },
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
           singleLine = true,
+          trailingIcon = {
+            IconButton(onClick = { calculatorTarget = "charges" }, modifier = Modifier.testTag("trade_charges_calculator_button")) {
+              Icon(Icons.Rounded.Calculate, contentDescription = "Calculate trade charges")
+            }
+          },
           modifier = Modifier.fillMaxWidth().testTag("trade_charges_input"),
         )
 
@@ -548,6 +613,17 @@ fun RecordTradeDialog(
           singleLine = true,
           modifier = Modifier.fillMaxWidth().testTag("trade_notes_input"),
         )
+        if (calculatorTarget != null) {
+          SmartCalculatorAmountDialog(
+            initialExpression = if (calculatorTarget == "price") unitPriceText else chargesText,
+            decimalScale = Money.resolveFractionDigits(holding.currencyCode),
+            onApply = { calculatedAmount ->
+              if (calculatorTarget == "price") unitPriceText = calculatedAmount else chargesText = calculatedAmount
+              calculatorTarget = null
+            },
+            onDismiss = { calculatorTarget = null },
+          )
+        }
 
         if (livePreview != null) {
           Surface(
@@ -639,9 +715,13 @@ fun UpdateMarketPriceDialog(
   onDismiss: () -> Unit,
   onSubmit: (newPriceDecimal: String, priceDate: Long) -> Unit,
 ) {
-  var priceText by remember(holding) { mutableStateOf(holding.currentMarketPriceDecimal) }
+  // A cost-price fallback is not a market quote; leave the field blank until one exists.
+  var priceText by remember(holding) {
+    mutableStateOf(if (holding.lastPriceUpdateDate > 0L) holding.currentMarketPriceDecimal else "")
+  }
   var dateText by remember { mutableStateOf(formatDateIso(System.currentTimeMillis())) }
   var errorText by remember { mutableStateOf<String?>(null) }
+  var showPriceCalculator by remember { mutableStateOf(false) }
 
   AlertDialog(
     onDismissRequest = onDismiss,
@@ -660,8 +740,24 @@ fun UpdateMarketPriceDialog(
           label = { Text("Current Price per Unit (${holding.currencyCode}) *") },
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
           singleLine = true,
+          trailingIcon = {
+            IconButton(onClick = { showPriceCalculator = true }, modifier = Modifier.testTag("manual_price_calculator_button")) {
+              Icon(Icons.Rounded.Calculate, contentDescription = "Calculate manual market price")
+            }
+          },
           modifier = Modifier.fillMaxWidth().testTag("manual_price_input"),
         )
+        if (showPriceCalculator) {
+          SmartCalculatorAmountDialog(
+            initialExpression = priceText,
+            decimalScale = Money.resolveFractionDigits(holding.currencyCode),
+            onApply = { calculatedAmount ->
+              priceText = calculatedAmount
+              showPriceCalculator = false
+            },
+            onDismiss = { showPriceCalculator = false },
+          )
+        }
         Row(
           modifier = Modifier.fillMaxWidth(),
           verticalAlignment = Alignment.CenterVertically,

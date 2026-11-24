@@ -5,16 +5,21 @@ import androidx.room.RoomDatabase
 import com.example.data.local.db.dao.AccountMappingRuleDao
 import com.example.data.local.db.dao.BudgetDao
 import com.example.data.local.db.dao.CreditCardDao
+import com.example.data.local.db.dao.CreditCardStatementDao
+import com.example.data.local.db.dao.CreditCardRewardEventDao
 import com.example.data.local.db.dao.FinancialAccountDao
 import com.example.data.local.db.dao.FinancialTransactionDao
 import com.example.data.local.db.dao.InvestmentDao
 import com.example.data.local.db.dao.LoanDao
 import com.example.data.local.db.dao.SavingsGoalDao
 import com.example.data.local.db.dao.ShoppingDao
+import com.example.data.local.db.dao.ShoppingExtendedDao
 import com.example.data.local.db.dao.TransactionDetectionEventDao
 import com.example.data.local.db.entity.AccountMappingRuleEntity
 import com.example.data.local.db.entity.BudgetEntity
 import com.example.data.local.db.entity.CreditCardEntity
+import com.example.data.local.db.entity.CreditCardStatementEntity
+import com.example.data.local.db.entity.CreditCardRewardEventEntity
 import com.example.data.local.db.entity.BudgetPeriodEntity
 import com.example.data.local.db.entity.FinancialAccountEntity
 import com.example.data.local.db.entity.FinancialTransactionEntity
@@ -28,6 +33,10 @@ import com.example.data.local.db.entity.SavingsContributionEntity
 import com.example.data.local.db.entity.SavingsGoalEntity
 import com.example.data.local.db.entity.ShoppingListEntity
 import com.example.data.local.db.entity.ShoppingStorePriceEntity
+import com.example.data.local.db.entity.ShoppingPantryEntity
+import com.example.data.local.db.entity.ShoppingMealPlanEntity
+import com.example.data.local.db.entity.ShoppingMealIngredientEntity
+import com.example.data.local.db.entity.ShoppingReceiptEntity
 import com.example.data.local.db.entity.TransactionDetectionEventEntity
 
 @Database(
@@ -39,6 +48,8 @@ import com.example.data.local.db.entity.TransactionDetectionEventEntity
     BudgetEntity::class,
     BudgetPeriodEntity::class,
     CreditCardEntity::class,
+    CreditCardStatementEntity::class,
+    CreditCardRewardEventEntity::class,
     SavingsGoalEntity::class,
     SavingsContributionEntity::class,
     LoanEntity::class,
@@ -49,8 +60,12 @@ import com.example.data.local.db.entity.TransactionDetectionEventEntity
     ShoppingListEntity::class,
     ShoppingItemEntity::class,
     ShoppingStorePriceEntity::class,
+    ShoppingPantryEntity::class,
+    ShoppingMealPlanEntity::class,
+    ShoppingMealIngredientEntity::class,
+    ShoppingReceiptEntity::class,
   ],
-  version = 9,
+  version = 11,
   exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -60,8 +75,11 @@ abstract class AppDatabase : RoomDatabase() {
   abstract fun accountMappingRuleDao(): AccountMappingRuleDao
   abstract fun budgetDao(): BudgetDao
   abstract fun creditCardDao(): CreditCardDao
+  abstract fun creditCardStatementDao(): CreditCardStatementDao
+  abstract fun creditCardRewardEventDao(): CreditCardRewardEventDao
   abstract fun savingsGoalDao(): SavingsGoalDao
   abstract fun loanDao(): LoanDao
   abstract fun investmentDao(): InvestmentDao
   abstract fun shoppingDao(): ShoppingDao
+  abstract fun shoppingExtendedDao(): ShoppingExtendedDao
 }

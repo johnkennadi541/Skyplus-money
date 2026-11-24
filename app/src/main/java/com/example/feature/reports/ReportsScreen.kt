@@ -1,5 +1,9 @@
 package com.example.feature.reports
 
+import android.Manifest
+import android.app.TimePickerDialog
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Assessment
 import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -38,6 +43,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
@@ -55,12 +61,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.content.ContextCompat
 import com.example.R
 import com.example.core.designsystem.component.OceanCard
 import com.example.core.designsystem.component.OceanSectionHeader
 import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
 import com.example.domain.model.EmailReportSettings
+import com.example.domain.model.DailyAutoEntryReportSettings
 import com.example.domain.model.FinancialReportSnapshot
 import com.example.domain.model.ReportCategoryTab
 import com.example.domain.model.ReportDateWindow
@@ -80,10 +88,33 @@ fun ReportsScreen(
   val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
   val selectedCurrency by viewModel.selectedCurrency.collectAsStateWithLifecycle()
   val emailSettings by viewModel.emailSettings.collectAsStateWithLifecycle()
+  val dailyAutoEntrySettings by viewModel.dailyAutoEntrySettings.collectAsStateWithLifecycle()
   val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
   val emailPreview by viewModel.emailPreview.collectAsStateWithLifecycle()
   val pendingSafExport by viewModel.pendingSafExport.collectAsStateWithLifecycle()
+  val notificationPermissionLauncher =
+    rememberLauncherForActivityResult(
+      contract = ActivityResultContracts.RequestPermission(),
+      onResult = { granted ->
+        if (granted) {
+          viewModel.setDailyAutoEntryReportSettings(dailyAutoEntrySettings.copy(enabled = true))
+        }
+      },
+    )
+
   val context = LocalContext.current
+
+  val onToggleDailyAutoEntryReport: (Boolean) -> Unit = { enabled ->
+    if (
+      enabled &&
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+    ) {
+      notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    } else {
+      viewModel.setDailyAutoEntryReportSettings(dailyAutoEntrySettings.copy(enabled = enabled))
+    }
+  }
 
   val createDocumentLauncher =
     rememberLauncherForActivityResult(
@@ -104,6 +135,7 @@ fun ReportsScreen(
     selectedTab = selectedTab,
     selectedCurrency = selectedCurrency,
     emailSettings = emailSettings,
+    dailyAutoEntrySettings = dailyAutoEntrySettings,
     defaultRecipientEmail = defaultRecipientEmail,
     userMessage = userMessage,
     emailPreview = emailPreview,
@@ -115,6 +147,8 @@ fun ReportsScreen(
     onSaveExport = viewModel::prepareExportForSave,
     onShareExport = { format -> viewModel.shareExportReport(context, format) },
     onToggleEmailEnabled = viewModel::setEmailReportsEnabled,
+    onSetDailyAutoEntrySettings = viewModel::setDailyAutoEntryReportSettings,
+    onToggleDailyAutoEntryReport = onToggleDailyAutoEntryReport,
     onSelectFrequency = viewModel::setEmailFrequency,
     onSaveRecipient = viewModel::saveRecipientEmail,
     onOpenEmailPreview = viewModel::openEmailPreview,
@@ -133,6 +167,7 @@ fun ReportsContent(
   selectedTab: ReportCategoryTab = ReportCategoryTab.OVERVIEW,
   selectedCurrency: String? = null,
   emailSettings: EmailReportSettings = EmailReportSettings(),
+  dailyAutoEntrySettings: DailyAutoEntryReportSettings = DailyAutoEntryReportSettings(),
   defaultRecipientEmail: String = "",
   userMessage: String? = null,
   emailPreview: PreparedEmailPreview? = null,
@@ -144,6 +179,8 @@ fun ReportsContent(
   onSaveExport: (ReportExportFormat) -> Unit = {},
   onShareExport: (ReportExportFormat) -> Unit = {},
   onToggleEmailEnabled: (Boolean) -> Unit = {},
+  onSetDailyAutoEntrySettings: (DailyAutoEntryReportSettings) -> Unit = {},
+  onToggleDailyAutoEntryReport: (Boolean) -> Unit = {},
   onSelectFrequency: (ReportFrequency) -> Unit = {},
   onSaveRecipient: (String) -> Unit = {},
   onOpenEmailPreview: (String) -> Unit = {},
@@ -262,6 +299,15 @@ fun ReportsContent(
             }
           }
         }
+      }
+
+      // Daily automatic-entry summary scheduling
+      item {
+        DailyAutoEntryReportCard(
+          settings = dailyAutoEntrySettings,
+          onSettingsChanged = onSetDailyAutoEntrySettings,
+          onToggleEnabled = onToggleDailyAutoEntryReport,
+        )
       }
 
       // Category Tabs
@@ -424,6 +470,83 @@ fun ReportsContent(
         }
       },
     )
+  }
+}
+
+@Composable
+private fun DailyAutoEntryReportCard(
+  settings: DailyAutoEntryReportSettings,
+  onSettingsChanged: (DailyAutoEntryReportSettings) -> Unit,
+  onToggleEnabled: (Boolean) -> Unit,
+) {
+  val context = LocalContext.current
+  val timeLabel = remember(settings.hourOfDay, settings.minute) {
+    val calendar = java.util.Calendar.getInstance().apply {
+      set(java.util.Calendar.HOUR_OF_DAY, settings.hourOfDay)
+      set(java.util.Calendar.MINUTE, settings.minute)
+    }
+    android.text.format.DateFormat.format(
+      if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a",
+      calendar,
+    ).toString()
+  }
+
+  OceanCard(modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp).testTag("daily_auto_entry_report_card")) {
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(OceanSpacing.sm),
+    ) {
+      Icon(
+        imageVector = Icons.Rounded.NotificationsActive,
+        contentDescription = null,
+        tint = OceanTheme.colors.gold,
+        modifier = Modifier.size(28.dp),
+      )
+      Column(modifier = Modifier.weight(1f)) {
+        Text("Daily Auto-Entry Report", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(
+          "One notification each day with automatic income, expenses, duplicates and items needing attention.",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+      Switch(
+        checked = settings.enabled,
+        onCheckedChange = onToggleEnabled,
+        modifier = Modifier.testTag("daily_auto_entry_report_switch"),
+      )
+    }
+    Spacer(modifier = Modifier.height(OceanSpacing.sm))
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
+        Text("Report time", style = MaterialTheme.typography.labelLarge)
+        Text("Uses your phone's local time", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+      }
+      Button(
+        onClick = {
+          TimePickerDialog(
+            context,
+            { _, hour, minute ->
+              onSettingsChanged(settings.copy(hourOfDay = hour, minute = minute))
+            },
+            settings.hourOfDay,
+            settings.minute,
+            android.text.format.DateFormat.is24HourFormat(context),
+          ).show()
+        },
+        modifier = Modifier.testTag("daily_auto_entry_report_time_button"),
+      ) {
+        Text(
+          timeLabel,
+          fontWeight = FontWeight.Bold,
+        )
+      }
+    }
   }
 }
 

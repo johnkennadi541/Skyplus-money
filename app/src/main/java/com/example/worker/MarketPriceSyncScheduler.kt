@@ -17,7 +17,12 @@ class MarketPriceSyncScheduler @Inject constructor(
 ) {
 
   fun updateSchedule(autoUpdateConsentEnabled: Boolean, syncOnlyOnWifi: Boolean) {
-    val workManager = runCatching { WorkManager.getInstance(context) }.getOrNull() ?: return
+    val workManager =
+      try {
+        WorkManager.getInstance(context)
+      } catch (_: Exception) {
+        return
+      }
     if (!autoUpdateConsentEnabled) {
       workManager.cancelUniqueWork(UNIQUE_WORK_NAME)
       return

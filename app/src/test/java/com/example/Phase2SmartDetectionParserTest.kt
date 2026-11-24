@@ -7,6 +7,7 @@ import com.example.domain.model.TransactionType
 import com.example.feature.smartdetection.engine.DeduplicationEngine
 import com.example.feature.smartdetection.engine.SmartTransactionParser
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -30,6 +31,34 @@ class Phase2SmartDetectionParserTest {
     assertEquals("Swiggy", parsed.merchantOrPayee)
     assertEquals(DetectionConfidence.HIGH, parsed.confidenceLevel)
     assertEquals("Food & Dining", parsed.suggestedCategory)
+  }
+
+  @Test
+  fun `confidence reasons contain no amount merchant account or reference values`() {
+    val parsed =
+      SmartTransactionParser.parse(
+        "Rs. 1,450.50 debited from A/c XX4321 paid to Swiggy Ref 432187654321",
+        "com.google.android.apps.nbu.paisa.user",
+        1_700_000_000_000L,
+      )!!
+
+    val reasons = parsed.confidenceReasons.joinToString(" ")
+    assertFalse(reasons.contains("1,450.50"))
+    assertFalse(reasons.contains("1450.50"))
+    assertFalse(reasons.contains("4321"))
+    assertFalse(reasons.contains("432187654321"))
+    assertFalse(reasons.contains("Swiggy", ignoreCase = true))
+    assertEquals(
+      listOf(
+        "Valid amount and currency parsed",
+        "Status verified as Completed",
+        "Direction identified as Debit/Expense",
+        "Account hint detected",
+        "Reference ID detected",
+        "Merchant/Payee identified",
+      ),
+      parsed.confidenceReasons,
+    )
   }
 
   @Test
@@ -103,6 +132,27 @@ class Phase2SmartDetectionParserTest {
   }
 
   @Test
+  fun `parses Indian rupee symbol and rejects ambiguous dollar currency symbol`() {
+    val rupee = SmartTransactionParser.parse("₹ 1,250.00 debited from A/c XX4321 paid to Grocery Ref INR123456")!!
+    assertEquals("INR", rupee.currencyCode)
+    assertEquals(125000L, rupee.amountMinor)
+    assertNull(SmartTransactionParser.parse("$ 25.00 spent at Store on card ending 7788 Ref USD123456"))
+  }
+
+  @Test
+  fun `parses additional ISO currencies and rejects excess fractional precision`() {
+    val cad = SmartTransactionParser.parse("CAD 15.25 debited from A/c XX4321 paid to Store Ref CAD123456")!!
+    assertEquals("CAD", cad.currencyCode)
+    assertEquals(1_525L, cad.amountMinor)
+
+    val jpy = SmartTransactionParser.parse("JPY 1,500 debited from A/c XX4321 paid to Store Ref JPY123456")!!
+    assertEquals("JPY", jpy.currencyCode)
+    assertEquals(1_500L, jpy.amountMinor)
+
+    assertNull(SmartTransactionParser.parse("JPY 100.50 debited from A/c XX4321 paid to Store Ref JPY654321"))
+  }
+
+  @Test
   fun `strictly rejects OTP PIN MPIN TPIN CVV password and security notifications`() {
     val sensitiveAlerts =
       listOf(
@@ -130,6 +180,17 @@ class Phase2SmartDetectionParserTest {
     val parsed = SmartTransactionParser.parse("Transaction of INR 500.00 on A/c XX1234 completed Ref 1122334455")!!
     assertEquals(TransactionType.PENDING, parsed.type)
     assertNotEquals(DetectionConfidence.HIGH, parsed.confidenceLevel)
+  }
+
+  @Test
+  fun `amount-only or debit-request notifications are not treated as completed transactions`() {
+    val unconfirmed = SmartTransactionParser.parse(
+      "Debit request for INR 250.00 from A/c XX4321 at Store Ref REQ123456",
+    )!!
+
+    assertEquals(TransactionStatus.PENDING, unconfirmed.status)
+    assertEquals(TransactionType.PENDING, unconfirmed.type)
+    assertNotEquals(DetectionConfidence.HIGH, unconfirmed.confidenceLevel)
   }
 
   @Test

@@ -9,5 +9,6 @@
     <exclude domain="database" path="skyplus_money_encrypted.db-shm" />
     <exclude domain="database" path="skyplus_money_encrypted.db-journal" />
     <exclude domain="sharedpref" path="skyplus_db_secure_vault.xml" />
+    <exclude domain="sharedpref" path="skyplus_backup_recovery_vault.xml" />
     <exclude domain="file" path="datastore/skyplus_detection_settings.preferences_pb" />
 </full-backup-content>

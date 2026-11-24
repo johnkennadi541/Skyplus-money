@@ -7,13 +7,22 @@ import com.example.domain.model.AuthSessionState
 import com.example.domain.model.CreditCard
 import com.example.domain.model.CreditCardNetwork
 import com.example.domain.model.CreditCardSummary
+import com.example.domain.model.CreditCardStatement
+import com.example.domain.model.CreditCardRewardEvent
+import com.example.domain.model.CreditCardSpendingAnalytics
+import com.example.domain.model.CreditCardStatementSummary
 import com.example.domain.model.FinancialAccount
 import com.example.domain.repository.AuthRepository
 import com.example.domain.repository.FinancialAccountRepository
+import com.example.domain.repository.CreditCardRepository
+import com.example.domain.repository.FinancialTransactionRepository
 import com.example.domain.usecase.CreateCreditCardUseCase
+import com.example.domain.usecase.ObserveCreditCardStatementSummariesUseCase
+import com.example.domain.usecase.ObserveCreditCardSpendingAnalyticsUseCase
 import com.example.domain.usecase.DeleteCreditCardUseCase
 import com.example.domain.usecase.ObserveCreditCardsUseCase
 import com.example.domain.usecase.UpdateCreditCardUseCase
+import com.example.worker.CreditCardReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,11 +43,27 @@ class CardsViewModel
 constructor(
   private val authRepository: AuthRepository,
   private val accountRepository: FinancialAccountRepository,
+  private val creditCardRepository: CreditCardRepository,
+  private val financialTransactionRepository: FinancialTransactionRepository,
   observeCreditCardsUseCase: ObserveCreditCardsUseCase,
+  private val observeStatementSummariesUseCase: ObserveCreditCardStatementSummariesUseCase,
+  private val observeSpendingAnalyticsUseCase: ObserveCreditCardSpendingAnalyticsUseCase,
+  private val creditCardReminderScheduler: CreditCardReminderScheduler,
   private val createCreditCardUseCase: CreateCreditCardUseCase,
   private val updateCreditCardUseCase: UpdateCreditCardUseCase,
   private val deleteCreditCardUseCase: DeleteCreditCardUseCase,
 ) : ViewModel() {
+
+  private val _selectedCardId = MutableStateFlow<String?>(null)
+
+  init {
+    viewModelScope.launch {
+      authRepository.observeAuthSession().collect { session ->
+        val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+        if (!uid.isNullOrBlank()) creditCardReminderScheduler.updateSchedule(uid)
+      }
+    }
+  }
 
   private val _userMessage = MutableStateFlow<String?>(null)
   val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
@@ -82,6 +107,67 @@ constructor(
       }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+  private val selectedCard =
+    combine(cards, _selectedCardId) { summaries, selectedId ->
+      summaries.firstOrNull { it.card.id == selectedId }?.card
+    }
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  val selectedCardStatements: StateFlow<List<CreditCardStatementSummary>> =
+    combine(sessionFlow, selectedCard) { session, card ->
+      val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+      uid to card
+    }
+      .flatMapLatest { (uid, card) ->
+        if (uid != null && card != null) observeStatementSummariesUseCase(uid, card)
+        else flowOf(emptyList())
+      }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  val selectedCardRewardEvents: StateFlow<List<CreditCardRewardEvent>> =
+    combine(sessionFlow, selectedCard) { session, card ->
+      val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+      uid to card
+    }
+      .flatMapLatest { (uid, card) ->
+        if (uid != null && card != null) creditCardRepository.observeRewardEvents(uid, card.id)
+        else flowOf(emptyList())
+      }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  val selectedCardTransactions: StateFlow<List<com.example.domain.model.FinancialTransaction>> =
+    combine(sessionFlow, selectedCard) { session, card ->
+      val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+      uid to card
+    }
+      .flatMapLatest { (uid, card) ->
+        if (uid != null && card != null) financialTransactionRepository.getTransactionsByAccount(uid, card.accountId)
+        else flowOf(emptyList())
+      }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  val selectedCardAnalytics: StateFlow<CreditCardSpendingAnalytics?> =
+    combine(sessionFlow, selectedCard) { session, card ->
+      val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+      uid to card
+    }
+      .flatMapLatest { (uid, card) ->
+        if (uid != null && card != null) observeSpendingAnalyticsUseCase(uid, card)
+        else flowOf(null)
+      }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+  fun selectCardDetails(cardId: String) {
+    _selectedCardId.value = cardId
+  }
+
+  fun clearCardDetails() {
+    _selectedCardId.value = null
+  }
+
   fun dismissMessage() {
     _userMessage.value = null
     _isErrorMessage.value = false
@@ -91,11 +177,19 @@ constructor(
     accountId: String,
     issuerName: String,
     network: CreditCardNetwork,
+    isActive: Boolean = true,
     last4: String,
     limitDecimal: String,
     billingCycleDay: Int,
     paymentDueDayOffset: Int,
     aprPercent: String,
+    joiningFeeDecimal: String = "0",
+    annualFeeDecimal: String = "0",
+    annualFeeMonth: Int = 1,
+    rewardProgramName: String? = null,
+    reminderEnabled: Boolean = true,
+    reminderDaysBefore: Int = 3,
+    notes: String? = null,
     onSuccess: () -> Unit,
   ) {
     val uid = currentUid() ?: return
@@ -103,8 +197,10 @@ constructor(
 
     viewModelScope.launch {
       val limitMinor = parseAmountToMinor(limitDecimal, account.currencyCode)
-      if (limitMinor == null) {
-        _userMessage.value = "Enter a valid credit limit"
+      val joiningFeeMinor = parseAmountToMinor(joiningFeeDecimal.ifBlank { "0" }, account.currencyCode)
+      val annualFeeMinor = parseAmountToMinor(annualFeeDecimal.ifBlank { "0" }, account.currencyCode)
+      if (limitMinor == null || joiningFeeMinor == null || annualFeeMinor == null) {
+        _userMessage.value = "Enter valid credit limit, joining fee and annual fee amounts"
         _isErrorMessage.value = true
         return@launch
       }
@@ -113,12 +209,20 @@ constructor(
         accountId = accountId,
         issuerName = issuerName,
         network = network,
+        isActive = isActive,
         last4 = last4,
         creditLimitMinor = limitMinor,
         currencyCode = account.currencyCode,
         billingCycleDay = billingCycleDay,
         paymentDueDayOffset = paymentDueDayOffset,
         aprPercent = aprPercent.ifBlank { "0" },
+        joiningFeeMinor = joiningFeeMinor,
+        annualFeeMinor = annualFeeMinor,
+        annualFeeMonth = annualFeeMonth,
+        rewardProgramName = rewardProgramName,
+        reminderEnabled = reminderEnabled,
+        reminderDaysBefore = reminderDaysBefore,
+        notes = notes,
       )
         .onSuccess {
           _userMessage.value = "Card added"
@@ -135,17 +239,21 @@ constructor(
   fun updateCard(
     card: CreditCard,
     limitDecimal: String,
+    joiningFeeDecimal: String,
+    annualFeeDecimal: String,
     onSuccess: () -> Unit,
   ) {
     val uid = currentUid() ?: return
     viewModelScope.launch {
       val limitMinor = parseAmountToMinor(limitDecimal, card.currencyCode)
-      if (limitMinor == null) {
-        _userMessage.value = "Enter a valid credit limit"
+      val joiningFeeMinor = parseAmountToMinor(joiningFeeDecimal.ifBlank { "0" }, card.currencyCode)
+      val annualFeeMinor = parseAmountToMinor(annualFeeDecimal.ifBlank { "0" }, card.currencyCode)
+      if (limitMinor == null || joiningFeeMinor == null || annualFeeMinor == null) {
+        _userMessage.value = "Enter valid credit limit, joining fee and annual fee amounts"
         _isErrorMessage.value = true
         return@launch
       }
-      updateCreditCardUseCase(uid, card.copy(creditLimitMinor = limitMinor))
+      updateCreditCardUseCase(uid, card.copy(creditLimitMinor = limitMinor, joiningFeeMinor = joiningFeeMinor, annualFeeMinor = annualFeeMinor))
         .onSuccess {
           _userMessage.value = "Card updated"
           _isErrorMessage.value = false
@@ -153,6 +261,57 @@ constructor(
         }
         .onFailure {
           _userMessage.value = it.message ?: "Could not update the card"
+          _isErrorMessage.value = true
+        }
+    }
+  }
+
+  fun createStatement(statement: CreditCardStatement, onSuccess: () -> Unit = {}) {
+    val uid = currentUid() ?: return
+    viewModelScope.launch {
+      creditCardRepository.createStatement(uid, statement)
+        .onSuccess {
+          _userMessage.value = "Statement saved"
+          _isErrorMessage.value = false
+          onSuccess()
+        }
+        .onFailure {
+          _userMessage.value = it.message ?: "Could not save statement"
+          _isErrorMessage.value = true
+        }
+    }
+  }
+
+  fun addRewardEvent(event: CreditCardRewardEvent, onSuccess: () -> Unit = {}) {
+    val uid = currentUid() ?: return
+    viewModelScope.launch {
+      creditCardRepository.addRewardEvent(uid, event)
+        .onSuccess {
+          _userMessage.value = "Rewards updated"
+          _isErrorMessage.value = false
+          onSuccess()
+        }
+        .onFailure {
+          _userMessage.value = it.message ?: "Could not update rewards"
+          _isErrorMessage.value = true
+        }
+    }
+  }
+
+  fun setCardFrozen(cardId: String, frozen: Boolean) {
+    val uid = currentUid() ?: return
+    viewModelScope.launch {
+      creditCardRepository.setCardFrozen(uid, cardId, frozen)
+        .onSuccess {
+          _userMessage.value = if (frozen) {
+            "Marked as frozen in SKYPLUS MONEY. This does not lock the card with your bank."
+          } else {
+            "Card marked as active in SKYPLUS MONEY."
+          }
+          _isErrorMessage.value = false
+        }
+        .onFailure {
+          _userMessage.value = it.message ?: "Could not update card status"
           _isErrorMessage.value = true
         }
     }

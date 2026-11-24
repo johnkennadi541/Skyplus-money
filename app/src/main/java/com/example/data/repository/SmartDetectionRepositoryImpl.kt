@@ -89,7 +89,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     parsed: ParsedFinancialMessage,
   ): Result<TransactionDetectionEvent> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         val settings = getDetectionSettings(userId).first()
         if (!settings.isNotificationDetectionEnabled) {
@@ -99,7 +99,8 @@ class SmartDetectionRepositoryImpl @Inject constructor(
         val safeTitle = sanitizeSenderTitle(senderOrTitle)
         val safeMerchant = sanitizeMerchant(parsed.merchantOrPayee)
 
-        database.withTransaction {
+        var pendingNotice: com.example.domain.model.AutoSavedTransactionNotice? = null
+        val processedEvent = database.withTransaction {
           // 1. Resolve target account upfront so deduplication/ambiguity checks respect distinct accounts
           val accounts = accountDao.getActiveAccountsSync(userId)
           val accountsById = accounts.associateBy { it.id }
@@ -107,8 +108,12 @@ class SmartDetectionRepositoryImpl @Inject constructor(
           var resolvedAccountName: String? = null
 
           if (!parsed.accountLast4Hint.isNullOrBlank()) {
-            val rule = mappingDao.findRuleForPattern(userId, parsed.accountLast4Hint)
-            val matchedAcc = rule?.let { r -> accounts.firstOrNull { it.id == r.accountId } }
+            val matchingRules = mappingDao.findRulesForPattern(userId, parsed.accountLast4Hint)
+            // Legacy duplicate rules are ambiguous too; never select an arbitrary LIMIT 1 row.
+            val matchedAcc =
+              matchingRules.singleOrNull()?.let { rule ->
+                accounts.firstOrNull { it.id == rule.accountId }
+              }
             if (matchedAcc != null) {
               resolvedAccountId = matchedAcc.id
               resolvedAccountName = matchedAcc.name
@@ -116,20 +121,18 @@ class SmartDetectionRepositoryImpl @Inject constructor(
           }
 
           if (resolvedAccountId == null && !parsed.accountLast4Hint.isNullOrBlank()) {
-            val matchingAccount = accounts.firstOrNull { it.accountNumberLast4 == parsed.accountLast4Hint }
-            if (matchingAccount != null) {
-              resolvedAccountId = matchingAccount.id
-              resolvedAccountName = matchingAccount.name
+            val matchingAccounts = accounts.filter { it.accountNumberLast4 == parsed.accountLast4Hint }
+            // A repeated last-four value across multiple institutions is ambiguous.
+            // Never choose the first matching account by list order.
+            if (matchingAccounts.size == 1) {
+              resolvedAccountId = matchingAccounts.single().id
+              resolvedAccountName = matchingAccounts.single().name
             }
           }
 
-          if (resolvedAccountId == null) {
-            val currencyMatches = accounts.filter { it.currencyCode.equals(parsed.currencyCode, ignoreCase = true) }
-            if (currencyMatches.size == 1) {
-              resolvedAccountId = currencyMatches.first().id
-              resolvedAccountName = currencyMatches.first().name
-            }
-          }
+          // Never guess an account from currency alone. A single same-currency
+          // account is not proof that the bank SMS belongs to that account.
+          // Unmatched account references remain in the exception/review queue.
 
           val fingerprint = DeduplicationEngine.generateFingerprint(userId, parsed)
 
@@ -273,14 +276,19 @@ class SmartDetectionRepositoryImpl @Inject constructor(
               parsed.confidenceReasons
             }
 
+          val isSupportedAutomaticLedgerType =
+            parsed.type == TransactionType.EXPENSE ||
+              parsed.type == TransactionType.INCOME ||
+              parsed.type == TransactionType.REFUND ||
+              parsed.type == TransactionType.REVERSAL
+
           val shouldAutoSave =
             !isAmbiguousRepeat &&
               settings.isAutoSaveHighConfidenceEnabled &&
               parsed.confidenceLevel == DetectionConfidence.HIGH &&
               parsed.status == TransactionStatus.COMPLETED &&
               currencyMatchesAccount &&
-              parsed.type != TransactionType.PENDING &&
-              parsed.type != TransactionType.FAILED
+              isSupportedAutomaticLedgerType
 
           val eventId = UUID.randomUUID().toString()
           var createdTxnId: String? = null
@@ -314,7 +322,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
             if (savedInTx) {
               createdTxnId = newTxn.id
               eventStatus = DetectionEventStatus.AUTO_SAVED
-              _latestAutoSavedNotice.value =
+              pendingNotice =
                 AutoSavedTransactionNotice(
                   eventId = eventId,
                   transactionId = newTxn.id,
@@ -358,6 +366,10 @@ class SmartDetectionRepositoryImpl @Inject constructor(
           eventDao.insertEvent(eventEntity)
           eventEntity.toDomain()
         }
+        // Publish UI state only after Room commits; rolled-back transactions must not
+        // produce a success notice.
+        pendingNotice?.let { _latestAutoSavedNotice.value = it }
+        processedEvent
       }
     }
 
@@ -371,7 +383,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     correctedAmountMinor: Long?,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(eventId.isNotBlank()) { "Event ID is required" }
         require(selectedAccountId.isNotBlank()) { "Selected account ID is required" }
@@ -386,10 +398,13 @@ class SmartDetectionRepositoryImpl @Inject constructor(
 
           val parsedType =
             correctedType
-              ?: runCatching { TransactionType.valueOf(event.detectedType) }
+              ?: runCatchingPreservingCancellation { TransactionType.valueOf(event.detectedType) }
                 .getOrDefault(TransactionType.EXPENSE)
           val finalType =
             if (parsedType == TransactionType.PENDING) TransactionType.EXPENSE else parsedType
+          require(finalType != TransactionType.TRANSFER) {
+            "Transfer detections require both source and destination accounts; create a paired transfer from Transactions."
+          }
           val finalAmount = correctedAmountMinor ?: event.detectedAmountMinor
           val safeMerchant = sanitizeMerchant(merchant ?: event.detectedMerchant)
 
@@ -443,8 +458,8 @@ class SmartDetectionRepositoryImpl @Inject constructor(
           check(updatedRows == 1) { "Detection event approval rejected for authenticated user" }
 
           if (!event.detectedAccountLast4.isNullOrBlank()) {
-            val existingRule = mappingDao.findRuleForPattern(userId, event.detectedAccountLast4)
-            if (existingRule == null) {
+            val existingRules = mappingDao.findRulesForPattern(userId, event.detectedAccountLast4)
+            if (existingRules.isEmpty()) {
               mappingDao.insertRule(
                 AccountMappingRuleEntity(
                   id = UUID.randomUUID().toString(),
@@ -490,7 +505,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
 
   override suspend fun dismissReviewEvent(userId: String, eventId: String): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(eventId.isNotBlank()) { "Event ID is required" }
         database.withTransaction {
@@ -518,7 +533,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
 
   override suspend fun clearDetectionHistory(userId: String): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         eventDao.clearAllEvents(userId)
       }
@@ -534,24 +549,35 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     rule: AccountMappingRule,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(rule.userId == authenticatedUserId) {
           "Mapping rule ownership cannot be assigned across users"
         }
+        val normalizedPattern = rule.matchPattern.trim()
+        require(normalizedPattern.matches(Regex("^[0-9]{4}$"))) {
+          "Account mapping rules may contain only the last four account digits"
+        }
         database.withTransaction {
+          require(mappingDao.findRulesForPattern(authenticatedUserId, normalizedPattern).isEmpty()) {
+            "A mapping rule already exists for this account reference; edit or remove it first"
+          }
           val ownerAccount =
             accountDao.getAccountById(authenticatedUserId, rule.accountId)
               ?: throw SecurityException("Mapping rule target account does not belong to user")
           require(ownerAccount.userId == authenticatedUserId) { "Mapping rule ownership verification failed" }
-          mappingDao.insertRule(AccountMappingRuleEntity.fromDomain(rule.copy(userId = authenticatedUserId)))
+          mappingDao.insertRule(
+            AccountMappingRuleEntity.fromDomain(
+              rule.copy(userId = authenticatedUserId, matchPattern = normalizedPattern)
+            )
+          )
         }
       }
     }
 
   override suspend fun deleteAccountMappingRule(userId: String, ruleId: String): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(ruleId.isNotBlank()) { "Rule ID is required" }
         mappingDao.deleteRule(userId, ruleId)
@@ -582,7 +608,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     settings: DetectionSettings,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(settings.userId == authenticatedUserId) {
           "Detection settings ownership cannot be modified across users"

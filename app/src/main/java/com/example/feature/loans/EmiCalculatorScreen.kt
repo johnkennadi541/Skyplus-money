@@ -62,10 +62,12 @@ import com.example.core.designsystem.theme.OceanNumericStyle
 import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
 import com.example.domain.model.EmiCalculationResult
+import com.example.domain.model.Money
 import com.example.domain.model.EmiPrefillDraft
 import com.example.domain.model.TenureUnit
 import com.example.domain.usecase.EmiCalculationEngine
 import com.example.domain.usecase.FormatMoneyUseCase
+import com.example.feature.calculator.SmartCalculatorAmountDialog
 
 @Composable
 fun EmiCalculatorScreen(
@@ -105,6 +107,7 @@ fun EmiCalculatorContent(
   }
 
   var principalText by remember { mutableStateOf("10000") }
+  var showPrincipalCalculator by remember { mutableStateOf(false) }
   var rateText by remember { mutableStateOf("8.5") }
   var tenureText by remember { mutableStateOf("24") }
   var tenureUnit by remember { mutableStateOf(TenureUnit.MONTHS) }
@@ -186,6 +189,14 @@ fun EmiCalculatorContent(
               label = { Text("Principal Amount") },
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
               singleLine = true,
+              trailingIcon = {
+                IconButton(
+                  onClick = { showPrincipalCalculator = true },
+                  modifier = Modifier.testTag("emi_principal_calculator_button"),
+                ) {
+                  Icon(Icons.Rounded.Calculate, contentDescription = "Calculate principal amount")
+                }
+              },
               modifier = Modifier.weight(2f).testTag("emi_principal_input"),
             )
 
@@ -434,5 +445,16 @@ fun EmiCalculatorContent(
       }
     }
   }
+    if (showPrincipalCalculator) {
+      SmartCalculatorAmountDialog(
+        initialExpression = principalText,
+        decimalScale = Money.resolveFractionDigits(selectedCurrency),
+        onApply = { calculatedAmount ->
+          principalText = calculatedAmount
+          showPrincipalCalculator = false
+        },
+        onDismiss = { showPrincipalCalculator = false },
+      )
+    }
   }
 }

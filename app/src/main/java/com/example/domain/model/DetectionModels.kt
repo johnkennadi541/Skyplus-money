@@ -112,3 +112,17 @@ data class AutoSavedTransactionNotice(
   val money: Money
     get() = Money.fromMinorUnits(amountMinor, currencyCode)
 }
+
+data class DailyAutoEntryReportSettings(
+  val enabled: Boolean = false,
+  val hourOfDay: Int = 21,
+  val minute: Int = 0,
+) {
+  init {
+    require(hourOfDay in 0..23)
+    require(minute in 0..59)
+  }
+
+  val formattedTime: String
+    get() = "%02d:%02d".format(hourOfDay, minute)
+}

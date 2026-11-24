@@ -486,4 +486,132 @@ object DatabaseMigrations {
         )
       }
     }
+  /**
+   * Stage 4 — credit card statements, reward history and card-management preferences.
+   *
+   * Additive only. Existing credit card records receive safe defaults; existing accounts,
+   * transactions, balances and earlier statements are never rewritten.
+   */
+  val MIGRATION_9_10: Migration =
+    object : Migration(9, 10) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN joiningFeeMinor INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN annualFeeMinor INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN annualFeeMonth INTEGER NOT NULL DEFAULT 1")
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN rewardProgramName TEXT")
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN isFrozen INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN reminderEnabled INTEGER NOT NULL DEFAULT 1")
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN reminderDaysBefore INTEGER NOT NULL DEFAULT 3")
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN notes TEXT")
+
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS credit_card_statements (
+            id TEXT NOT NULL PRIMARY KEY,
+            userId TEXT NOT NULL,
+            cardId TEXT NOT NULL,
+            currencyCode TEXT NOT NULL,
+            statementDate INTEGER NOT NULL,
+            dueDate INTEGER NOT NULL,
+            statementBalanceMinor INTEGER NOT NULL,
+            minimumDueMinor INTEGER NOT NULL,
+            feesMinor INTEGER NOT NULL,
+            lateFeeMinor INTEGER NOT NULL,
+            interestMinor INTEGER NOT NULL,
+            notes TEXT,
+            createdAt INTEGER NOT NULL,
+            updatedAt INTEGER NOT NULL,
+            FOREIGN KEY(cardId) REFERENCES credit_cards(id) ON UPDATE NO ACTION ON DELETE CASCADE
+          )
+          """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_credit_card_statements_cardId ON credit_card_statements(cardId)")
+        db.execSQL(
+          "CREATE UNIQUE INDEX IF NOT EXISTS index_credit_card_statements_userId_cardId_statementDate ON credit_card_statements(userId, cardId, statementDate)"
+        )
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS index_credit_card_statements_userId_dueDate ON credit_card_statements(userId, dueDate)"
+        )
+
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS credit_card_reward_events (
+            id TEXT NOT NULL PRIMARY KEY,
+            userId TEXT NOT NULL,
+            cardId TEXT NOT NULL,
+            eventDate INTEGER NOT NULL,
+            eventType TEXT NOT NULL,
+            pointsDelta INTEGER NOT NULL,
+            cashValueMinor INTEGER NOT NULL,
+            currencyCode TEXT NOT NULL,
+            description TEXT NOT NULL,
+            createdAt INTEGER NOT NULL,
+            FOREIGN KEY(cardId) REFERENCES credit_cards(id) ON UPDATE NO ACTION ON DELETE CASCADE
+          )
+          """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_credit_card_reward_events_cardId ON credit_card_reward_events(cardId)")
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS index_credit_card_reward_events_userId_cardId_eventDate ON credit_card_reward_events(userId, cardId, eventDate)"
+        )
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS index_credit_card_reward_events_userId_cardId ON credit_card_reward_events(userId, cardId)"
+        )
+      }
+    }
+
+
+  /** Additive shopping workspace tables; existing financial and shopping rows remain untouched. */
+  val MIGRATION_10_11: Migration =
+    object : Migration(10, 11) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS shopping_pantry (
+            id TEXT NOT NULL PRIMARY KEY, userId TEXT NOT NULL, name TEXT NOT NULL,
+            category TEXT NOT NULL, quantityDecimal TEXT NOT NULL, unit TEXT NOT NULL,
+            lowStockThresholdDecimal TEXT NOT NULL, expiryAt INTEGER, updatedAt INTEGER NOT NULL
+          )
+          """.trimIndent()
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_shopping_pantry_userId_name_unit ON shopping_pantry(userId, name, unit)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_shopping_pantry_userId_expiryAt ON shopping_pantry(userId, expiryAt)")
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS shopping_meal_plans (
+            id TEXT NOT NULL PRIMARY KEY, userId TEXT NOT NULL, title TEXT NOT NULL,
+            plannedDate INTEGER NOT NULL, mealType TEXT NOT NULL, notes TEXT,
+            createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL
+          )
+          """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_shopping_meal_plans_userId_plannedDate ON shopping_meal_plans(userId, plannedDate)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_shopping_meal_plans_userId_mealType ON shopping_meal_plans(userId, mealType)")
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS shopping_meal_ingredients (
+            id TEXT NOT NULL PRIMARY KEY, userId TEXT NOT NULL, mealPlanId TEXT NOT NULL,
+            name TEXT NOT NULL, quantityDecimal TEXT NOT NULL, unit TEXT NOT NULL, shoppingItemId TEXT,
+            FOREIGN KEY(mealPlanId) REFERENCES shopping_meal_plans(id) ON UPDATE NO ACTION ON DELETE CASCADE
+          )
+          """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_shopping_meal_ingredients_mealPlanId ON shopping_meal_ingredients(mealPlanId)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_shopping_meal_ingredients_userId_name ON shopping_meal_ingredients(userId, name)")
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS shopping_receipts (
+            id TEXT NOT NULL PRIMARY KEY, userId TEXT NOT NULL, listId TEXT, accountId TEXT,
+            fingerprint TEXT NOT NULL, merchant TEXT, purchaseDate INTEGER, currencyCode TEXT NOT NULL,
+            totalMinor INTEGER NOT NULL, financialTransactionId TEXT, status TEXT NOT NULL,
+            createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL
+          )
+          """.trimIndent()
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_shopping_receipts_userId_fingerprint ON shopping_receipts(userId, fingerprint)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_shopping_receipts_userId_purchaseDate ON shopping_receipts(userId, purchaseDate)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_shopping_receipts_userId_financialTransactionId ON shopping_receipts(userId, financialTransactionId)")
+      }
+    }
+
 }

@@ -11,6 +11,7 @@ import com.example.core.common.DispatcherProvider
 import com.example.data.local.ReportPreferencesDataSource
 import com.example.domain.model.AuthSessionState
 import com.example.domain.model.EmailReportSettings
+import com.example.domain.model.DailyAutoEntryReportSettings
 import com.example.domain.model.ExportedReportFile
 import com.example.domain.model.FinancialReportSnapshot
 import com.example.domain.model.ReportCategoryTab
@@ -19,6 +20,7 @@ import com.example.domain.model.ReportExportFormat
 import com.example.domain.model.ReportFrequency
 import com.example.domain.model.ReportPeriodType
 import com.example.domain.repository.AuthRepository
+import com.example.worker.DailyAutoEntryReportScheduler
 import com.example.domain.usecase.ObserveFinancialReportsUseCase
 import com.example.domain.usecase.ReportExportGenerator
 import com.example.domain.usecase.ReportsCalculationEngine
@@ -53,6 +55,7 @@ class ReportsViewModel @Inject constructor(
   private val calculationEngine: ReportsCalculationEngine,
   private val exportGenerator: ReportExportGenerator,
   private val reportPreferencesDataSource: ReportPreferencesDataSource,
+  private val dailyAutoEntryReportScheduler: DailyAutoEntryReportScheduler,
   private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
 
@@ -87,7 +90,7 @@ class ReportsViewModel @Inject constructor(
     viewModelScope.launch {
       authRepository.observeAuthSession()
         .distinctUntilChangedBy { (it as? AuthSessionState.Authenticated)?.user?.uid }
-        .collect {
+        .collect { session ->
           _selectedPeriod.value = ReportPeriodType.MONTHLY
           _customStartMillis.value = null
           _customEndMillis.value = null
@@ -97,6 +100,12 @@ class ReportsViewModel @Inject constructor(
           _isErrorMessage.value = false
           _emailPreview.value = null
           _pendingSafExport.value = null
+
+          val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+          if (!uid.isNullOrBlank()) {
+            val dailySettings = reportPreferencesDataSource.observeDailyAutoEntrySettings(uid).first()
+            dailyAutoEntryReportScheduler.updateSchedule(uid, dailySettings)
+          }
         }
     }
   }
@@ -156,6 +165,32 @@ class ReportsViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = EmailReportSettings(),
       )
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  val dailyAutoEntrySettings: StateFlow<DailyAutoEntryReportSettings> =
+    authRepository.observeAuthSession()
+      .flatMapLatest { session ->
+        val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+        if (uid != null) reportPreferencesDataSource.observeDailyAutoEntrySettings(uid)
+        else flowOf(DailyAutoEntryReportSettings())
+      }
+      .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = DailyAutoEntryReportSettings(),
+      )
+
+  fun setDailyAutoEntryReportSettings(settings: DailyAutoEntryReportSettings) {
+    viewModelScope.launch {
+      val uid = currentAuthenticatedUserId() ?: return@launch
+      reportPreferencesDataSource.setDailyAutoEntrySettings(uid, settings)
+      dailyAutoEntryReportScheduler.updateSchedule(uid, settings)
+      _isErrorMessage.value = false
+      _userMessage.value =
+        if (settings.enabled) "Daily auto-entry report scheduled for ${settings.formattedTime}."
+        else "Daily auto-entry report disabled."
+    }
+  }
 
   fun selectPeriod(periodType: ReportPeriodType) {
     _selectedPeriod.value = periodType

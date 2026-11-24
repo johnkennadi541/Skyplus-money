@@ -35,7 +35,15 @@ interface CreditCardDao {
         billingCycleDay = :billingCycleDay,
         paymentDueDayOffset = :paymentDueDayOffset,
         aprPercent = :aprPercent,
+        joiningFeeMinor = :joiningFeeMinor,
+        annualFeeMinor = :annualFeeMinor,
+        annualFeeMonth = :annualFeeMonth,
+        rewardProgramName = :rewardProgramName,
         isActive = :isActive,
+        isFrozen = :isFrozen,
+        reminderEnabled = :reminderEnabled,
+        reminderDaysBefore = :reminderDaysBefore,
+        notes = :notes,
         updatedAt = :updatedAt
     WHERE id = :id AND userId = :userId
     """
@@ -50,7 +58,15 @@ interface CreditCardDao {
     billingCycleDay: Int,
     paymentDueDayOffset: Int,
     aprPercent: String,
+    joiningFeeMinor: Long,
+    annualFeeMinor: Long,
+    annualFeeMonth: Int,
+    rewardProgramName: String?,
     isActive: Boolean,
+    isFrozen: Boolean,
+    reminderEnabled: Boolean,
+    reminderDaysBefore: Int,
+    notes: String?,
     updatedAt: Long,
   ): Int
 

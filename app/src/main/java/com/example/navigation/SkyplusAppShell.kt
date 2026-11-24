@@ -4,6 +4,16 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -24,7 +34,6 @@ import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.Button
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,16 +41,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -79,6 +90,8 @@ import com.example.feature.budgets.BudgetsViewModel
 import com.example.feature.consent.LegalConsentPreviewScreen
 import com.example.feature.consent.LegalConsentScreen
 import com.example.feature.cards.CardsScreen
+import com.example.feature.calculator.SmartCalculatorScreen
+import com.example.feature.calculator.SipCalculatorScreen
 import com.example.feature.cards.CardsViewModel
 import com.example.feature.dashboard.HomeDashboardScreen
 import com.example.feature.goals.SavingsGoalsScreen
@@ -131,6 +144,8 @@ import com.example.feature.transactions.TransactionsViewModel
 @Composable
 fun SkyplusAuthGateRoot(
   authUiState: AuthUiState,
+  openReportsRequest: Long = 0L,
+  openCardsRequest: Long = 0L,
   homeUiState: HomeFoundationUiState,
   themePreference: ThemePreference,
   onContinueWithGoogle: (android.content.Context) -> Unit,
@@ -154,6 +169,8 @@ fun SkyplusAuthGateRoot(
   homeDashboardViewModel: HomeDashboardViewModel? = null,
   cardsViewModel: CardsViewModel? = null,
   savingsGoalsViewModel: SavingsGoalsViewModel? = null,
+  profileFirstName: String = "",
+  onSaveProfileFirstName: (String) -> Unit = {},
 ) {
   if (databaseSecurityError != null) {
     DatabaseSecurityErrorScreen(
@@ -191,6 +208,8 @@ fun SkyplusAuthGateRoot(
           SkyplusAppShell(
             homeUiState = homeUiState,
             themePreference = themePreference,
+            openReportsRequest = openReportsRequest,
+            openCardsRequest = openCardsRequest,
             onToggleTheme = onToggleTheme,
             onSelectTheme = onSelectTheme,
             authenticatedUser = session.user,
@@ -206,6 +225,8 @@ fun SkyplusAuthGateRoot(
             homeDashboardViewModel = homeDashboardViewModel,
             cardsViewModel = cardsViewModel,
             savingsGoalsViewModel = savingsGoalsViewModel,
+            profileFirstName = profileFirstName,
+            onSaveProfileFirstName = onSaveProfileFirstName,
             modifier = modifier,
           )
         }
@@ -273,6 +294,8 @@ private fun DatabaseSecurityErrorScreen(
 @Composable
 fun SkyplusAppShell(
   homeUiState: HomeFoundationUiState,
+  openReportsRequest: Long = 0L,
+  openCardsRequest: Long = 0L,
   themePreference: ThemePreference,
   onToggleTheme: () -> Unit,
   onSelectTheme: (ThemePreference) -> Unit,
@@ -291,12 +314,54 @@ fun SkyplusAppShell(
   homeDashboardViewModel: HomeDashboardViewModel? = null,
   cardsViewModel: CardsViewModel? = null,
   savingsGoalsViewModel: SavingsGoalsViewModel? = null,
+  profileFirstName: String = "",
+  onSaveProfileFirstName: (String) -> Unit = {},
 ) {
   val backStackEntry by navController.currentBackStackEntryAsState()
   val currentDestination = backStackEntry?.destination
+
+  LaunchedEffect(openReportsRequest, currentDestination) {
+    if (
+      openReportsRequest > 0L &&
+        currentDestination != null &&
+        currentDestination.hasRoute(SkyplusRoute.Reports::class).not()
+    ) {
+      navController.navigate(SkyplusRoute.Reports) {
+        launchSingleTop = true
+      }
+    }
+  }
+
+  LaunchedEffect(openCardsRequest, currentDestination) {
+    if (
+      openCardsRequest > 0L &&
+        currentDestination != null &&
+        currentDestination.hasRoute(SkyplusRoute.Cards::class).not()
+    ) {
+      navController.navigate(SkyplusRoute.Cards) {
+        launchSingleTop = true
+      }
+    }
+  }
+
   val showTopLevelNav =
     TopLevelTab.entries.any { tab -> currentDestination?.hasRoute(tab.route::class) == true } ||
       currentDestination == null
+
+  var headerVisible by remember { mutableStateOf(true) }
+  LaunchedEffect(currentDestination) {
+    // Restore the compact header whenever navigation returns to a top-level screen.
+    headerVisible = true
+  }
+  val headerScrollConnection = remember {
+    object : NestedScrollConnection {
+      override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        if (available.y < -6f) headerVisible = false
+        else if (available.y > 6f) headerVisible = true
+        return Offset.Zero
+      }
+    }
+  }
 
   val navigateToTab: (TopLevelTab) -> Unit = { tab ->
     navController.navigate(tab.route) {
@@ -318,21 +383,45 @@ fun SkyplusAppShell(
     val useNavigationRail = maxWidth >= 600.dp
 
     Scaffold(
-      modifier = Modifier.fillMaxSize(),
+      modifier = Modifier.fillMaxSize().nestedScroll(headerScrollConnection),
       contentWindowInsets = WindowInsets.safeDrawing,
       containerColor = MaterialTheme.colorScheme.background,
       topBar = {
         if (showTopLevelNav) {
-          CenterAlignedTopAppBar(
-            title = {
+          AnimatedVisibility(
+            visible = headerVisible,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
+          ) {
+            Surface(
+            color = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+          ) {
+            Row(
+              modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = OceanSpacing.md)
+                .testTag("skyplus_compact_app_header"),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
               Text(
                 text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
               )
-            },
-            actions = {
+              IconButton(
+                onClick = onToggleTheme,
+                modifier = Modifier.minimumInteractiveComponentSize().testTag("theme_toggle_button"),
+              ) {
+                Icon(
+                  imageVector =
+                    if (OceanTheme.colors.isDark) Icons.Rounded.LightMode
+                    else Icons.Rounded.DarkMode,
+                  contentDescription = stringResource(R.string.cd_toggle_theme),
+                  tint = MaterialTheme.colorScheme.primary,
+                )
+              }
               IconButton(
                 onClick = { navController.navigate(SkyplusRoute.Profile) },
                 modifier = Modifier.minimumInteractiveComponentSize().testTag("profile_menu_button"),
@@ -343,25 +432,9 @@ fun SkyplusAppShell(
                   tint = MaterialTheme.colorScheme.primary,
                 )
               }
-              IconButton(
-                onClick = onToggleTheme,
-                modifier = Modifier.minimumInteractiveComponentSize().testTag("theme_toggle_button"),
-              ) {
-                Icon(
-                  imageVector =
-                    if (OceanTheme.colors.isDark) Icons.Rounded.LightMode
-                    else Icons.Rounded.DarkMode,
-                  contentDescription = stringResource(R.string.cd_toggle_theme),
-                  tint = OceanTheme.colors.gold,
-                )
-              }
-            },
-            colors =
-              TopAppBarDefaults.centerAlignedTopAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-                titleContentColor = MaterialTheme.colorScheme.onSurface,
-              ),
-          )
+            }
+            }
+          }
         }
       },
       bottomBar = {
@@ -439,6 +512,7 @@ fun SkyplusAppShell(
                 onOpenPortfolio = { navigateToTab(TopLevelTab.PORTFOLIO) },
                 onOpenReports = { navigateToTab(TopLevelTab.REPORTS) },
                 onOpenEmiCalculator = { navController.navigate(SkyplusRoute.EmiCalculator) },
+                onOpenSmartCalculator = { navController.navigate(SkyplusRoute.SmartCalculator) },
                 onOpenLoans = { navController.navigate(SkyplusRoute.Loans) },
                 onOpenSmartDetection = { navController.navigate(SkyplusRoute.SmartDetectionSettings) },
                 onOpenReviewQueue = { navController.navigate(SkyplusRoute.ReviewQueue) },
@@ -469,6 +543,7 @@ fun SkyplusAppShell(
                 onOpenBudgets = { navController.navigate(SkyplusRoute.Budgets) },
                 onOpenLoans = { navController.navigate(SkyplusRoute.Loans) },
                 onOpenEmiCalculator = { navController.navigate(SkyplusRoute.EmiCalculator) },
+                onOpenSipCalculator = { navController.navigate(SkyplusRoute.SipCalculator) },
                 onOpenShoppingList = { navController.navigate(SkyplusRoute.ShoppingList) },
                 onOpenSmartDetection = { navController.navigate(SkyplusRoute.SmartDetectionSettings) },
                 onOpenReports = { navigateToTab(TopLevelTab.REPORTS) },
@@ -525,6 +600,8 @@ fun SkyplusAppShell(
                 onNavigateBack = { navController.popBackStack() },
                 onOpenInvestments = { navController.navigate(SkyplusRoute.Investments) },
                 onSignOut = onSignOut,
+                profileFirstName = profileFirstName,
+                onSaveProfileFirstName = onSaveProfileFirstName,
               )
             }
             composable<SkyplusRoute.Investments> {
@@ -730,6 +807,15 @@ fun SkyplusAppShell(
                   onNavigateBack = { navController.popBackStack() },
                 )
               }
+            }
+            composable<SkyplusRoute.SmartCalculator> {
+              SmartCalculatorScreen(onNavigateBack = { navController.popBackStack() })
+            }
+            composable<SkyplusRoute.SipCalculator> {
+              SipCalculatorScreen(
+                defaultCurrency = accounts.firstOrNull()?.currencyCode ?: "INR",
+                onNavigateBack = { navController.popBackStack() },
+              )
             }
             composable<SkyplusRoute.EmiCalculator> {
               if (loansViewModel != null) {

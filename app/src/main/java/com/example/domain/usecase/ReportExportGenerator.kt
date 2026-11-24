@@ -151,7 +151,14 @@ class ReportExportGenerator @Inject constructor() {
         val p = inv.portfolioSummary
         appendRow("Investments", currency, "Portfolio Summary", "Val ${fmt(p.totalValuationMinor, currency)}", "Invested ${fmt(p.totalInvestedMinor, currency)}", "Unrealized ${fmt(p.unrealizedPnlMinor, currency)} | Realized ${fmt(p.realizedPnlMinor, currency)}")
         inv.holdingRows.forEach { h ->
-          appendRow("InvestmentHolding", currency, sanitizeFormula("${h.name} (${h.category.displayName})"), fmt(h.valuationMinor, currency), "Invested ${fmt(h.investedMinor, currency)}", "P&L Unrealized ${fmt(h.unrealizedPnlMinor, currency)}")
+          appendRow(
+            "InvestmentHolding",
+            currency,
+            sanitizeFormula("${h.name} (${h.category.displayName})"),
+            fmt(h.valuationMinor, currency),
+            "Invested ${fmt(h.investedMinor, currency)}",
+            "Unrealized ${fmt(h.unrealizedPnlMinor, currency)} | Realized ${fmt(h.realizedPnlMinor, currency)} | Return ${h.returnPercent.toPlainString()}% | Price as of ${if (h.lastPriceUpdateDate > 0L) dateFmt.format(Date(h.lastPriceUpdateDate)) else "Awaiting first price"} | Stale ${h.isStalePrice}",
+          )
         }
       }
 
@@ -492,7 +499,9 @@ $paragraphsXml
         lines += ReportLine("  Invested Capital: ${fmt(p.totalInvestedMinor, currency)} | Valuation: ${fmt(p.totalValuationMinor, currency)}")
         lines += ReportLine("  Unrealized P&L: ${fmt(p.unrealizedPnlMinor, currency)} | Realized P&L: ${fmt(p.realizedPnlMinor, currency)}")
         inv.holdingRows.take(12).forEach { h ->
-          lines += ReportLine("    • ${h.name} [${h.category.displayName}]: Val ${fmt(h.valuationMinor, currency)} (Cost ${fmt(h.investedMinor, currency)})")
+          lines += ReportLine(
+            "    • ${h.name} [${h.category.displayName}]: Val ${fmt(h.valuationMinor, currency)} (Cost ${fmt(h.investedMinor, currency)}) | Unrealized ${fmt(h.unrealizedPnlMinor, currency)} | Realized ${fmt(h.realizedPnlMinor, currency)} | Return ${h.returnPercent.toPlainString()}% | Price as of ${if (h.lastPriceUpdateDate > 0L) dFmt.format(Date(h.lastPriceUpdateDate)) else "Awaiting first price"} | Stale ${h.isStalePrice}",
+          )
         }
         lines += ReportLine("")
       }

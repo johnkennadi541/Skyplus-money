@@ -61,7 +61,7 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
     destinationAmountMinor: Long?,
   ): Result<Pair<FinancialTransaction, FinancialTransaction>> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(sourceTransaction.userId == authenticatedUserId) {
           "Transaction ownership cannot be assigned across users"
@@ -148,7 +148,7 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
     transaction: FinancialTransaction,
   ): Result<FinancialTransaction> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(transaction.userId == authenticatedUserId) {
           "Transaction ownership cannot be assigned across users"
@@ -187,7 +187,7 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
     oldTransaction: FinancialTransaction,
   ): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(
           oldTransaction.userId == authenticatedUserId &&
@@ -246,7 +246,7 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
 
   override suspend fun deleteTransaction(userId: String, transactionId: String): Result<Unit> =
     withContext(dispatchers.io) {
-      runCatching {
+      runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(transactionId.isNotBlank()) { "Transaction ID is required" }
         database.withTransaction {
@@ -255,8 +255,8 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
               ?: throw SecurityException("Transaction does not belong to authenticated user")
           require(txn.userId == userId) { "Transaction ownership verification failed" }
           val now = System.currentTimeMillis()
-          val type = runCatching { TransactionType.valueOf(txn.type) }.getOrDefault(TransactionType.EXPENSE)
-          val status = runCatching { TransactionStatus.valueOf(txn.status) }.getOrDefault(TransactionStatus.COMPLETED)
+          val type = runCatchingPreservingCancellation { TransactionType.valueOf(txn.type) }.getOrDefault(TransactionType.EXPENSE)
+          val status = runCatchingPreservingCancellation { TransactionStatus.valueOf(txn.status) }.getOrDefault(TransactionStatus.COMPLETED)
 
           if (status == TransactionStatus.COMPLETED && type == TransactionType.TRANSFER && !txn.linkedTransferId.isNullOrBlank()) {
             val linkedEntries = transactionDao.findByLinkedTransferId(userId, txn.linkedTransferId)

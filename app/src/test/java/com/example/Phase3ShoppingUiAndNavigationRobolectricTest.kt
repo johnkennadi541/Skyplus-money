@@ -209,14 +209,16 @@ class Phase3ShoppingUiAndNavigationRobolectricTest {
     composeTestRule.waitForIdle()
 
     // Filter Purchased
-    composeTestRule.onNodeWithTag("shopping_filter_purchased").performScrollTo().performClick()
+    composeTestRule.onNodeWithTag("shopping_lists_lazy_column").performScrollToNode(hasTestTag("shopping_filter_purchased"))
+    composeTestRule.onNodeWithTag("shopping_filter_purchased").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("shopping_lists_lazy_column").performScrollToNode(hasTestTag("shopping_item_b"))
     composeTestRule.onNodeWithTag("shopping_item_b").assertIsDisplayed()
     composeTestRule.onNodeWithTag("shopping_item_a").assertDoesNotExist()
 
     // Switch back to All & search
-    composeTestRule.onNodeWithTag("shopping_filter_all").performScrollTo().performClick()
+    composeTestRule.onNodeWithTag("shopping_lists_lazy_column").performScrollToNode(hasTestTag("shopping_filter_all"))
+    composeTestRule.onNodeWithTag("shopping_filter_all").performClick()
     composeTestRule.onNodeWithTag("shopping_search_input").performScrollTo().performTextInput("Olive")
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("shopping_lists_lazy_column").performScrollToNode(hasTestTag("shopping_item_a"))
