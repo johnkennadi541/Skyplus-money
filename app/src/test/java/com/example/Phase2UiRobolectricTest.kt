@@ -197,7 +197,7 @@ class Phase2UiRobolectricTest {
           event = event,
           accounts = listOf(acc),
           onDismiss = {},
-          onConfirm = { _, _, _, _, _ -> confirmed = true },
+          onConfirm = { _, _, _, _, _, _ -> confirmed = true },
         )
       }
     }
