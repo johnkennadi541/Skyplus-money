@@ -33,7 +33,7 @@ class NotificationDeduplicationCache(
             nowElapsedRealtimeMillis - seenAtMillis > ttlMillis
         }
         .map { it.key }
-    expired.forEach(seenAt::remove)
+    expired.forEach { key -> seenAt.remove(key) }
 
     val identity = sha256("$notificationKey|$postTime")
     val previous = seenAt[identity]
