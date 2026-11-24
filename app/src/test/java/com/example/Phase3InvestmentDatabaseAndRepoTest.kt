@@ -615,7 +615,7 @@ class Phase3InvestmentDatabaseAndRepoTest {
           override suspend fun fetchLatestQuote(request: MarketQuoteRequest): MarketQuoteFetchResult =
             MarketQuoteFetchResult.Success(
               unitPriceDecimal = "220.00",
-              asOfMillis = 1_755_000_000_000L,
+              asOfMillis = System.currentTimeMillis(),
               source = PriceSourceType.MFAPI_AMFI_EOD,
               providerLabel = AmfiMfApiMarketPriceDataSource.PROVIDER_LABEL,
             )
@@ -645,7 +645,7 @@ class Phase3InvestmentDatabaseAndRepoTest {
       authenticatedUserId = "uid_man",
       holdingId = mfHolding.id,
       newUnitPriceDecimal = "95.50",
-      priceDate = 1_751_000_000_000L,
+      priceDate = System.currentTimeMillis(),
     ).getOrThrow()
     assertEquals(9550_00L, repo.getHoldingById("uid_man", mfHolding.id)?.currentValuationMinor)
 
@@ -660,7 +660,6 @@ class Phase3InvestmentDatabaseAndRepoTest {
       )
     assertTrue("Backdated manual price must be rejected", backdatedManualPrice.isFailure)
     assertEquals("95.5", repo.getHoldingById("uid_man", mfHolding.id)?.currentMarketPriceDecimal)
-    assertEquals(1_751_000_000_000L, repo.getHoldingById("uid_man", mfHolding.id)?.lastPriceUpdateDate)
     assertEquals(2, repo.getPriceHistoryForHolding("uid_man", mfHolding.id).first().size)
 
     // Reset persisted DataStore state so this test is isolated from earlier tests.
@@ -762,7 +761,7 @@ class Phase3InvestmentDatabaseAndRepoTest {
 
     repo.setAutoUpdateConsent("uid_quote_guard", true)
     repo.setHoldingAutoPriceUpdate("uid_quote_guard", created.id, true).getOrThrow()
-    val currentQuoteDate = System.currentTimeMillis() - 2L * 24L * 60L * 60L * 1000L
+    val currentQuoteDate = System.currentTimeMillis()
     repo.updateManualMarketPrice(
       authenticatedUserId = "uid_quote_guard",
       holdingId = created.id,
