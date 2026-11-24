@@ -13,7 +13,15 @@ data class NotificationText(
   val text: String = "",
   val bigText: String = "",
 ) {
+  fun exceedsSafeLength(): Boolean =
+    title.length.toLong() + text.length.toLong() + bigText.length.toLong() >
+      MAX_NOTIFICATION_CHARS
+
   fun combined(): String = "$title $text $bigText".trim()
+
+  companion object {
+    const val MAX_NOTIFICATION_CHARS = 8_192
+  }
 }
 
 sealed interface ReadOnlyNotificationResult {
@@ -66,6 +74,9 @@ class ReadOnlyNotificationProcessor(
     val notificationText =
       runCatching(contentProvider).getOrNull()
         ?: return ReadOnlyNotificationResult.ContentUnavailable
+    if (notificationText.exceedsSafeLength()) {
+      return ReadOnlyNotificationResult.Classified(NotificationClassification.Sensitive)
+    }
     val combined = notificationText.combined()
     if (combined.isBlank()) return ReadOnlyNotificationResult.Empty
 
