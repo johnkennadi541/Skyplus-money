@@ -53,6 +53,7 @@ class SmartDetectionViewModel @Inject constructor(
 
   private val _merchantCategoryOverride = MutableStateFlow<String?>(null)
   val merchantCategoryOverride: StateFlow<String?> = _merchantCategoryOverride.asStateFlow()
+  private var merchantOverrideRequestId: Long = 0L
 
   private val _isPermissionGranted = MutableStateFlow(NotificationPermissionHelper.isNotificationAccessGranted(context))
   val isPermissionGranted: StateFlow<Boolean> = _isPermissionGranted.asStateFlow()
@@ -64,6 +65,8 @@ class SmartDetectionViewModel @Inject constructor(
         .collect { session ->
           _userMessage.value = null
           if (session !is AuthSessionState.Authenticated) {
+            merchantOverrideRequestId++
+            _merchantCategoryOverride.value = null
             settingsUseCases.clearAutoSavedNotice()
           }
         }
@@ -163,13 +166,19 @@ class SmartDetectionViewModel @Inject constructor(
   }
 
   fun loadMerchantCategoryOverride(merchant: String?) {
+    val requestId = ++merchantOverrideRequestId
     _merchantCategoryOverride.value = null
     val safeMerchant = merchant?.trim()?.takeIf { it.isNotBlank() } ?: return
     viewModelScope.launch {
       val session = authRepository.observeAuthSession().first()
       val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
       if (uid.isNullOrBlank()) return@launch
-      _merchantCategoryOverride.value = settingsUseCases.getMerchantCategoryOverride(uid, safeMerchant)
+      val savedCategory = settingsUseCases.getMerchantCategoryOverride(uid, safeMerchant)
+      val latestSession = authRepository.observeAuthSession().first()
+      val latestUid = (latestSession as? AuthSessionState.Authenticated)?.user?.uid
+      if (requestId == merchantOverrideRequestId && latestUid == uid) {
+        _merchantCategoryOverride.value = savedCategory
+      }
     }
   }
 
