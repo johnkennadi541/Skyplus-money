@@ -399,7 +399,12 @@ class Phase2SecurityRemediationTest {
     )
     detectionRepo.updateDetectionSettings(
       uid,
-      DetectionSettings(userId = uid, isNotificationDetectionEnabled = true, isAutoSaveHighConfidenceEnabled = true),
+      DetectionSettings(
+        userId = uid,
+        isNotificationDetectionEnabled = true,
+        isAutoSaveHighConfidenceEnabled = true,
+        hasAllAppNotificationConsent = true,
+      ),
     )
 
     val gateway = FakeGateway().apply {
