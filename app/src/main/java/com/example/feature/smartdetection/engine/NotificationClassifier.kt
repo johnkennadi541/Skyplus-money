@@ -1,5 +1,6 @@
 package com.example.feature.smartdetection.engine
 
+import com.example.domain.model.DetectionConfidence
 import com.example.domain.model.ParsedFinancialMessage
 import com.example.domain.model.TransactionStatus
 import com.example.domain.model.TransactionType
@@ -41,7 +42,7 @@ object NotificationClassifier {
 
     val safeForCandidate =
       parsed.status == TransactionStatus.COMPLETED &&
-        parsed.confidenceLevel.name == "HIGH" &&
+        parsed.confidenceLevel == DetectionConfidence.HIGH &&
         parsed.type != TransactionType.PENDING &&
         parsed.type != TransactionType.FAILED &&
         parsed.type != TransactionType.TRANSFER
