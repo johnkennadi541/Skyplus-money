@@ -52,6 +52,19 @@ class NotificationPrivacyGateTest {
   }
 
   @Test
+  fun `missing all-app scope consent fails closed`() {
+    val result =
+      NotificationPrivacyGate.evaluate(
+        "com.bank.app",
+        enabledAccess.copy(hasAllAppNotificationConsent = false),
+      )
+    assertEquals(
+      NotificationGateDecision.Blocked(NotificationGateBlockReason.ALL_APP_CONSENT_REQUIRED),
+      result,
+    )
+  }
+
+  @Test
   fun `disabled detection fails closed`() {
     val result = NotificationPrivacyGate.evaluate("com.bank.app", enabledAccess.copy(isDetectionEnabled = false))
     assertEquals(
