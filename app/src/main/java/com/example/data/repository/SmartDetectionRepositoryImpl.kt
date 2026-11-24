@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.security.MessageDigest
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -644,9 +645,19 @@ class SmartDetectionRepositoryImpl @Inject constructor(
 
   private fun merchantCategoryOverrideKey(userId: String, merchant: String) =
     stringPreferencesKey(
-      "merchant_category_override_${Integer.toHexString(userId.hashCode())}_" +
-        merchant.uppercase().replace(Regex("[^A-Z0-9]+"), "_").trim('_').take(48)
+      "merchant_category_override_${sha256Hex(userId).take(24)}_${sha256Hex(normalizeMerchantKey(merchant)).take(32)}"
     )
+
+  private fun normalizeMerchantKey(merchant: String): String =
+    merchant.uppercase()
+      .replace(Regex("[^A-Z0-9]+"), " ")
+      .trim()
+      .replace(Regex("\\s+"), " ")
+
+  private fun sha256Hex(value: String): String =
+    MessageDigest.getInstance("SHA-256")
+      .digest(value.toByteArray(Charsets.UTF_8))
+      .joinToString("") { byte -> "%02x".format(byte) }
 
   private fun merchantsEquivalent(a: String, b: String): Boolean {
     val normA = a.trim().lowercase()
