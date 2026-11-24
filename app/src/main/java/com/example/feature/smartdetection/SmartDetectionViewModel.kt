@@ -9,6 +9,7 @@ import com.example.domain.model.AutoSavedTransactionNotice
 import com.example.domain.model.DetectionSettings
 import com.example.domain.model.FinancialAccount
 import com.example.domain.model.Money
+import com.example.domain.model.MerchantCategoryOverridePersistenceException
 import com.example.domain.model.TransactionDetectionEvent
 import com.example.domain.model.TransactionType
 import com.example.domain.repository.AuthRepository
@@ -49,6 +50,9 @@ class SmartDetectionViewModel @Inject constructor(
 
   private val _userMessage = MutableStateFlow<String?>(null)
   val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
+
+  private val _merchantCategoryOverride = MutableStateFlow<String?>(null)
+  val merchantCategoryOverride: StateFlow<String?> = _merchantCategoryOverride.asStateFlow()
 
   private val _isPermissionGranted = MutableStateFlow(NotificationPermissionHelper.isNotificationAccessGranted(context))
   val isPermissionGranted: StateFlow<Boolean> = _isPermissionGranted.asStateFlow()
@@ -158,6 +162,17 @@ class SmartDetectionViewModel @Inject constructor(
     settingsUseCases.clearAutoSavedNotice()
   }
 
+  fun loadMerchantCategoryOverride(merchant: String?) {
+    _merchantCategoryOverride.value = null
+    val safeMerchant = merchant?.trim()?.takeIf { it.isNotBlank() } ?: return
+    viewModelScope.launch {
+      val session = authRepository.observeAuthSession().first()
+      val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+      if (uid.isNullOrBlank()) return@launch
+      _merchantCategoryOverride.value = settingsUseCases.getMerchantCategoryOverride(uid, safeMerchant)
+    }
+  }
+
   fun approveReviewItem(
     eventId: String,
     selectedAccountId: String,
@@ -193,7 +208,14 @@ class SmartDetectionViewModel @Inject constructor(
         rememberMerchantCategory = rememberMerchantCategory,
       )
         .onSuccess { _userMessage.value = "Transaction approved and saved" }
-        .onFailure { error -> _userMessage.value = "Approval failed: ${error.message}" }
+        .onFailure { error ->
+          _userMessage.value =
+            if (error is MerchantCategoryOverridePersistenceException) {
+              "Transaction saved; merchant category preference could not be saved. You can still correct future entries manually."
+            } else {
+              "Approval failed: ${error.message}"
+            }
+        }
     }
   }
 
