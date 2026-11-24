@@ -18,6 +18,7 @@ class ReadOnlyNotificationProcessorTest {
       isAuthenticated = true,
       hasCurrentConsent = true,
       isDetectionEnabled = true,
+      hasAllAppNotificationConsent = true,
     )
 
   private fun metadata(
