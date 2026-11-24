@@ -446,6 +446,24 @@ class Phase2SecurityRemediationTest {
     assertEquals(200_000L, accountRepo.getAccountById(uid, "acc_n1")!!.currentBalanceMinor)
   }
 
+  @Test
+  fun `all-app notification consent and exclusions persist per user`() = runTest {
+    val uid = "uid_all_app_preferences"
+    val settings =
+      DetectionSettings(
+        userId = uid,
+        isNotificationDetectionEnabled = true,
+        hasAllAppNotificationConsent = true,
+        excludedPackages = setOf("com.private.chat", "com.social.app"),
+      )
+
+    detectionRepo.updateDetectionSettings(uid, settings).getOrThrow()
+    val restored = detectionRepo.getDetectionSettings(uid).first()
+
+    assertTrue(restored.hasAllAppNotificationConsent)
+    assertEquals(setOf("com.private.chat", "com.social.app"), restored.excludedPackages)
+  }
+
   // --- Requirement 5: Consent DataStore error handling + spaced OTP/2FA/digit masking ---
 
   @Test
