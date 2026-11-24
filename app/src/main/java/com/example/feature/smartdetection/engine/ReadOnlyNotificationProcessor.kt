@@ -38,6 +38,10 @@ class ReadOnlyNotificationProcessor(
   private val deduplicationCache: NotificationDeduplicationCache =
     NotificationDeduplicationCache(),
 ) {
+  fun clearTransientState() {
+    deduplicationCache.clear()
+  }
+
   fun process(
     metadata: NotificationMetadata,
     access: NotificationAccessContext,
