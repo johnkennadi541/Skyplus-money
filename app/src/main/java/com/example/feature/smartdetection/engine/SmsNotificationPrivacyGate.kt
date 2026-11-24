@@ -29,6 +29,11 @@ sealed interface SmsNotificationGateDecision {
 }
 
 object SmsNotificationPrivacyGate {
+  fun isSourceAllowed(packageName: String?, defaultSmsPackage: String?): Boolean =
+    !packageName.isNullOrBlank() &&
+      !defaultSmsPackage.isNullOrBlank() &&
+      packageName == defaultSmsPackage
+
   fun evaluate(access: SmsNotificationAccessContext): SmsNotificationGateDecision {
     val packageName = access.packageName
     val defaultSmsPackage = access.defaultSmsPackage
