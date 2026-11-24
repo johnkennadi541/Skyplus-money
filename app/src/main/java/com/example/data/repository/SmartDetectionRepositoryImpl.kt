@@ -32,6 +32,7 @@ import com.example.domain.model.TransactionType
 import com.example.domain.repository.FinancialTransactionRepository
 import com.example.domain.repository.SmartDetectionRepository
 import com.example.feature.smartdetection.engine.DeduplicationEngine
+import com.example.feature.smartdetection.engine.MerchantCategoryResolver
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
