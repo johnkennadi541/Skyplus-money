@@ -6,8 +6,8 @@ package com.example.feature.smartdetection.engine
 data class NotificationAccessContext(
   val isAuthenticated: Boolean,
   val hasCurrentConsent: Boolean,
-  val hasAllAppNotificationConsent: Boolean = false,
   val isDetectionEnabled: Boolean,
+  val hasAllAppNotificationConsent: Boolean = false,
   val excludedPackages: Set<String> = emptySet(),
 )
 
