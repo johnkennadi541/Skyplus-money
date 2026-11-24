@@ -4,6 +4,16 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.nestedScroll
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -338,6 +348,17 @@ fun SkyplusAppShell(
     TopLevelTab.entries.any { tab -> currentDestination?.hasRoute(tab.route::class) == true } ||
       currentDestination == null
 
+  var headerVisible by remember { mutableStateOf(true) }
+  val headerScrollConnection = remember {
+    object : NestedScrollConnection {
+      override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        if (available.y < -6f) headerVisible = false
+        else if (available.y > 6f) headerVisible = true
+        return Offset.Zero
+      }
+    }
+  }
+
   val navigateToTab: (TopLevelTab) -> Unit = { tab ->
     navController.navigate(tab.route) {
       popUpTo(navController.graph.findStartDestination().id) { saveState = true }
@@ -358,12 +379,17 @@ fun SkyplusAppShell(
     val useNavigationRail = maxWidth >= 600.dp
 
     Scaffold(
-      modifier = Modifier.fillMaxSize(),
+      modifier = Modifier.fillMaxSize().nestedScroll(headerScrollConnection),
       contentWindowInsets = WindowInsets.safeDrawing,
       containerColor = MaterialTheme.colorScheme.background,
       topBar = {
         if (showTopLevelNav) {
-          Surface(
+          AnimatedVisibility(
+            visible = headerVisible,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
+          ) {
+            Surface(
             color = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.onSurface,
           ) {
@@ -402,6 +428,7 @@ fun SkyplusAppShell(
                   tint = MaterialTheme.colorScheme.primary,
                 )
               }
+            }
             }
           }
         }

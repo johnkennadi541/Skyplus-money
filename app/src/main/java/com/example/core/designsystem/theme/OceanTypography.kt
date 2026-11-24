@@ -8,11 +8,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.R
 
-val SpaceGroteskFamily = FontFamily(Font(R.font.space_grotesk, FontWeight.Normal))
+val SpaceGroteskFamily = FontFamily.Default
 
-val PlusJakartaSansFamily = FontFamily(Font(R.font.plus_jakarta_sans, FontWeight.Normal))
+val PlusJakartaSansFamily = FontFamily.Default
 
-val JetBrainsMonoFamily = FontFamily(Font(R.font.jetbrains_mono, FontWeight.Normal))
+val JetBrainsMonoFamily = FontFamily.Default
 
 val OceanNumericStyle =
   TextStyle(
