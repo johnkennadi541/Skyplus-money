@@ -34,10 +34,12 @@ object TransactionCategories {
   val EXPENSE_CATEGORIES =
     listOf(
       "Food & Dining",
+      "Groceries",
       "Shopping",
       "Transport",
       "Housing",
       "Utilities",
+      "Bills & Utilities",
       "Medical & Healthcare",
       "Entertainment",
       "Education",
