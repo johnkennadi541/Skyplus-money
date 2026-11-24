@@ -136,6 +136,9 @@ dependencies {
   // implementation(libs.firebase.firestore)
   implementation(libs.firebase.auth)
   implementation(libs.firebase.functions)
+  // Production attestation is always available; debug builds use the isolated debug provider.
+  implementation(libs.firebase.appcheck.playintegrity)
+  debugImplementation(libs.firebase.appcheck.debug)
   implementation(libs.androidx.credentials)
   implementation(libs.androidx.credentials.play.services)
   implementation(libs.googleid)

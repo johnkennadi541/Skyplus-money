@@ -37,6 +37,11 @@ jobs:
       - name: Compile Debug Kotlin
         run: ./gradlew :app:compileDebugKotlin
 
+      # Compile the production source set too, proving it cannot accidentally depend on
+      # the debug-only App Check provider.
+      - name: Compile Release Kotlin
+        run: ./gradlew :app:compileReleaseKotlin
+
       # Blocking gate: every unit and Robolectric test must pass.
       - name: Run Unit & Robolectric Tests
         run: ./gradlew :app:testDebugUnitTest

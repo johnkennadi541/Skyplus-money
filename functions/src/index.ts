@@ -28,7 +28,7 @@ function escapeHtml(value: string): string {
  * The client cannot choose a recipient, and this function has no inbox/read scope.
  */
 export const sendWelcomeEmail = onCall(
-  { secrets: [resendApiKey] },
+  { secrets: [resendApiKey], enforceAppCheck: true },
   async (request) => {
     const uid = request.auth?.uid;
     const email = request.auth?.token.email;
