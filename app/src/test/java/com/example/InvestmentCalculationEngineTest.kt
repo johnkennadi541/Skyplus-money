@@ -125,6 +125,27 @@ class InvestmentCalculationEngineTest {
     engine.parsePositiveDecimal("0", "Units")
   }
 
+  @Test(expected = IllegalArgumentException::class)
+  fun `positive decimal parser rejects exponent notation`() {
+    engine.parsePositiveDecimal("1e999999999", "Units")
+  }
+
+  @Test(expected = IllegalArgumentException::class)
+  fun `positive decimal parser rejects excessive fractional precision`() {
+    engine.parsePositiveDecimal("1.1234567890123", "Price")
+  }
+
+  @Test(expected = IllegalArgumentException::class)
+  fun `nonnegative decimal parser rejects excessive integer precision`() {
+    engine.parseNonNegativeDecimal("1234567890123456789", "Quantity")
+  }
+
+  @Test
+  fun `decimal parser accepts supported fractional investment precision`() {
+    assertEquals(BigDecimal("0.123456789012"), engine.parsePositiveDecimal("0.123456789012", "Units"))
+    assertEquals(BigDecimal.ZERO, engine.parseNonNegativeDecimal("0", "Price"))
+  }
+
   @Test
   fun `repeated fractional partial sales conserve every minor unit of cost basis`() {
     // 100 minor units across 3 units: rounded allocations must still sum exactly to 100.
