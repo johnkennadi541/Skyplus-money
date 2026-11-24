@@ -80,7 +80,7 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
   }
 
   @Test
-  fun `investments dashboard renders allocation chart growth chart and stale warning in light theme`() {
+  fun `investments dashboard renders allocation chart authentic growth empty state and stale warning in light theme`() {
     val now = 1_755_000_000_000L
     val tenDaysAgo = now - (10L * 86_400_000L)
     val holdings =
@@ -170,7 +170,7 @@ class Phase3InvestmentUiAndNavigationRobolectricTest {
     composeTestRule.onNodeWithTag("investments_list").performScrollToNode(hasTestTag("asset_allocation_chart_card"))
     composeTestRule.onNodeWithTag("asset_allocation_canvas").assertIsDisplayed()
     composeTestRule.onNodeWithTag("investments_list").performScrollToNode(hasTestTag("portfolio_growth_chart_card"))
-    composeTestRule.onNodeWithTag("portfolio_growth_canvas").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("portfolio_growth_empty_state").assertIsDisplayed()
     composeTestRule.onNodeWithTag("investments_list").performScrollToNode(hasTestTag("holding_card_h_1"))
     composeTestRule.onNodeWithText("Tata Consultancy Services").assertIsDisplayed()
 
