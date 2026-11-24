@@ -38,7 +38,7 @@ object MerchantCategoryResolver {
   fun normalizeMerchantName(value: String): String =
     Normalizer.normalize(value, Normalizer.Form.NFKC)
       .uppercase(Locale.ROOT)
-      .replace(Regex("[^\\p{L}\\p{N}]+"), " ")
+      .replace(Regex("[^\\p{L}\\p{M}\\p{N}]+"), " ")
       .trim()
       .replace(Regex("\\s+"), " ")
 
