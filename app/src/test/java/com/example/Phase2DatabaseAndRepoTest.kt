@@ -423,6 +423,7 @@ class Phase2DatabaseAndRepoTest {
 
     assertEquals(DetectionEventStatus.APPROVED, detectionRepo.getEventById(uid, reviewEvent.id)?.status)
     assertEquals(920_000L, accountRepo.getAccountById(uid, "acc_hdfc")!!.currentBalanceMinor)
+    assertEquals(null, detectionRepo.getMerchantCategoryOverride(uid, "Uber India"))
   }
 
   @Test
