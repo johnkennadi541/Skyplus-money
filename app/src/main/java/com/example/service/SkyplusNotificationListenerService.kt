@@ -1,14 +1,19 @@
 package com.example.service
 
+import android.app.Notification
+import android.provider.Telephony
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import android.provider.Telephony
 import com.example.core.common.DispatcherProvider
 import com.example.domain.model.AuthSessionState
 import com.example.domain.repository.AuthRepository
 import com.example.domain.repository.ConsentRepository
 import com.example.domain.repository.SmartDetectionRepository
+import com.example.feature.smartdetection.engine.SensitiveNotificationFilter
 import com.example.feature.smartdetection.engine.SmartTransactionParser
+import com.example.feature.smartdetection.engine.SmsNotificationAccessContext
+import com.example.feature.smartdetection.engine.SmsNotificationGateDecision
+import com.example.feature.smartdetection.engine.SmsNotificationPrivacyGate
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -16,6 +21,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+internal data class SmsNotificationContent(
+  val title: String,
+  val text: String,
+  val bigText: String,
+)
 
 @AndroidEntryPoint
 class SkyplusNotificationListenerService : NotificationListenerService() {
@@ -46,49 +57,57 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
     if (sbn == null) return
 
     val packageName = sbn.packageName ?: return
-
-    // Privacy boundary: inspect notification content ONLY when it belongs to the
-    // device's current default SMS app. All other packages (including every email
-    // app and bank app notification) are ignored before notification extras are read.
     val defaultSmsPackage = Telephony.Sms.getDefaultSmsPackage(this) ?: return
+
+    // Check source identity using metadata only. Never inspect extras for any other app.
     if (packageName != defaultSmsPackage) return
 
-    val extras = sbn.notification.extras ?: return
-    // Bound untrusted notification text before parsing so a malformed or oversized
-    // default-SMS notification cannot cause excessive memory or regex work.
-    val title = extras.getCharSequence("android.title")?.toString()?.take(MAX_TITLE_CHARS).orEmpty()
-    val text = extras.getCharSequence("android.text")?.toString()?.take(MAX_NOTIFICATION_TEXT_CHARS).orEmpty()
-    val bigText = extras.getCharSequence("android.bigText")?.toString()?.take(MAX_NOTIFICATION_TEXT_CHARS).orEmpty()
-
-    val combinedContent = "$title $text $bigText".take(MAX_COMBINED_CONTENT_CHARS).trim()
-    if (combinedContent.isBlank()) return
-
     serviceScope.launch {
-      processNotificationContent(
+      // Re-check the current default SMS app immediately before any notification body access.
+      val currentDefaultSmsPackage = Telephony.Sms.getDefaultSmsPackage(this@SkyplusNotificationListenerService)
+        ?: return@launch
+
+      processNotification(
         packageName = packageName,
-        title = title,
-        combinedContent = combinedContent,
+        defaultSmsPackage = currentDefaultSmsPackage,
         timestamp = sbn.postTime,
-      )
+      ) {
+        // This provider is invoked only after source, authentication, legal consent,
+        // and detection-setting checks all pass.
+        val extras = sbn.notification.extras
+        if (extras == null) {
+          null
+        } else {
+          SmsNotificationContent(
+            title = boundedNotificationField(extras.getCharSequence(Notification.EXTRA_TITLE), MAX_TITLE_CHARS),
+            text = boundedNotificationField(extras.getCharSequence(Notification.EXTRA_TEXT), MAX_NOTIFICATION_TEXT_CHARS),
+            bigText = boundedNotificationField(extras.getCharSequence(Notification.EXTRA_BIG_TEXT), MAX_NOTIFICATION_TEXT_CHARS),
+          )
+        }
+      }
     }
   }
 
-  internal suspend fun processNotificationContent(
-    packageName: String,
-    title: String,
-    combinedContent: String,
+  internal suspend fun processNotification(
+    packageName: String?,
+    defaultSmsPackage: String?,
     timestamp: Long = System.currentTimeMillis(),
+    contentProvider: () -> SmsNotificationContent?,
   ) {
-    if (combinedContent.isBlank()) return
+    // Fail closed on source mismatch before authentication or content access.
+    if (!SmsNotificationPrivacyGate.isSourceAllowed(packageName, defaultSmsPackage)) return
 
-    // This internal method is called only after onNotificationPosted has
-    // verified the default SMS app package before reading notification extras.
+    val session =
+      try {
+        authRepository.observeAuthSession().first()
+      } catch (cancelled: CancellationException) {
+        throw cancelled
+      } catch (_: Exception) {
+        return
+      }
+    val userId = (session as? AuthSessionState.Authenticated)?.user?.uid
+      ?.takeIf { it.isNotBlank() } ?: return
 
-    val session = authRepository.observeAuthSession().first()
-    val userId = (session as? AuthSessionState.Authenticated)?.user?.uid ?: return
-
-    // Enforce Phase 1D Legal Consent Gate in background ingestion: fail closed on missing,
-    // outdated, or unreadable consent records.
     val consent =
       try {
         consentRepository.getConsent(userId)
@@ -97,24 +116,58 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
       } catch (_: Exception) {
         null
       }
-    if (consent == null || !consent.isUpToDate) return
 
-    val settings = detectionRepository.getDetectionSettings(userId).first()
-    if (!settings.isNotificationDetectionEnabled) return
+    val settings =
+      try {
+        detectionRepository.getDetectionSettings(userId).first()
+      } catch (cancelled: CancellationException) {
+        throw cancelled
+      } catch (_: Exception) {
+        null
+      }
 
-    // The current default SMS app package is the sole permitted source. Do not
-    // apply the legacy bank/UPI notification allowlist here: it would reject the
-    // SMS app itself and can never authorize email or other notification sources.
+    val accessDecision =
+      SmsNotificationPrivacyGate.evaluate(
+        SmsNotificationAccessContext(
+          packageName = packageName,
+          defaultSmsPackage = defaultSmsPackage,
+          isAuthenticated = true,
+          hasCurrentConsent = consent?.isUpToDate == true,
+          isDetectionEnabled = settings?.isNotificationDetectionEnabled == true,
+        )
+      )
+    if (accessDecision !is SmsNotificationGateDecision.Allowed) return
 
-    // On-device parsing with expanded sensitive token filter
+    val content =
+      try {
+        contentProvider()
+      } catch (cancelled: CancellationException) {
+        throw cancelled
+      } catch (_: Exception) {
+        null
+      } ?: return
+
+    val combinedContent =
+      "${content.title} ${content.text} ${content.bigText}"
+        .take(MAX_COMBINED_CONTENT_CHARS)
+        .trim()
+    if (combinedContent.isBlank()) return
+
+    // Reject OTP/PIN/CVV/password/security notifications in English, Tamil and Arabic.
+    if (SensitiveNotificationFilter.containsSensitiveContent(combinedContent)) return
+
     val parsed = SmartTransactionParser.parse(combinedContent, packageName, timestamp) ?: return
 
-    // Process event through deduplication, ambiguity review, and auto-save engine
     detectionRepository.processIncomingEvent(
       userId = userId,
-      rawPackageName = packageName,
-      senderOrTitle = title.ifBlank { packageName },
+      rawPackageName = packageName.orEmpty(),
+      senderOrTitle = content.title.ifBlank { packageName.orEmpty() },
       parsed = parsed,
     )
+  }
+
+  private fun boundedNotificationField(value: CharSequence?, maxChars: Int): String {
+    if (value == null) return ""
+    return value.subSequence(0, minOf(value.length, maxChars)).toString()
   }
 }
