@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextInput
 import com.example.core.designsystem.theme.SkyplusOceanTheme
 import com.example.domain.model.InvestmentCategory
 import com.example.domain.model.InvestmentHolding
