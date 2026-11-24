@@ -57,6 +57,8 @@ data class DetectionSettings(
   val isSmsDetectionEnabled: Boolean = false,
   val isSmsPolicyRestricted: Boolean = true,
   val permittedPackages: Set<String> = DEFAULT_PERMITTED_PACKAGES,
+  val excludedPackages: Set<String> = emptySet(),
+  val hasAllAppNotificationConsent: Boolean = false,
 ) {
   companion object {
     val DEFAULT_PERMITTED_PACKAGES =

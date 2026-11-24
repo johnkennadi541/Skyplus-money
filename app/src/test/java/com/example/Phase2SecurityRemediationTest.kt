@@ -2,6 +2,7 @@ package com.example
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.SystemClock
 import android.util.Base64
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -46,6 +47,9 @@ import com.example.domain.usecase.SignInWithGoogleIdTokenUseCase
 import com.example.domain.usecase.SignOutUseCase
 import com.example.feature.authentication.AuthViewModel
 import com.example.feature.smartdetection.engine.SmartTransactionParser
+import com.example.feature.smartdetection.engine.ReadOnlyNotificationResult
+import com.example.feature.smartdetection.engine.NotificationMetadata
+import com.example.feature.smartdetection.engine.NotificationText
 import com.example.service.SkyplusNotificationListenerService
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -398,7 +402,12 @@ class Phase2SecurityRemediationTest {
     )
     detectionRepo.updateDetectionSettings(
       uid,
-      DetectionSettings(userId = uid, isNotificationDetectionEnabled = true, isAutoSaveHighConfidenceEnabled = true),
+      DetectionSettings(
+        userId = uid,
+        isNotificationDetectionEnabled = true,
+        isAutoSaveHighConfidenceEnabled = true,
+        hasAllAppNotificationConsent = true,
+      ),
     )
 
     val gateway = FakeGateway().apply {
@@ -417,21 +426,63 @@ class Phase2SecurityRemediationTest {
 
     val smsLikeNotif = "Rs. 400.00 debited from A/c XX8899 paid to Uber Ref N1234567"
 
-    // 1. Missing consent -> MUST be blocked
-    service.processNotificationContent("com.phonepe.app", "PhonePe", smsLikeNotif, 1_700_000_000_000L)
+    suspend fun classifyAt(timestamp: Long): Pair<ReadOnlyNotificationResult, Boolean> {
+      var contentRead = false
+      val metadata =
+        NotificationMetadata(
+          packageName = "com.phonepe.app",
+          notificationKey = null,
+          postTime = timestamp,
+          receivedAtWallClockMillis = timestamp,
+          receivedAtElapsedRealtimeMillis = SystemClock.elapsedRealtime(),
+        )
+      val result =
+        service.processNotification(metadata) {
+          contentRead = true
+          NotificationText(title = "PhonePe", text = smsLikeNotif)
+        }
+      return result to contentRead
+    }
+
+    // 1. Missing consent -> content provider is never invoked.
+    val (missingConsentResult, missingConsentRead) = classifyAt(1_700_000_000_000L)
+    assertTrue(missingConsentResult is ReadOnlyNotificationResult.Blocked)
+    assertFalse(missingConsentRead)
     assertEquals(0, detectionRepo.getDetectionEvents(uid).first().size)
 
-    // 2. Outdated consent (0.9.0 != 1.0.0) -> MUST be blocked
+    // 2. Outdated consent (0.9.0 != 1.0.0) -> fail closed before content access.
     fakeConsentRepo.records[uid] = ConsentRecord("0.9.0", ConsentRecord.CURRENT_PRIVACY_VERSION, 1000L)
-    service.processNotificationContent("com.phonepe.app", "PhonePe", smsLikeNotif, 1_700_000_010_000L)
+    val (outdatedConsentResult, outdatedConsentRead) = classifyAt(1_700_000_010_000L)
+    assertTrue(outdatedConsentResult is ReadOnlyNotificationResult.Blocked)
+    assertFalse(outdatedConsentRead)
     assertEquals(0, detectionRepo.getDetectionEvents(uid).first().size)
 
-    // 3. Up-to-date consent -> allowed and processed
+    // 3. Current consent permits read-only classification; database and balance remain unchanged.
     fakeConsentRepo.records[uid] =
       ConsentRecord(ConsentRecord.CURRENT_TERMS_VERSION, ConsentRecord.CURRENT_PRIVACY_VERSION, 2000L)
-    service.processNotificationContent("com.phonepe.app", "PhonePe", smsLikeNotif, 1_700_000_020_000L)
-    assertEquals(1, detectionRepo.getDetectionEvents(uid).first().size)
-    assertEquals(160_000L, accountRepo.getAccountById(uid, "acc_n1")!!.currentBalanceMinor)
+    val (classifiedResult, classifiedContentRead) = classifyAt(1_700_000_020_000L)
+    assertTrue(classifiedContentRead)
+    assertTrue(classifiedResult is ReadOnlyNotificationResult.Classified)
+    assertEquals(0, detectionRepo.getDetectionEvents(uid).first().size)
+    assertEquals(200_000L, accountRepo.getAccountById(uid, "acc_n1")!!.currentBalanceMinor)
+  }
+
+  @Test
+  fun `all-app notification consent and exclusions persist per user`() = runTest {
+    val uid = "uid_all_app_preferences"
+    val settings =
+      DetectionSettings(
+        userId = uid,
+        isNotificationDetectionEnabled = true,
+        hasAllAppNotificationConsent = true,
+        excludedPackages = setOf("com.private.chat", "com.social.app"),
+      )
+
+    detectionRepo.updateDetectionSettings(uid, settings).getOrThrow()
+    val restored = detectionRepo.getDetectionSettings(uid).first()
+
+    assertTrue(restored.hasAllAppNotificationConsent)
+    assertEquals(setOf("com.private.chat", "com.social.app"), restored.excludedPackages)
   }
 
   // --- Requirement 5: Consent DataStore error handling + spaced OTP/2FA/digit masking ---

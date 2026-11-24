@@ -565,6 +565,10 @@ class SmartDetectionRepositoryImpl @Inject constructor(
         val autoSave = prefs[booleanPreferencesKey("autosave_high_conf_$userId")] ?: true
         val packages =
           prefs[stringSetPreferencesKey("permitted_pkgs_$userId")] ?: DetectionSettings.DEFAULT_PERMITTED_PACKAGES
+        val excludedPackages =
+          prefs[stringSetPreferencesKey("excluded_pkgs_$userId")] ?: emptySet()
+        val allAppConsent =
+          prefs[booleanPreferencesKey("all_app_notification_consent_$userId")] ?: false
 
         DetectionSettings(
           userId = userId,
@@ -573,6 +577,8 @@ class SmartDetectionRepositoryImpl @Inject constructor(
           isSmsDetectionEnabled = false, // Blocked per Google Play SMS & Call Log Policy
           isSmsPolicyRestricted = true,
           permittedPackages = packages,
+          excludedPackages = excludedPackages,
+          hasAllAppNotificationConsent = allAppConsent,
         )
       }
       .flowOn(dispatchers.io)
@@ -594,6 +600,10 @@ class SmartDetectionRepositoryImpl @Inject constructor(
             settings.isAutoSaveHighConfidenceEnabled
           prefs[stringSetPreferencesKey("permitted_pkgs_$authenticatedUserId")] =
             settings.permittedPackages
+          prefs[stringSetPreferencesKey("excluded_pkgs_$authenticatedUserId")] =
+            settings.excludedPackages
+          prefs[booleanPreferencesKey("all_app_notification_consent_$authenticatedUserId")] =
+            settings.hasAllAppNotificationConsent
         }
         Unit
       }

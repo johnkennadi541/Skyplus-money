@@ -244,6 +244,48 @@ class SmartDetectionViewModel @Inject constructor(
     }
   }
 
+  fun toggleAllAppNotificationConsent(enabled: Boolean) {
+    viewModelScope.launch {
+      val session = authRepository.observeAuthSession().first()
+      val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+      if (uid.isNullOrBlank()) {
+        _userMessage.value = "Consent update failed: Authentication required"
+        return@launch
+      }
+      val current = settingsUseCases.getSettings(uid).first()
+      settingsUseCases.updateSettings(
+        uid,
+        current.copy(userId = uid, hasAllAppNotificationConsent = enabled),
+      ).onSuccess {
+        _userMessage.value =
+          if (enabled) "All-app notification classification consent enabled"
+          else "All-app notification classification consent withdrawn"
+      }.onFailure { error ->
+        _userMessage.value = "Consent update failed: ${error.message}"
+      }
+    }
+  }
+
+  fun toggleExcludedPackage(packageName: String, excluded: Boolean) {
+    viewModelScope.launch {
+      val session = authRepository.observeAuthSession().first()
+      val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+      if (uid.isNullOrBlank()) {
+        _userMessage.value = "Source update failed: Authentication required"
+        return@launch
+      }
+      val current = settingsUseCases.getSettings(uid).first()
+      val newPackages = current.excludedPackages.toMutableSet()
+      if (excluded) newPackages.add(packageName) else newPackages.remove(packageName)
+      settingsUseCases.updateSettings(
+        uid,
+        current.copy(userId = uid, excludedPackages = newPackages),
+      ).onFailure { error ->
+        _userMessage.value = "Source update failed: ${error.message}"
+      }
+    }
+  }
+
   fun togglePermittedPackage(packageName: String, permitted: Boolean) {
     viewModelScope.launch {
       val session = authRepository.observeAuthSession().first()
