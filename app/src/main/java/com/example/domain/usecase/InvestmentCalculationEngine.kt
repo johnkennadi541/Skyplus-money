@@ -365,7 +365,9 @@ class InvestmentCalculationEngine @Inject constructor() {
           totalRealized = Math.addExact(totalRealized, h.realizedPnlMinor)
           if (!perf.isFullyExited) activeCount++
           if (perf.isPriceStale) staleCount++
-          lastMarketUpdate = maxOf(lastMarketUpdate ?: h.lastPriceUpdateDate, h.lastPriceUpdateDate)
+          if (h.lastPriceUpdateDate > 0L) {
+            lastMarketUpdate = maxOf(lastMarketUpdate ?: h.lastPriceUpdateDate, h.lastPriceUpdateDate)
+          }
         }
 
         val unrealizedPnl = Math.subtractExact(totalValuation, totalInvested)
@@ -456,6 +458,10 @@ class InvestmentCalculationEngine @Inject constructor() {
         latestPerHoldingState[snapshot.holdingId] = snapshot
         idx++
       }
+
+      // Do not plot a partial portfolio: wait until every current holding has
+      // at least one authentic snapshot, otherwise the chart understates earlier values.
+      if (latestPerHoldingState.size < holdingsCount) continue
 
       var investedSum = 0L
       var valuationSum = 0L
