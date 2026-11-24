@@ -5,9 +5,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 // ============================================================================================
-// SKYPLUS MONEY — Google-inspired Stage 2 palette.
-// Google Blue is the primary interaction colour; navy remains the structural foundation.
-// Yellow is a restrained accent, while green/red retain semantic success/error meaning.
+// SKYPLUS MONEY — balanced Google-inspired palette.
+// Blue is primary; red, yellow and green are supporting/semantic accents.
 // This is an independent SKYPLUS palette, not a reproduction of Google's brand identity.
 // ============================================================================================
 
@@ -120,11 +119,11 @@ val DarkSkyplusChartPalette =
   SkyplusChartPalette(
     series =
       listOf(
-        SkyplusYellow,
-        OceanTealBright,
-        Color(0xFF60A5FA),
-        Color(0xFFA78BFA),
-        Color(0xFFF472B6),
+        Color(0xFF8AB4F8),
+        Color(0xFFF28B82),
+        SkyplusYellowBright,
+        Color(0xFF81C995),
+        Color(0xFFC58AF9),
       ),
     gridLine = Color(0xFF1E446B).copy(alpha = 0.55f),
     axisLabel = OceanTextMutedDark,
@@ -136,11 +135,11 @@ val LightSkyplusChartPalette =
   SkyplusChartPalette(
     series =
       listOf(
-        SkyplusYellowDeep,
-        OceanTeal,
-        Color(0xFF2563EB),
-        Color(0xFF7C3AED),
-        Color(0xFFDB2777),
+        Color(0xFF4285F4),
+        Color(0xFFEA4335),
+        Color(0xFFF9AB00),
+        Color(0xFF34A853),
+        Color(0xFF7E57C2),
       ),
     gridLine = Color(0xFFCBDCEB),
     axisLabel = OceanTextMutedLight,

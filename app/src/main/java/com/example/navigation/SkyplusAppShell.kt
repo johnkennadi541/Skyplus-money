@@ -24,7 +24,6 @@ import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.Button
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,8 +31,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -363,16 +363,35 @@ fun SkyplusAppShell(
       containerColor = MaterialTheme.colorScheme.background,
       topBar = {
         if (showTopLevelNav) {
-          CenterAlignedTopAppBar(
-            title = {
+          Surface(
+            color = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+          ) {
+            Row(
+              modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = OceanSpacing.md)
+                .testTag("skyplus_compact_app_header"),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
               Text(
                 text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
               )
-            },
-            actions = {
+              IconButton(
+                onClick = onToggleTheme,
+                modifier = Modifier.minimumInteractiveComponentSize().testTag("theme_toggle_button"),
+              ) {
+                Icon(
+                  imageVector =
+                    if (OceanTheme.colors.isDark) Icons.Rounded.LightMode
+                    else Icons.Rounded.DarkMode,
+                  contentDescription = stringResource(R.string.cd_toggle_theme),
+                  tint = MaterialTheme.colorScheme.primary,
+                )
+              }
               IconButton(
                 onClick = { navController.navigate(SkyplusRoute.Profile) },
                 modifier = Modifier.minimumInteractiveComponentSize().testTag("profile_menu_button"),
@@ -383,25 +402,8 @@ fun SkyplusAppShell(
                   tint = MaterialTheme.colorScheme.primary,
                 )
               }
-              IconButton(
-                onClick = onToggleTheme,
-                modifier = Modifier.minimumInteractiveComponentSize().testTag("theme_toggle_button"),
-              ) {
-                Icon(
-                  imageVector =
-                    if (OceanTheme.colors.isDark) Icons.Rounded.LightMode
-                    else Icons.Rounded.DarkMode,
-                  contentDescription = stringResource(R.string.cd_toggle_theme),
-                  tint = OceanTheme.colors.gold,
-                )
-              }
-            },
-            colors =
-              TopAppBarDefaults.centerAlignedTopAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-                titleContentColor = MaterialTheme.colorScheme.onSurface,
-              ),
-          )
+            }
+          }
         }
       },
       bottomBar = {
