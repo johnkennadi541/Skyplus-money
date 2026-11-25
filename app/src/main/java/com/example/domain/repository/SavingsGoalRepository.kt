@@ -28,8 +28,8 @@ interface SavingsGoalRepository {
     goal: SavingsGoal,
   ): Result<Unit>
 
-  /** Removes the goal and its contributions in one transaction. */
-  suspend fun deleteGoal(userId: String, goalId: String): Result<Unit>
+  /** Archives or restores a goal without deleting its contribution history. */
+  suspend fun setGoalArchived(userId: String, goalId: String, archived: Boolean): Result<Unit>
 
   /** Rejects a contribution whose currency differs from the goal's, and any non-positive amount. */
   suspend fun addContribution(
@@ -37,5 +37,6 @@ interface SavingsGoalRepository {
     contribution: SavingsContribution,
   ): Result<SavingsContribution>
 
-  suspend fun deleteContribution(userId: String, contributionId: String): Result<Unit>
+  /** Permanently retains the row and marks it void; voiding is one-way and UID-scoped. */
+  suspend fun voidContribution(userId: String, contributionId: String): Result<Unit>
 }
