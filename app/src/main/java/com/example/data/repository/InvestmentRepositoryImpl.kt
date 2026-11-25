@@ -248,6 +248,12 @@ class InvestmentRepositoryImpl @Inject constructor(
             "Investment ownership verification failed"
           }
 
+          // The original acquisition date is ledger history, not editable metadata.
+          // Keep it immutable so the initial BUY and initial price-history dates cannot diverge.
+          require(holding.purchaseDate == existing.purchaseDate) {
+            "Investment purchase date cannot be changed after the initial purchase"
+          }
+
           val existingDomain = existing.toDomain()
           val allowAuto =
             holding.autoPriceUpdateEnabled && holding.category == InvestmentCategory.MUTUAL_FUNDS
@@ -259,7 +265,6 @@ class InvestmentRepositoryImpl @Inject constructor(
               symbolOrTicker = holding.symbolOrTicker?.trim()?.takeIf { it.isNotEmpty() },
               isin = holding.isin?.trim()?.uppercase()?.takeIf { it.isNotEmpty() },
               brokerOrPlatform = holding.brokerOrPlatform?.trim()?.takeIf { it.isNotEmpty() },
-              purchaseDate = holding.purchaseDate,
               autoPriceUpdateEnabled = allowAuto,
               notes = holding.notes?.trim()?.takeIf { it.isNotEmpty() },
               updatedAt = now,
