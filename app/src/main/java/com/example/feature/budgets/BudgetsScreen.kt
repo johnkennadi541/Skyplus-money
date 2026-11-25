@@ -63,6 +63,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.designsystem.component.BadgeTone
 import com.example.core.designsystem.component.OceanCard
+import com.example.core.designsystem.component.SkyplusSectionCard
 import com.example.core.designsystem.component.OceanSectionHeader
 import com.example.core.designsystem.component.OceanStatusBadge
 import com.example.core.designsystem.theme.OceanSpacing
@@ -248,7 +249,7 @@ fun BudgetsContent(
       // Overall Summary Card for Active Currency
       if (activeSummary != null && activeSummary.activeBudgetCount > 0) {
         item {
-          OceanCard(modifier = Modifier.testTag("budget_summary_card")) {
+          SkyplusSectionCard(modifier = Modifier.testTag("budget_summary_card")) {
             Row(
               modifier = Modifier.fillMaxWidth(),
               horizontalArrangement = Arrangement.SpaceBetween,
@@ -338,7 +339,7 @@ fun BudgetsContent(
       // Empty State
       if (filteredBudgets.isEmpty()) {
         item {
-          OceanCard(modifier = Modifier.testTag("budgets_empty_state")) {
+          SkyplusSectionCard(modifier = Modifier.testTag("budgets_empty_state")) {
             Column(
               modifier = Modifier.fillMaxWidth().padding(OceanSpacing.lg),
               horizontalAlignment = Alignment.CenterHorizontally,
@@ -346,7 +347,7 @@ fun BudgetsContent(
               Icon(
                 imageVector = Icons.Rounded.PieChart,
                 contentDescription = null,
-                tint = OceanTheme.colors.gold,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(48.dp),
               )
               Spacer(modifier = Modifier.height(OceanSpacing.sm))
