@@ -276,6 +276,28 @@ class CreditCardDatabaseAndRepoTest {
   }
 
   @Test
+  fun `archiving a card preserves outstanding balance transactions and can be restored`() = runTest {
+    val account = createAccount(userA, "acc_card_archive", balanceMinor = -42_500L)
+    val created = cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
+    insertTransaction(account.id, "txn_archive_preserved")
+
+    cardRepository.setCardArchived(userA, created.id, archived = true).getOrThrow()
+
+    val archived = cardRepository.getCard(userA, created.id)
+    assertTrue(archived?.isArchived == true)
+    assertEquals(1, cardRepository.observeCards(userA).first().size)
+    assertEquals(-42_500L, accountRepository.getAccountById(userA, account.id)?.currentBalanceMinor)
+    assertNotNull(database.financialTransactionDao().getTransactionById(userA, "txn_archive_preserved"))
+
+    cardRepository.setCardArchived(userA, created.id, archived = false).getOrThrow()
+
+    assertFalse(cardRepository.getCard(userA, created.id)?.isArchived ?: true)
+    assertEquals(1, cardRepository.observeCards(userA).first().size)
+    assertEquals(-42_500L, accountRepository.getAccountById(userA, account.id)?.currentBalanceMinor)
+    assertNotNull(database.financialTransactionDao().getTransactionById(userA, "txn_archive_preserved"))
+  }
+
+  @Test
   fun `a card can be recreated after deletion`() = runTest {
     val account = createAccount(userA, "acc_card_r1")
     val first = cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
