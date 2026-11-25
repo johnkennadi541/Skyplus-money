@@ -407,6 +407,60 @@ class ReportsCalculationEngineTest {
   }
 
   @Test
+  fun `refunds are not attributed to categories without an original expense link`() {
+    val window =
+      ReportDateWindow(
+        periodType = ReportPeriodType.CUSTOM,
+        startDateMillis = startMillis,
+        endDateMillis = endMillis,
+        label = "Refund category test",
+      )
+    fun transaction(
+      id: String,
+      type: TransactionType,
+      amount: Long,
+      category: String,
+    ) = FinancialTransaction(
+      id = id,
+      userId = uid,
+      accountId = "acc_test",
+      type = type,
+      amountMinor = amount,
+      currencyCode = "INR",
+      category = category,
+      transactionDate = midMillis,
+      status = TransactionStatus.COMPLETED,
+    )
+
+    val report =
+      engine.computeIncomeExpenseReport(
+        currencyCode = "INR",
+        window = window,
+        transactions =
+          listOf(
+            transaction("expense_food", TransactionType.EXPENSE, 1_000L, "Food"),
+            transaction("expense_travel", TransactionType.EXPENSE, 500L, "Travel"),
+            // Even a matching category is not proof that this refund belongs to that expense.
+            transaction("refund_travel", TransactionType.REFUND, 100L, "Travel"),
+            transaction("refund_other", TransactionType.REFUND, 50L, "Other"),
+          ),
+      )
+
+    assertEquals(1_500L, report.grossExpensesMinor)
+    assertEquals(150L, report.totalRefundsAndReversalsMinor)
+    assertEquals(1_350L, report.netExpensesMinor)
+    assertEquals(2, report.completedRefundCount)
+
+    val categories = report.expenseByCategory.associateBy { it.category }
+    assertEquals(setOf("Food", "Travel"), categories.keys)
+    assertEquals(1_000L, categories.getValue("Food").totalMinor)
+    assertEquals(500L, categories.getValue("Travel").totalMinor)
+    assertEquals(0L, categories.getValue("Travel").refundOffsetMinor)
+    assertEquals(1_500L, report.expenseByCategory.sumOf { it.totalMinor })
+    assertEquals(100L, categories.getValue("Food").grossMinor - categories.getValue("Food").totalMinor)
+  }
+
+  @Test
   fun `buildDateWindow generates accurate boundaries for all report periods`() {
     val now = 1_751_500_000_000L
     ReportPeriodType.entries.forEach { period ->
