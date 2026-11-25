@@ -486,4 +486,15 @@ object DatabaseMigrations {
         )
       }
     }
+  /**
+   * Credit-card archive state. Additive only: existing card rows and all linked ledger data remain
+   * intact; existing cards default to visible/unarchived.
+   */
+  val MIGRATION_9_10: Migration =
+    object : Migration(9, 10) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+      }
+    }
+
 }
