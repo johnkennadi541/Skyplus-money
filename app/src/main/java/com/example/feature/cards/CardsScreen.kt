@@ -39,7 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.core.designsystem.component.BadgeTone
-import com.example.core.designsystem.component.OceanCard
+import com.example.core.designsystem.component.SkyplusSectionCard
 import com.example.core.designsystem.component.OceanSectionHeader
 import com.example.core.designsystem.component.OceanStatusBadge
 import com.example.core.designsystem.component.SkyplusConfirmDialog
@@ -127,7 +127,7 @@ fun CardsContent(
         ) {
           OceanSectionHeader(
             title = "Credit cards",
-            subtitle = "Balances are liabilities and are never counted as assets",
+            subtitle = "Track limits, outstanding balances, and utilisation",
           )
           SkyplusPrimaryButton(
             text = "Add card",
@@ -210,7 +210,7 @@ private fun CardTile(
   val limitText = formatter.format(Money.fromMinorUnits(summary.card.creditLimitMinor, summary.card.currencyCode))
   val utilisation = (summary.utilisationPercent.toFloat() / 100f).coerceIn(0f, 1f)
 
-  OceanCard(modifier = Modifier.fillMaxWidth().testTag("card_tile_${summary.card.id}")) {
+  SkyplusSectionCard(modifier = Modifier.fillMaxWidth().testTag("card_tile_${summary.card.id}")) {
     Row(
       modifier = Modifier.fillMaxWidth(),
       horizontalArrangement = Arrangement.SpaceBetween,
@@ -363,7 +363,7 @@ private fun CardFormDialog(
                 .testTag("card_account_option_${account.id}"),
             shape = MaterialTheme.shapes.small,
             color =
-              if (selected) OceanTheme.colors.accentContainer
+              if (selected) MaterialTheme.colorScheme.primaryContainer
               else MaterialTheme.colorScheme.surfaceVariant,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
           ) {
@@ -414,7 +414,7 @@ private fun CardFormDialog(
                 Modifier.clickable { network = candidate }.testTag("card_network_${candidate.name}"),
               shape = MaterialTheme.shapes.small,
               color =
-                if (selected) OceanTheme.colors.accentContainer
+                if (selected) MaterialTheme.colorScheme.primaryContainer
                 else MaterialTheme.colorScheme.surfaceVariant,
             ) {
               Text(

@@ -34,10 +34,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.example.core.designsystem.component.OceanCard
+import com.example.core.designsystem.component.SkyplusSectionCard
 import com.example.core.designsystem.component.OceanSectionHeader
 import com.example.core.designsystem.theme.OceanSpacing
-import com.example.core.designsystem.theme.OceanTheme
 import com.example.core.designsystem.theme.SkyplusIconSize
 
 /**
@@ -74,7 +73,7 @@ fun ToolsScreen(
   ) {
     OceanSectionHeader(
       title = "Tools",
-      subtitle = "Everything that is not on the main tabs lives here.",
+      subtitle = "Quick access to the rest of your money tools.",
     )
 
     ToolGroup(title = "Money") {
@@ -179,7 +178,7 @@ private fun ToolGroup(title: String, content: @Composable () -> Unit) {
       color = MaterialTheme.colorScheme.onSurfaceVariant,
       modifier = Modifier.padding(bottom = OceanSpacing.xs),
     )
-    OceanCard { content() }
+    SkyplusSectionCard { content() }
   }
 }
 
@@ -191,7 +190,6 @@ private fun ToolRow(
   testTag: String,
   onClick: () -> Unit,
 ) {
-  val extended = OceanTheme.colors
   Row(
     modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).testTag(testTag),
     verticalAlignment = Alignment.CenterVertically,
@@ -200,7 +198,7 @@ private fun ToolRow(
     Icon(
       imageVector = icon,
       contentDescription = null,
-      tint = extended.accent,
+      tint = MaterialTheme.colorScheme.primary,
       modifier = Modifier.size(SkyplusIconSize.md),
     )
     Column(modifier = Modifier.weight(1f)) {
