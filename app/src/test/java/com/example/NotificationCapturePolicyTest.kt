@@ -10,6 +10,7 @@ class NotificationCapturePolicyTest {
   @Test
   fun `allows ordinary posted notifications`() {
     assertTrue(NotificationCapturePolicy.shouldCapture(false, 0))
+    assertTrue(NotificationCapturePolicy.shouldCapture(false, Notification.FLAG_AUTO_CANCEL))
   }
 
   @Test
