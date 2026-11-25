@@ -202,6 +202,12 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
           require(existing.userId == authenticatedUserId) {
             "Transaction ownership verification failed"
           }
+          require(existing.type != TransactionType.TRANSFER.name &&
+            oldTransaction.type != TransactionType.TRANSFER &&
+            updatedTransaction.type != TransactionType.TRANSFER
+          ) {
+            "Transfer transactions cannot be edited. Delete and recreate the transfer to preserve both linked entries and account balances."
+          }
           requireNotNull(accountDao.getAccountById(authenticatedUserId, oldTransaction.accountId)) {
             "Original account not found for authenticated user"
           }

@@ -232,6 +232,74 @@ class Phase2DatabaseAndRepoTest {
   }
 
   @Test
+  fun `transfer edit is rejected without mutating either linked leg or balance`() = runTest {
+    val uid = "uid_transfer_edit_guard"
+    accountRepo.createAccount(
+      uid,
+      FinancialAccount(
+        id = "transfer_edit_source",
+        userId = uid,
+        name = "Source",
+        type = AccountType.BANK,
+        currencyCode = "INR",
+        initialBalanceMinor = 500_000L,
+        currentBalanceMinor = 500_000L,
+      ),
+    )
+    accountRepo.createAccount(
+      uid,
+      FinancialAccount(
+        id = "transfer_edit_destination",
+        userId = uid,
+        name = "Destination",
+        type = AccountType.WALLET,
+        currencyCode = "INR",
+        initialBalanceMinor = 100_000L,
+        currentBalanceMinor = 100_000L,
+      ),
+    )
+
+    val (sourceLeg, _) = txnRepo.recordTransfer(
+      authenticatedUserId = uid,
+      sourceTransaction = FinancialTransaction(
+        userId = uid,
+        accountId = "transfer_edit_source",
+        type = TransactionType.TRANSFER,
+        amountMinor = 100_000L,
+        currencyCode = "INR",
+        category = TransactionCategories.TRANSFER_OUT_CATEGORY,
+      ),
+      destinationAccountId = "transfer_edit_destination",
+    ).getOrThrow()
+
+    val attemptedEdit = txnRepo.updateTransaction(
+      authenticatedUserId = uid,
+      updatedTransaction = sourceLeg.copy(
+        type = TransactionType.EXPENSE,
+        category = "Shopping",
+        linkedTransferId = null,
+        transferDestinationAccountId = null,
+      ),
+      oldTransaction = sourceLeg,
+    )
+
+    assertTrue("A linked transfer must not be converted into an expense", attemptedEdit.isFailure)
+    assertEquals(400_000L, accountRepo.getAccountById(uid, "transfer_edit_source")!!.currentBalanceMinor)
+    assertEquals(200_000L, accountRepo.getAccountById(uid, "transfer_edit_destination")!!.currentBalanceMinor)
+
+    val rowsAfterRejectedEdit = txnRepo.getTransactions(uid).first()
+    assertEquals(2, rowsAfterRejectedEdit.size)
+    assertTrue(rowsAfterRejectedEdit.all { it.type == TransactionType.TRANSFER })
+    assertEquals(1, rowsAfterRejectedEdit.map { it.linkedTransferId }.distinct().size)
+
+    // Deleting the untouched source leg must still reverse both sides of the transfer.
+    txnRepo.deleteTransaction(uid, sourceLeg.id).getOrThrow()
+    assertEquals(500_000L, accountRepo.getAccountById(uid, "transfer_edit_source")!!.currentBalanceMinor)
+    assertEquals(100_000L, accountRepo.getAccountById(uid, "transfer_edit_destination")!!.currentBalanceMinor)
+    assertTrue(txnRepo.getTransactions(uid).first().isEmpty())
+  }
+
+  @Test
   fun `internal transfer is atomic across accounts, rolls back on delete, and blocks implicit cross currency`() = runTest {
     val uid = "uid_xfer"
     accountRepo.createAccount(
