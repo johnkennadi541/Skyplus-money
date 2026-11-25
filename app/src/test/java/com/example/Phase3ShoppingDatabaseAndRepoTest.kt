@@ -121,6 +121,36 @@ class Phase3ShoppingDatabaseAndRepoTest {
     assertEquals(3, pricesAfterPurchase.size)
     assertEquals("DailyMart", pricesAfterPurchase.first().storeName)
 
+    // Retrying the exact same purchase request is idempotent and does not add history.
+    val retriedPurchase =
+      repo.markItemPurchased(
+        authenticatedUserId = "user_1",
+        itemId = rice.id,
+        actualUnitPriceDecimal = "100.00",
+        actualTotalOverrideDecimal = null,
+        purchasedAt = 5_000L,
+        storeNameOverride = "DailyMart",
+      ).getOrThrow()
+    assertEquals(purchased.id, retriedPurchase.id)
+    assertEquals(3, repo.getStorePricesForList("user_1", groceryList.id).first().size)
+
+    // A conflicting second purchase request is rejected without changing the item or history.
+    assertTrue(
+      repo.markItemPurchased(
+        authenticatedUserId = "user_1",
+        itemId = rice.id,
+        actualUnitPriceDecimal = "110.00",
+        actualTotalOverrideDecimal = null,
+        purchasedAt = 6_000L,
+        storeNameOverride = "DailyMart",
+      ).isFailure
+    )
+    val unchangedPurchase = repo.getItemsForList("user_1", groceryList.id).first().single()
+    assertEquals(100_00L, unchangedPurchase.actualUnitPriceMinor)
+    assertEquals(250_00L, unchangedPurchase.actualTotalMinor)
+    assertEquals(5_000L, unchangedPurchase.purchasedAt)
+    assertEquals(3, repo.getStorePricesForList("user_1", groceryList.id).first().size)
+
     // Unpurchase restores pending state while keeping estimated values intact
     repo.markItemUnpurchased("user_1", rice.id).getOrThrow()
     val unpurchased = repo.getItemsForList("user_1", groceryList.id).first().single()
