@@ -37,7 +37,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.R
-import com.example.core.designsystem.component.BadgeTone
 import com.example.core.designsystem.component.OceanCard
 import com.example.core.designsystem.component.OceanSectionHeader
 import com.example.core.designsystem.component.SkyplusSectionCard
@@ -156,7 +155,7 @@ fun MoreScreen(
         Icon(
           imageVector = androidx.compose.material.icons.Icons.Rounded.NotificationsActive,
           contentDescription = "Smart Detection",
-          tint = OceanTheme.colors.gold,
+          tint = MaterialTheme.colorScheme.primary,
         )
         Spacer(modifier = Modifier.width(OceanSpacing.sm))
         Column(modifier = Modifier.weight(1f)) {
