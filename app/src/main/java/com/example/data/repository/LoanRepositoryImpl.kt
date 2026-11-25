@@ -152,6 +152,32 @@ class LoanRepositoryImpl @Inject constructor(
               ?: throw SecurityException("Loan does not belong to authenticated user")
           require(existing.userId == authenticatedUserId) { "Loan ownership verification failed" }
 
+          val paymentHistory = loanDao.getPaymentsForLoanSync(authenticatedUserId, loan.id)
+          val hasPaymentHistory =
+            paymentHistory.isNotEmpty() ||
+              existing.amountPaidMinor > 0L ||
+              existing.outstandingPrincipalMinor != existing.principalMinor
+
+          if (hasPaymentHistory) {
+            require(
+              loan.loanType == LoanType.valueOf(existing.loanType) &&
+                loan.principalMinor == existing.principalMinor &&
+                loan.currencyCode.equals(existing.currencyCode, ignoreCase = true) &&
+                rate.compareTo(BigDecimal(existing.annualInterestRatePercent)) == 0 &&
+                loan.tenureMonths == existing.tenureMonths &&
+                loan.startDate == existing.startDate &&
+                loan.nextDueDate == existing.nextDueDate
+            ) {
+              "Loan financial terms cannot be changed after payment history exists. Use a separate loan restructuring workflow."
+            }
+            require(
+              loan.amountPaidMinor == existing.amountPaidMinor &&
+                loan.outstandingPrincipalMinor == existing.outstandingPrincipalMinor
+            ) {
+              "Payment-derived loan balances cannot be edited. Record payments through the payment workflow."
+            }
+          }
+
           val now = System.currentTimeMillis()
           val finalStatus =
             when {
@@ -170,7 +196,7 @@ class LoanRepositoryImpl @Inject constructor(
               monthlyEmiMinor = emiResult.monthlyEmiMoney.minorUnits,
               totalPayableMinor = emiResult.totalRepaymentMoney.minorUnits,
               totalInterestMinor = emiResult.totalInterestMoney.minorUnits,
-              status = finalStatus,
+              status = if (hasPaymentHistory) LoanStatus.valueOf(existing.status) else finalStatus,
               notes = loan.notes?.trim()?.ifBlank { null },
               createdAt = existing.createdAt,
               updatedAt = now,
