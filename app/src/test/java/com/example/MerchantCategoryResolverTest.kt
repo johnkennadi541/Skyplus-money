@@ -36,6 +36,14 @@ class MerchantCategoryResolverTest {
   }
 
   @Test
+  fun unicode_merchant_names_are_preserved_and_normalized_consistently() {
+    assertEquals("தமிழ் கடை", MerchantCategoryResolver.normalizeMerchantName("தமிழ்-கடை"))
+    assertEquals("مَتْجَر", MerchantCategoryResolver.normalizeMerchantName("مَتْجَر"))
+    assertEquals("CAFE", MerchantCategoryResolver.normalizeMerchantName("Ｃａｆｅ"))
+    assertEquals("", MerchantCategoryResolver.normalizeMerchantName("•••"))
+  }
+
+  @Test
   fun aliases_do_not_match_inside_unrelated_names() {
     assertNull(MerchantCategoryResolver.resolve("NotAmazonic Store", TransactionType.EXPENSE))
     assertNull(MerchantCategoryResolver.resolve("JioMartial Arts", TransactionType.EXPENSE))

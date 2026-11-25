@@ -1,10 +1,16 @@
 package com.example
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.example.core.designsystem.theme.SkyplusOceanTheme
 import com.example.domain.model.AccountType
 import com.example.domain.model.AutoSavedTransactionNotice
@@ -20,9 +26,12 @@ import com.example.feature.dashboard.HomeFoundationUiState
 import com.example.feature.dashboard.HomeDashboardScreen
 import com.example.feature.dashboard.HomeDashboardUiState
 import com.example.feature.smartdetection.SmsPolicyStatusScreen
+import com.example.feature.smartdetection.MerchantOverrideSessionGuard
 import com.example.feature.smartdetection.TransactionCorrectionDialog
 import com.example.feature.transactions.TransactionsContent
 import com.example.feature.transactions.TransactionsFilterState
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -162,6 +171,93 @@ class Phase2UiRobolectricTest {
   }
 
   @Test
+  fun `late saved merchant category never overwrites a manual category selection`() {
+    var preferredCategory by mutableStateOf<String?>("Groceries")
+    val event =
+      TransactionDetectionEvent(
+        id = "ev_category_race",
+        userId = "uid_1",
+        rawPackageName = "com.phonepe.app",
+        senderOrTitle = "PhonePe",
+        detectedAmountMinor = 45_000L,
+        detectedCurrency = "INR",
+        detectedType = TransactionType.PENDING,
+        detectedMerchant = "Uber",
+        confidence = 0.65f,
+        confidenceLevel = DetectionConfidence.MEDIUM,
+        dedupFingerprint = "fp_race",
+        status = DetectionEventStatus.IN_REVIEW,
+      )
+
+    composeTestRule.setContent {
+      SkyplusOceanTheme(themePreference = ThemePreference.DARK) {
+        TransactionCorrectionDialog(
+          event = event,
+          accounts = emptyList(),
+          preferredCategory = preferredCategory,
+          onDismiss = {},
+          onConfirm = { _, _, _, _, _, _ -> },
+        )
+      }
+    }
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("category_chip_Food & Dining").performClick()
+    preferredCategory = "Shopping"
+    composeTestRule.waitForIdle()
+
+    composeTestRule.onNodeWithTag("category_chip_Food & Dining").assertIsSelected()
+  }
+
+  @Test
+  fun `changing merchant recalculates category and requests that merchant override`() {
+    var requestedMerchant: String? = null
+    val event =
+      TransactionDetectionEvent(
+        id = "ev_merchant_change",
+        userId = "uid_1",
+        rawPackageName = "com.phonepe.app",
+        senderOrTitle = "PhonePe",
+        detectedAmountMinor = 45_000L,
+        detectedCurrency = "INR",
+        detectedType = TransactionType.PENDING,
+        detectedMerchant = "Uber",
+        confidence = 0.65f,
+        confidenceLevel = DetectionConfidence.MEDIUM,
+        dedupFingerprint = "fp_merchant_change",
+        status = DetectionEventStatus.IN_REVIEW,
+      )
+
+    composeTestRule.setContent {
+      SkyplusOceanTheme(themePreference = ThemePreference.DARK) {
+        TransactionCorrectionDialog(
+          event = event,
+          accounts = emptyList(),
+          onMerchantChanged = { requestedMerchant = it },
+          onDismiss = {},
+          onConfirm = { _, _, _, _, _, _ -> },
+        )
+      }
+    }
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("correction_merchant_input").performTextClearance()
+    composeTestRule.onNodeWithTag("correction_merchant_input").performTextInput("Swiggy")
+    composeTestRule.waitForIdle()
+
+    assertEquals("Swiggy", requestedMerchant)
+    composeTestRule.onNodeWithTag("category_chip_Food & Dining").assertIsSelected()
+  }
+
+  @Test
+  fun `merchant override session guard invalidates state for every identity change`() {
+    val guard = MerchantOverrideSessionGuard()
+    assertTrue(guard.onUidChanged("uid_a"))
+    assertFalse(guard.onUidChanged("uid_a"))
+    assertTrue(guard.onUidChanged("uid_b"))
+    assertTrue(guard.onUidChanged(null))
+    assertFalse(guard.onUidChanged(null))
+  }
+
+  @Test
   fun `sms policy screen and transaction correction dialog render accurately`() {
     var confirmed = false
     val event =
@@ -196,6 +292,7 @@ class Phase2UiRobolectricTest {
         TransactionCorrectionDialog(
           event = event,
           accounts = listOf(acc),
+          preferredCategory = "Groceries",
           onDismiss = {},
           onConfirm = { _, _, _, _, _, _ -> confirmed = true },
         )
@@ -205,6 +302,7 @@ class Phase2UiRobolectricTest {
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("sms_policy_status_screen").assertIsDisplayed()
     composeTestRule.onNodeWithTag("correction_amount_input").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("category_chip_Groceries").assertIsSelected()
     composeTestRule.onNodeWithTag("confirm_correction_button").performClick()
     assertTrue(confirmed)
   }

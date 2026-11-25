@@ -1,6 +1,8 @@
 package com.example.feature.smartdetection.engine
 
 import com.example.domain.model.TransactionType
+import java.text.Normalizer
+import java.util.Locale
 
 /** Offline, deterministic merchant-to-category rules. Unknown merchants return null. */
 object MerchantCategoryResolver {
@@ -32,6 +34,13 @@ object MerchantCategoryResolver {
       ?.value
   }
 
-  private fun normalize(value: String): String =
-    value.uppercase().replace(Regex("[^A-Z0-9]+"), " ").trim().replace(Regex("\\s+"), " ")
+  /** Stable Unicode-aware normalization shared by resolver and persisted merchant keys. */
+  fun normalizeMerchantName(value: String): String =
+    Normalizer.normalize(value, Normalizer.Form.NFKC)
+      .uppercase(Locale.ROOT)
+      .replace(Regex("[^\\p{L}\\p{M}\\p{N}]+"), " ")
+      .trim()
+      .replace(Regex("\\s+"), " ")
+
+  private fun normalize(value: String): String = normalizeMerchantName(value)
 }

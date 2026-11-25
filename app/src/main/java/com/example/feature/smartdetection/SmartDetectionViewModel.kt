@@ -9,6 +9,7 @@ import com.example.domain.model.AutoSavedTransactionNotice
 import com.example.domain.model.DetectionSettings
 import com.example.domain.model.FinancialAccount
 import com.example.domain.model.Money
+import com.example.domain.model.MerchantCategoryOverridePersistenceException
 import com.example.domain.model.TransactionDetectionEvent
 import com.example.domain.model.TransactionType
 import com.example.domain.repository.AuthRepository
@@ -50,15 +51,28 @@ class SmartDetectionViewModel @Inject constructor(
   private val _userMessage = MutableStateFlow<String?>(null)
   val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
 
+  private val _merchantCategoryOverride = MutableStateFlow<String?>(null)
+  val merchantCategoryOverride: StateFlow<String?> = _merchantCategoryOverride.asStateFlow()
+  private val _authSessionVersion = MutableStateFlow(0L)
+  val authSessionVersion: StateFlow<Long> = _authSessionVersion.asStateFlow()
+  private var merchantOverrideRequestId: Long = 0L
+
   private val _isPermissionGranted = MutableStateFlow(NotificationPermissionHelper.isNotificationAccessGranted(context))
   val isPermissionGranted: StateFlow<Boolean> = _isPermissionGranted.asStateFlow()
 
   init {
     viewModelScope.launch {
+      val sessionGuard = MerchantOverrideSessionGuard()
       authRepository.observeAuthSession()
         .distinctUntilChangedBy { (it as? AuthSessionState.Authenticated)?.user?.uid }
         .collect { session ->
           _userMessage.value = null
+          val currentUid = (session as? AuthSessionState.Authenticated)?.user?.uid
+          if (sessionGuard.onUidChanged(currentUid)) {
+            merchantOverrideRequestId++
+            _merchantCategoryOverride.value = null
+            _authSessionVersion.value = _authSessionVersion.value + 1L
+          }
           if (session !is AuthSessionState.Authenticated) {
             settingsUseCases.clearAutoSavedNotice()
           }
@@ -158,6 +172,23 @@ class SmartDetectionViewModel @Inject constructor(
     settingsUseCases.clearAutoSavedNotice()
   }
 
+  fun loadMerchantCategoryOverride(merchant: String?) {
+    val requestId = ++merchantOverrideRequestId
+    _merchantCategoryOverride.value = null
+    val safeMerchant = merchant?.trim()?.takeIf { it.isNotBlank() } ?: return
+    viewModelScope.launch {
+      val session = authRepository.observeAuthSession().first()
+      val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+      if (uid.isNullOrBlank()) return@launch
+      val savedCategory = settingsUseCases.getMerchantCategoryOverride(uid, safeMerchant)
+      val latestSession = authRepository.observeAuthSession().first()
+      val latestUid = (latestSession as? AuthSessionState.Authenticated)?.user?.uid
+      if (requestId == merchantOverrideRequestId && latestUid == uid) {
+        _merchantCategoryOverride.value = savedCategory
+      }
+    }
+  }
+
   fun approveReviewItem(
     eventId: String,
     selectedAccountId: String,
@@ -193,7 +224,14 @@ class SmartDetectionViewModel @Inject constructor(
         rememberMerchantCategory = rememberMerchantCategory,
       )
         .onSuccess { _userMessage.value = "Transaction approved and saved" }
-        .onFailure { error -> _userMessage.value = "Approval failed: ${error.message}" }
+        .onFailure { error ->
+          _userMessage.value =
+            if (error is MerchantCategoryOverridePersistenceException) {
+              "Transaction saved; merchant category preference could not be saved. You can still correct future entries manually."
+            } else {
+              "Approval failed: ${error.message}"
+            }
+        }
     }
   }
 
@@ -316,5 +354,17 @@ class SmartDetectionViewModel @Inject constructor(
 
   fun dismissMessage() {
     _userMessage.value = null
+  }
+}
+
+
+/** Tracks authenticated identity changes so account-scoped UI state can be invalidated. */
+internal class MerchantOverrideSessionGuard {
+  private var lastUid: String? = null
+
+  fun onUidChanged(currentUid: String?): Boolean {
+    if (lastUid == currentUid) return false
+    lastUid = currentUid
+    return true
   }
 }

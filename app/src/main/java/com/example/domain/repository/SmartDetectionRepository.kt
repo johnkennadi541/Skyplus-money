@@ -14,6 +14,7 @@ interface SmartDetectionRepository {
   fun observeLatestAutoSavedNotice(userId: String): Flow<AutoSavedTransactionNotice?>
   fun clearAutoSavedNotice()
   suspend fun getEventById(userId: String, eventId: String): TransactionDetectionEvent?
+  suspend fun getMerchantCategoryOverride(userId: String, merchant: String): String?
   suspend fun processIncomingEvent(
     userId: String,
     rawPackageName: String,

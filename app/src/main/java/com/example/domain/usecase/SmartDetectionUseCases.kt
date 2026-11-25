@@ -84,6 +84,9 @@ class DetectionSettingsUseCases @Inject constructor(
     settings: DetectionSettings,
   ): Result<Unit> = repository.updateDetectionSettings(authenticatedUserId, settings)
 
+  suspend fun getMerchantCategoryOverride(userId: String, merchant: String): String? =
+    repository.getMerchantCategoryOverride(userId, merchant)
+
   fun getMappingRules(userId: String): Flow<List<AccountMappingRule>> =
     repository.getAccountMappingRules(userId)
 
