@@ -133,6 +133,24 @@ constructor(
       }
     }
 
+  override suspend fun setCardArchived(userId: String, cardId: String, archived: Boolean): Result<Unit> =
+    withContext(dispatchers.io) {
+      runCatchingPreservingCancellation {
+        require(userId.isNotBlank()) { "Authenticated user ID is required" }
+        require(cardId.isNotBlank()) { "Card ID is required" }
+        database.withTransaction {
+          val existing =
+            creditCardDao.getCardById(userId, cardId)
+              ?: throw SecurityException("Card does not belong to authenticated user")
+          require(existing.userId == userId) { "Card ownership verification failed" }
+          if (existing.isArchived != archived) {
+            val rows = creditCardDao.setArchivedScoped(userId, cardId, archived, System.currentTimeMillis())
+            check(rows == 1) { "Card archive update rejected for authenticated user" }
+          }
+        }
+      }
+    }
+
   override suspend fun deleteCard(userId: String, cardId: String): Result<Unit> =
     withContext(dispatchers.io) {
       runCatchingPreservingCancellation {
