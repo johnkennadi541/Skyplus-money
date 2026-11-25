@@ -17,7 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/** Migration 10 -> 11 retains every savings goal and contribution row. */
+/** Migration 10 -> 11 retains every savings goal and contribution row; defaults are active and not voided. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class SavingsGoalArchiveMigration10To11Test {
