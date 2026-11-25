@@ -127,6 +127,8 @@ class BudgetsStaleDisplayTest {
     val expectedAllocated =
       com.example.domain.usecase.FormatMoneyUseCase()
         .format(Money.fromMinorUnits(allocatedMinor, currencyCode))
+    composeTestRule.onNodeWithTag("budgets_list")
+      .performScrollToNode(hasTestTag("budget_period_history_$currencyCode"))
     composeTestRule
       .onNodeWithText("Spent $expectedSpent of $expectedAllocated", substring = true)
       .assertIsDisplayed()
