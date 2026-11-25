@@ -43,6 +43,19 @@ jobs:
 
       # Always print an exact count of what the suite actually executed, so the
       # result can be quoted without guessing.
+      # Preserve the raw JUnit XML and HTML report even when the suite fails.
+      # This exposes the complete underlying exception for Robolectric setup failures.
+      - name: Upload unit test diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: unit-test-diagnostics
+          path: |
+            app/build/test-results/testDebugUnitTest/
+            app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Summarise test results
         if: always()
         run: |
