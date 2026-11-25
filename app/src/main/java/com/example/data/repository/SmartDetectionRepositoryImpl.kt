@@ -260,12 +260,8 @@ class SmartDetectionRepositoryImpl @Inject constructor(
 
           val isAmbiguousRepeat = matchesRecentSavedTxn || matchesRecentPendingEvent
 
-          // 5. Currency Check against Resolved Account
-          val resolvedAccount = resolvedAccountId?.let { id -> accountsById[id] }
-          val currencyMatchesAccount =
-            resolvedAccount != null && resolvedAccount.currencyCode.equals(parsed.currencyCode, ignoreCase = true)
-
-          // 6. Auto-Save vs Review Queue Decision
+          // Notification detection is strictly read-only. Every new, non-duplicate
+          // event must remain in the review queue until the authenticated user approves it.
           val finalConfidenceReasons =
             if (isAmbiguousRepeat) {
               parsed.confidenceReasons + "Similar transaction detected within 10 minutes — routed to Review Queue"
@@ -273,65 +269,9 @@ class SmartDetectionRepositoryImpl @Inject constructor(
               parsed.confidenceReasons
             }
 
-          val shouldAutoSave =
-            !isAmbiguousRepeat &&
-              settings.isAutoSaveHighConfidenceEnabled &&
-              parsed.confidenceLevel == DetectionConfidence.HIGH &&
-              parsed.status == TransactionStatus.COMPLETED &&
-              currencyMatchesAccount &&
-              parsed.type != TransactionType.PENDING &&
-              parsed.type != TransactionType.FAILED
-
           val eventId = UUID.randomUUID().toString()
-          var createdTxnId: String? = null
-          val eventStatus: DetectionEventStatus
-          val targetAutoSaveAccountId = if (shouldAutoSave) resolvedAccount?.id else null
-
-          if (targetAutoSaveAccountId != null) {
-            val defaultCategory =
-              parsed.suggestedCategory
-                ?: if (parsed.type == TransactionType.INCOME) "Other Income" else "Other Expenses"
-            val newTxn =
-              FinancialTransaction(
-                id = UUID.randomUUID().toString(),
-                userId = userId,
-                accountId = targetAutoSaveAccountId,
-                type = parsed.type,
-                status = TransactionStatus.COMPLETED,
-                amountMinor = parsed.amountMinor,
-                currencyCode = parsed.currencyCode,
-                category = defaultCategory,
-                merchantOrPayee = safeMerchant,
-                notes = "Auto-detected via $safeTitle",
-                transactionDate = parsed.timestamp,
-                isAutomaticallyDetected = true,
-                sourceApplication = rawPackageName,
-                referenceId = parsed.referenceId,
-                confidenceScore = parsed.confidenceScore,
-              )
-
-            val savedInTx = saveDetectedTransactionInCurrentTx(newTxn)
-            if (savedInTx) {
-              createdTxnId = newTxn.id
-              eventStatus = DetectionEventStatus.AUTO_SAVED
-              _latestAutoSavedNotice.value =
-                AutoSavedTransactionNotice(
-                  eventId = eventId,
-                  transactionId = newTxn.id,
-                  accountName = resolvedAccountName ?: "Account",
-                  merchantOrPayee = safeMerchant ?: defaultCategory,
-                  amountMinor = parsed.amountMinor,
-                  currencyCode = parsed.currencyCode,
-                  type = parsed.type,
-                  sourceApplication = rawPackageName,
-                  userId = userId,
-                )
-            } else {
-              eventStatus = DetectionEventStatus.IN_REVIEW
-            }
-          } else {
-            eventStatus = DetectionEventStatus.IN_REVIEW
-          }
+          val createdTxnId: String? = null
+          val eventStatus = DetectionEventStatus.IN_REVIEW
 
           val eventEntity =
             TransactionDetectionEventEntity(
@@ -562,14 +502,13 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     context.detectionDataStore.data
       .map { prefs ->
         val notifEnabled = prefs[booleanPreferencesKey("notif_detection_$userId")] ?: true
-        val autoSave = prefs[booleanPreferencesKey("autosave_high_conf_$userId")] ?: true
         val packages =
           prefs[stringSetPreferencesKey("permitted_pkgs_$userId")] ?: DetectionSettings.DEFAULT_PERMITTED_PACKAGES
 
         DetectionSettings(
           userId = userId,
           isNotificationDetectionEnabled = notifEnabled,
-          isAutoSaveHighConfidenceEnabled = autoSave,
+          isAutoSaveHighConfidenceEnabled = false,
           isSmsDetectionEnabled = false, // Blocked per Google Play SMS & Call Log Policy
           isSmsPolicyRestricted = true,
           permittedPackages = packages,
@@ -591,7 +530,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
           prefs[booleanPreferencesKey("notif_detection_$authenticatedUserId")] =
             settings.isNotificationDetectionEnabled
           prefs[booleanPreferencesKey("autosave_high_conf_$authenticatedUserId")] =
-            settings.isAutoSaveHighConfidenceEnabled
+            false // Never persist an enabled auto-save setting.
           prefs[stringSetPreferencesKey("permitted_pkgs_$authenticatedUserId")] =
             settings.permittedPackages
         }

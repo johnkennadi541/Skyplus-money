@@ -590,14 +590,14 @@ class Phase2FinalDaoRemediationTest {
         }
 
       val aliceStatuses = results.take(2).map { it.status }.toSet()
-      assertEquals(setOf(DetectionEventStatus.AUTO_SAVED, DetectionEventStatus.DUPLICATE), aliceStatuses)
-      assertEquals(DetectionEventStatus.AUTO_SAVED, results[2].status)
+      assertEquals(setOf(DetectionEventStatus.IN_REVIEW, DetectionEventStatus.DUPLICATE), aliceStatuses)
+      assertEquals(DetectionEventStatus.IN_REVIEW, results[2].status)
 
-      // Alice charged exactly once, Bob charged independently once, zero cross-UID leakage
-      assertEquals(475_000L, fileAccountRepo.getAccountById(uidAlice, "acc_conc_alice")!!.currentBalanceMinor)
-      assertEquals(290_000L, fileAccountRepo.getAccountById(uidBob, "acc_conc_bob")!!.currentBalanceMinor)
-      assertEquals(1, fileTxnRepo.getTransactions(uidAlice).first().size)
-      assertEquals(1, fileTxnRepo.getTransactions(uidBob).first().size)
+      // Detection is read-only for both users; duplicate delivery is deduplicated without ledger mutation.
+      assertEquals(500_000L, fileAccountRepo.getAccountById(uidAlice, "acc_conc_alice")!!.currentBalanceMinor)
+      assertEquals(300_000L, fileAccountRepo.getAccountById(uidBob, "acc_conc_bob")!!.currentBalanceMinor)
+      assertEquals(0, fileTxnRepo.getTransactions(uidAlice).first().size)
+      assertEquals(0, fileTxnRepo.getTransactions(uidBob).first().size)
     } finally {
       fileDb.close()
       tempDbFile.delete()

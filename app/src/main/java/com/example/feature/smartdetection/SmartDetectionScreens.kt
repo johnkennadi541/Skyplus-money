@@ -243,9 +243,9 @@ fun SmartDetectionSettingsScreen(
         }
       }
 
-      // Auto-save toggle
+      // Read-only detection: saving is possible only through explicit Review Queue approval.
       item {
-        OceanCard(modifier = Modifier.widthIn(max = 760.dp)) {
+        OceanCard(modifier = Modifier.widthIn(max = 760.dp).testTag("notification_read_only_policy_card")) {
           Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -253,21 +253,17 @@ fun SmartDetectionSettingsScreen(
           ) {
             Column(modifier = Modifier.weight(1f)) {
               Text(
-                text = "Automatic Save (High Confidence)",
+                text = "Manual Approval Required",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
               )
               Text(
-                text = "Verified completed transactions with >=80% confidence and mapped accounts auto-save offline.",
+                text = "Notifications are only parsed and added to Review Queue. No transaction or balance is changed unless you approve it.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
               )
             }
-            Switch(
-              checked = settings.isAutoSaveHighConfidenceEnabled,
-              onCheckedChange = { viewModel.toggleAutoSave(it) },
-              modifier = Modifier.testTag("toggle_auto_save_switch"),
-            )
+            OceanStatusBadge(text = "Read-only", tone = BadgeTone.INFO)
           }
         }
       }

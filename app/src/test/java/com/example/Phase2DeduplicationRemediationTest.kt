@@ -124,20 +124,20 @@ class Phase2DeduplicationRemediationTest {
   }
 
   @Test
-  fun `same merchant and amount with different reference IDs within 10 minutes both auto-save`() = runTest {
+  fun `same merchant and amount with different reference IDs remain in Review Queue`() = runTest {
     val t1 = SmartTransactionParser.parse("Rs. 150.00 debited from A/c XX4321 paid to Starbucks Ref REF111111", "com.phonepe.app", 1_700_000_000_000L)!!
     val t2 = SmartTransactionParser.parse("Rs. 150.00 debited from A/c XX4321 paid to Starbucks Ref REF222222", "com.phonepe.app", 1_700_000_120_000L)!!
 
     val ev1 = detectionRepo.processIncomingEvent(uid, "com.phonepe.app", "PhonePe", t1).getOrThrow()
     val ev2 = detectionRepo.processIncomingEvent(uid, "com.phonepe.app", "PhonePe", t2).getOrThrow()
 
-    assertEquals(DetectionEventStatus.AUTO_SAVED, ev1.status)
-    assertEquals(DetectionEventStatus.AUTO_SAVED, ev2.status)
-    assertEquals(470_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
+    assertEquals(DetectionEventStatus.IN_REVIEW, ev1.status)
+    assertEquals(DetectionEventStatus.IN_REVIEW, ev2.status)
+    assertEquals(500_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
   }
 
   @Test
-  fun `same merchant and amount on different accounts within 10 minutes both auto-save`() = runTest {
+  fun `same merchant and amount on different accounts remain in Review Queue`() = runTest {
     val msgAcc1 = ParsedFinancialMessage(
       amountMinor = 30_000L,
       currencyCode = "INR",
@@ -156,10 +156,10 @@ class Phase2DeduplicationRemediationTest {
     val ev1 = detectionRepo.processIncomingEvent(uid, "com.phonepe.app", "PhonePe", msgAcc1).getOrThrow()
     val ev2 = detectionRepo.processIncomingEvent(uid, "com.phonepe.app", "PhonePe", msgAcc2).getOrThrow()
 
-    assertEquals(DetectionEventStatus.AUTO_SAVED, ev1.status)
-    assertEquals(DetectionEventStatus.AUTO_SAVED, ev2.status)
-    assertEquals(470_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
-    assertEquals(470_000L, accountRepo.getAccountById(uid, "acc_2")!!.currentBalanceMinor)
+    assertEquals(DetectionEventStatus.IN_REVIEW, ev1.status)
+    assertEquals(DetectionEventStatus.IN_REVIEW, ev2.status)
+    assertEquals(500_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
+    assertEquals(500_000L, accountRepo.getAccountById(uid, "acc_2")!!.currentBalanceMinor)
   }
 
   @Test
@@ -186,14 +186,14 @@ class Phase2DeduplicationRemediationTest {
     val evRedelivered = detectionRepo.processIncomingEvent(uid, "com.phonepe.app", "PhonePe", exactRedelivery).getOrThrow()
     val ev2 = detectionRepo.processIncomingEvent(uid, "com.phonepe.app", "PhonePe", secondCoffee).getOrThrow()
 
-    assertEquals(DetectionEventStatus.AUTO_SAVED, ev1.status)
+    assertEquals(DetectionEventStatus.IN_REVIEW, ev1.status)
     assertEquals(DetectionEventStatus.DUPLICATE, evRedelivered.status)
     assertEquals(DetectionEventStatus.IN_REVIEW, ev2.status)
-    assertEquals(485_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
+    assertEquals(500_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
 
-    // User confirms second coffee in Review Queue -> balance updates to 470.00 INR
+    // Explicit approval is the only operation that changes the balance.
     detectionRepo.approveReviewEvent(uid, ev2.id, "acc_1", "Food & Dining", "Starbucks").getOrThrow()
-    assertEquals(470_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
+    assertEquals(485_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
   }
 
   @Test
@@ -219,9 +219,9 @@ class Phase2DeduplicationRemediationTest {
     val ev1 = detectionRepo.processIncomingEvent(uid, "com.phonepe.app", "PhonePe", firstNamed).getOrThrow()
     val ev2 = detectionRepo.processIncomingEvent(uid, "com.snapwork.hdfc", "HDFC Bank", secondNullMerchant).getOrThrow()
 
-    assertEquals(DetectionEventStatus.AUTO_SAVED, ev1.status)
-    assertEquals(DetectionEventStatus.AUTO_SAVED, ev2.status)
-    assertEquals(460_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
-    assertEquals(2, txnRepo.getTransactions(uid).first().size)
+    assertEquals(DetectionEventStatus.IN_REVIEW, ev1.status)
+    assertEquals(DetectionEventStatus.IN_REVIEW, ev2.status)
+    assertEquals(500_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
+    assertEquals(0, txnRepo.getTransactions(uid).first().size)
   }
 }
