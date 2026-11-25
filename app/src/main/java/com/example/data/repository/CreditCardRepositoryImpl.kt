@@ -133,7 +133,7 @@ constructor(
       }
     }
 
-  override suspend fun deleteCard(userId: String, cardId: String): Result<Unit> =
+  override suspend fun setCardArchived(userId: String, cardId: String, archived: Boolean): Result<Unit> =
     withContext(dispatchers.io) {
       runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
@@ -143,9 +143,12 @@ constructor(
             creditCardDao.getCardById(userId, cardId)
               ?: throw SecurityException("Card does not belong to authenticated user")
           require(existing.userId == userId) { "Card ownership verification failed" }
-          val rows = creditCardDao.deleteCard(userId, cardId)
-          check(rows == 1) { "Card deletion rejected for authenticated user" }
+          if (existing.isArchived != archived) {
+            val rows = creditCardDao.setArchivedScoped(userId, cardId, archived, System.currentTimeMillis())
+            check(rows == 1) { "Card archive update rejected for authenticated user" }
+          }
         }
       }
     }
+
 }

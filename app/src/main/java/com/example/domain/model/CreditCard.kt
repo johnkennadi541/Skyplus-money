@@ -46,6 +46,7 @@ data class CreditCard(
   /** Annual percentage rate as an exact decimal string; never a Double. */
   val aprPercent: String = "0",
   val isActive: Boolean = true,
+  val isArchived: Boolean = false,
   val createdAt: Long = System.currentTimeMillis(),
   val updatedAt: Long = System.currentTimeMillis(),
 ) {

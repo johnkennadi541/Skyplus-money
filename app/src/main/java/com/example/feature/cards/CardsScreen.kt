@@ -19,13 +19,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CreditCard
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -78,7 +77,7 @@ fun CardsScreen(
     isErrorMessage = isError,
     onDismissMessage = viewModel::dismissMessage,
     onCreateCard = viewModel::createCard,
-    onDeleteCard = viewModel::deleteCard,
+    onArchiveCard = viewModel::setCardArchived,
     modifier = modifier,
   )
 }
@@ -101,11 +100,11 @@ fun CardsContent(
     aprPercent: String,
     onSuccess: () -> Unit
   ) -> Unit,
-  onDeleteCard: (cardId: String, onSuccess: () -> Unit) -> Unit,
+  onArchiveCard: (cardId: String, archived: Boolean, onSuccess: () -> Unit) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   var showCreateDialog by remember { mutableStateOf(false) }
-  var cardToDelete by remember { mutableStateOf<CreditCardSummary?>(null) }
+  var cardToArchive by remember { mutableStateOf<CreditCardSummary?>(null) }
 
   Column(
     modifier =
@@ -166,7 +165,7 @@ fun CardsContent(
         items(cards, key = { it.card.id }) { summary ->
           CardTile(
             summary = summary,
-            onDelete = { cardToDelete = summary },
+            onToggleArchive = { cardToArchive = summary },
           )
         }
       }
@@ -183,18 +182,22 @@ fun CardsContent(
     )
   }
 
-  cardToDelete?.let { summary ->
+  cardToArchive?.let { summary ->
+    val archive = !summary.card.isArchived
     SkyplusConfirmDialog(
-      title = "Remove card?",
-      message =
-        "This removes the card record only. The account and its transactions stay exactly as they are.",
-      confirmLabel = "Remove",
-      destructive = true,
-      onConfirm = {
-        onDeleteCard(summary.card.id) { cardToDelete = null }
-        cardToDelete = null
+      title = if (archive) "Archive card?" else "Restore card?",
+      message = if (archive) {
+        "The card will remain in your records with its outstanding balance and transactions visible. You can restore it later."
+      } else {
+        "This card will return to your active card list. Its account, balance and transactions remain unchanged."
       },
-      onDismiss = { cardToDelete = null },
+      confirmLabel = if (archive) "Archive" else "Restore",
+      destructive = false,
+      onConfirm = {
+        onArchiveCard(summary.card.id, archive) { cardToArchive = null }
+        cardToArchive = null
+      },
+      onDismiss = { cardToArchive = null },
     )
   }
 }
@@ -202,7 +205,7 @@ fun CardsContent(
 @Composable
 private fun CardTile(
   summary: CreditCardSummary,
-  onDelete: () -> Unit,
+  onToggleArchive: () -> Unit,
 ) {
   val extended = OceanTheme.colors
   val formatter = remember { FormatMoneyUseCase() }
@@ -233,6 +236,10 @@ private fun CardTile(
             Spacer(modifier = Modifier.width(OceanSpacing.xs))
             OceanStatusBadge(text = "Over limit", tone = BadgeTone.NEGATIVE)
           }
+          if (summary.card.isArchived) {
+            Spacer(modifier = Modifier.width(OceanSpacing.xs))
+            OceanStatusBadge(text = "Archived", tone = BadgeTone.WARNING)
+          }
         }
         Text(
           text = summary.account.name,
@@ -240,15 +247,11 @@ private fun CardTile(
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
-      IconButton(
-        onClick = onDelete,
-        modifier = Modifier.testTag("delete_card_${summary.card.id}"),
+      TextButton(
+        onClick = onToggleArchive,
+        modifier = Modifier.testTag("archive_card_${summary.card.id}"),
       ) {
-        Icon(
-          imageVector = Icons.Rounded.Delete,
-          contentDescription = "Remove card",
-          tint = MaterialTheme.colorScheme.error,
-        )
+        Text(if (summary.card.isArchived) "Restore" else "Archive")
       }
     }
 
