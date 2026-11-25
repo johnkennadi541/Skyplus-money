@@ -37,7 +37,7 @@ class SavingsGoalCalculationEngine @Inject constructor() {
       require(contribution.amountMinor > 0L) {
         "Contribution amount must be greater than zero"
       }
-      total = Math.addExact(total, contribution.amountMinor)
+      if (!contribution.isVoided) total = Math.addExact(total, contribution.amountMinor)
     }
     return total
   }
@@ -64,7 +64,7 @@ class SavingsGoalCalculationEngine @Inject constructor() {
       savedMinor = saved,
       remainingMinor = remainingMinor(goal, saved),
       progressPercent = progressPercent(goal, saved),
-      contributionCount = contributions.size,
+      contributionCount = contributions.count { !it.isVoided },
     )
   }
 
