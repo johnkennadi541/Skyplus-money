@@ -162,7 +162,7 @@ fun BudgetsContent(
         .testTag("budgets_screen"),
   ) {
     LazyColumn(
-      modifier = Modifier.fillMaxSize().widthIn(max = 760.dp),
+      modifier = Modifier.fillMaxSize().widthIn(max = 760.dp).testTag("budgets_list"),
       verticalArrangement = Arrangement.spacedBy(OceanSpacing.md),
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
