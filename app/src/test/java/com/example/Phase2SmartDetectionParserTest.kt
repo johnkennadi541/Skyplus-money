@@ -140,11 +140,32 @@ class Phase2SmartDetectionParserTest {
   }
 
   @Test
-  fun `parses Indian rupee symbol and rejects ambiguous dollar currency symbol`() {
+  fun \`parses Indian rupee symbol and routes ambiguous dollar symbol to review\`() {
     val rupee = SmartTransactionParser.parse("₹ 1,250.00 debited from A/c XX4321 paid to Grocery Ref INR123456")!!
     assertEquals("INR", rupee.currencyCode)
     assertEquals(125000L, rupee.amountMinor)
-    assertNull(SmartTransactionParser.parse("$ 25.00 spent at Store on card ending 7788 Ref USD123456"))
+
+    // "$" can mean USD, AUD, CAD and other currencies. Parse it for review,
+    // but never auto-save it without an explicit currency code.
+    val dollar = SmartTransactionParser.parse("$ 25.00 spent at Store on card ending 7788 Ref USD123456")!!
+    assertEquals("USD", dollar.currencyCode)
+    assertEquals(2_500L, dollar.amountMinor)
+    assertEquals(DetectionConfidence.MEDIUM, dollar.confidenceLevel)
+  }
+
+  @Test
+  fun \`extracts POS terminal merchant and category\`() {
+    val parsed = SmartTransactionParser.parse(
+      "POS AMAZON 1,250.00 debited from card ending 7788 Ref POS123456",
+      "com.example.bank",
+      1_700_000_000_000L,
+    )!!
+
+    assertEquals("AMAZON", parsed.merchantOrPayee)
+    assertEquals("7788", parsed.accountLast4Hint)
+    assertEquals(125_000L, parsed.amountMinor)
+    assertEquals("Shopping", parsed.suggestedCategory)
+    assertEquals(DetectionConfidence.HIGH, parsed.confidenceLevel)
   }
 
   @Test
