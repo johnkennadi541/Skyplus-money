@@ -52,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.designsystem.component.BadgeTone
 import com.example.core.designsystem.component.OceanCard
+import com.example.core.designsystem.component.SkyplusSectionCard
 import com.example.core.designsystem.component.OceanStatusBadge
 import com.example.core.designsystem.theme.OceanNumericStyle
 import com.example.core.designsystem.theme.OceanSpacing
@@ -233,7 +234,7 @@ fun LoansContent(
               Icon(
                 imageVector = Icons.Rounded.Calculate,
                 contentDescription = stringResource(R.string.cd_emi_calculator),
-                tint = OceanTheme.colors.gold,
+                tint = MaterialTheme.colorScheme.primary,
               )
             }
             Button(
@@ -319,7 +320,7 @@ fun LoansContent(
       // Per-currency Summary Card
       if (activeSummary != null) {
         item {
-          OceanCard(modifier = Modifier.testTag("loan_summary_card")) {
+          SkyplusSectionCard(modifier = Modifier.testTag("loan_summary_card")) {
             Row(
               modifier = Modifier.fillMaxWidth(),
               horizontalArrangement = Arrangement.SpaceBetween,
@@ -406,7 +407,7 @@ fun LoansContent(
       // Loan Cards or Empty State
       if (filteredLoans.isEmpty()) {
         item {
-          OceanCard(modifier = Modifier.testTag("loans_empty_state")) {
+          SkyplusSectionCard(modifier = Modifier.testTag("loans_empty_state")) {
             Column(
               modifier = Modifier.fillMaxWidth().padding(OceanSpacing.lg),
               horizontalAlignment = Alignment.CenterHorizontally,
