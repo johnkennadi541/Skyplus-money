@@ -247,7 +247,7 @@ class CreditCardDatabaseAndRepoTest {
   }
 
   @Test
-  fun `deleting a card keeps the account transactions`() = runTest {
+  fun `archiving a card keeps the account transactions`() = runTest {
     val account = createAccount(userA, "acc_card_t1", balanceMinor = -10_000L)
     val created = cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
 
@@ -267,7 +267,7 @@ class CreditCardDatabaseAndRepoTest {
         com.example.data.local.db.entity.FinancialTransactionEntity.fromDomain(transaction)
       )
 
-    cardRepository.deleteCard(userA, created.id).getOrThrow()
+    cardRepository.setCardArchived(userA, created.id, archived = true).getOrThrow()
 
     val surviving =
       database.financialTransactionDao().getTransactionById(userA, "txn_on_card")
@@ -298,14 +298,15 @@ class CreditCardDatabaseAndRepoTest {
   }
 
   @Test
-  fun `a card can be recreated after deletion`() = runTest {
+  fun `an archived card remains linked and prevents duplicate attachment`() = runTest {
     val account = createAccount(userA, "acc_card_r1")
     val first = cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
-    cardRepository.deleteCard(userA, first.id).getOrThrow()
+    cardRepository.setCardArchived(userA, first.id, archived = true).getOrThrow()
 
-    val second = cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
+    val second = cardRepository.createCard(userA, card(userA, account.id))
 
-    assertEquals(account.id, second.accountId)
+    assertTrue(second.isFailure)
+    assertTrue(cardRepository.getCard(userA, first.id)?.isArchived == true)
     assertEquals(1, cardRepository.observeCards(userA).first().size)
   }
 
@@ -316,7 +317,7 @@ class CreditCardDatabaseAndRepoTest {
 
     assertTrue(cardRepository.createCard("", card(userA, account.id)).isFailure)
     assertTrue(cardRepository.updateCard("", created).isFailure)
-    assertTrue(cardRepository.deleteCard("", created.id).isFailure)
+    assertTrue(cardRepository.setCardArchived("", created.id, archived = true).isFailure)
     assertEquals(1, cardRepository.observeCards(userA).first().size)
   }
 
@@ -533,26 +534,27 @@ class CreditCardDatabaseAndRepoTest {
   }
 
   @Test
-  fun `deleting a card leaves the account and its balance untouched`() = runTest {
+  fun `archiving a card leaves the account and its balance untouched`() = runTest {
     val account = createAccount(userA, "acc_card_5", balanceMinor = -25_000L)
     val created = cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
 
-    cardRepository.deleteCard(userA, created.id).getOrThrow()
+    cardRepository.setCardArchived(userA, created.id, archived = true).getOrThrow()
 
-    assertTrue(cardRepository.observeCards(userA).first().isEmpty())
+    assertTrue(cardRepository.getCard(userA, created.id)?.isArchived == true)
     val stillThere = accountRepository.getAccountById(userA, account.id)
     assertNotNull(stillThere)
     assertEquals(-25_000L, stillThere?.currentBalanceMinor)
   }
 
   @Test
-  fun `deleting another user's card is refused`() = runTest {
+  fun `archiving another user's card is refused`() = runTest {
     val account = createAccount(userA, "acc_card_6")
     val created = cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
 
-    val result = cardRepository.deleteCard(userB, created.id)
+    val result = cardRepository.setCardArchived(userB, created.id, archived = true)
 
     assertTrue(result.isFailure)
+    assertFalse(cardRepository.getCard(userA, created.id)?.isArchived ?: true)
     assertEquals(1, cardRepository.observeCards(userA).first().size)
   }
 
