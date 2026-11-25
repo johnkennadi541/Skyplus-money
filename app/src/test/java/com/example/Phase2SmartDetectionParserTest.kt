@@ -140,7 +140,7 @@ class Phase2SmartDetectionParserTest {
   }
 
   @Test
-  fun \`parses Indian rupee symbol and routes ambiguous dollar symbol to review\`() {
+  fun `parses Indian rupee symbol and routes ambiguous dollar symbol to review`() {
     val rupee = SmartTransactionParser.parse("₹ 1,250.00 debited from A/c XX4321 paid to Grocery Ref INR123456")!!
     assertEquals("INR", rupee.currencyCode)
     assertEquals(125000L, rupee.amountMinor)
@@ -154,7 +154,7 @@ class Phase2SmartDetectionParserTest {
   }
 
   @Test
-  fun \`extracts POS terminal merchant and category\`() {
+  fun `extracts POS terminal merchant and category`() {
     val parsed = SmartTransactionParser.parse(
       "POS AMAZON 1,250.00 debited from card ending 7788 Ref POS123456",
       "com.example.bank",
