@@ -11,9 +11,9 @@ import com.example.domain.repository.AuthRepository
 import com.example.domain.repository.SavingsGoalRepository
 import com.example.domain.usecase.AddSavingsContributionUseCase
 import com.example.domain.usecase.CreateSavingsGoalUseCase
-import com.example.domain.usecase.DeleteSavingsContributionUseCase
-import com.example.domain.usecase.DeleteSavingsGoalUseCase
 import com.example.domain.usecase.ObserveSavingsGoalsUseCase
+import com.example.domain.usecase.SetSavingsGoalArchivedUseCase
+import com.example.domain.usecase.VoidSavingsContributionUseCase
 import com.example.domain.usecase.SavingsGoalCalculationEngine
 import com.example.domain.usecase.UpdateSavingsGoalUseCase
 import com.example.feature.goals.SavingsGoalsViewModel
@@ -90,9 +90,9 @@ class SavingsGoalsViewModelTest {
       observeSavingsGoalsUseCase = observe,
       createSavingsGoalUseCase = CreateSavingsGoalUseCase(repository),
       updateSavingsGoalUseCase = UpdateSavingsGoalUseCase(repository),
-      deleteSavingsGoalUseCase = DeleteSavingsGoalUseCase(repository),
+      setSavingsGoalArchivedUseCase = SetSavingsGoalArchivedUseCase(repository),
       addSavingsContributionUseCase = AddSavingsContributionUseCase(repository),
-      deleteSavingsContributionUseCase = DeleteSavingsContributionUseCase(repository),
+      voidSavingsContributionUseCase = VoidSavingsContributionUseCase(repository),
     )
   }
 
@@ -154,7 +154,7 @@ class SavingsGoalsViewModelTest {
       goal: SavingsGoal,
     ): Result<Unit> = Result.failure(UnsupportedOperationException("Not used in this test"))
 
-    override suspend fun deleteGoal(userId: String, goalId: String): Result<Unit> =
+    override suspend fun setGoalArchived(userId: String, goalId: String, archived: Boolean): Result<Unit> =
       Result.failure(UnsupportedOperationException("Not used in this test"))
 
     override suspend fun addContribution(
@@ -163,7 +163,7 @@ class SavingsGoalsViewModelTest {
     ): Result<SavingsContribution> =
       Result.failure(UnsupportedOperationException("Not used in this test"))
 
-    override suspend fun deleteContribution(userId: String, contributionId: String): Result<Unit> =
+    override suspend fun voidContribution(userId: String, contributionId: String): Result<Unit> =
       Result.failure(UnsupportedOperationException("Not used in this test"))
   }
 }

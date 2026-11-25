@@ -34,10 +34,13 @@ class SavingsGoalCalculationEngine @Inject constructor() {
       require(contribution.currencyCode.equals(goal.currencyCode, ignoreCase = true)) {
         "Contribution currency must match the goal currency"
       }
+      require(contribution.isVoided == (contribution.voidedAt != null)) {
+        "Voided contribution metadata is inconsistent"
+      }
       require(contribution.amountMinor > 0L) {
         "Contribution amount must be greater than zero"
       }
-      total = Math.addExact(total, contribution.amountMinor)
+      if (!contribution.isVoided) total = Math.addExact(total, contribution.amountMinor)
     }
     return total
   }
@@ -64,7 +67,8 @@ class SavingsGoalCalculationEngine @Inject constructor() {
       savedMinor = saved,
       remainingMinor = remainingMinor(goal, saved),
       progressPercent = progressPercent(goal, saved),
-      contributionCount = contributions.size,
+      contributionCount = contributions.count { !it.isVoided },
+      contributions = contributions.sortedByDescending { it.contributedAt },
     )
   }
 

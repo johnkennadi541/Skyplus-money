@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material3.AlertDialog
@@ -23,6 +22,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +51,7 @@ import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
 import com.example.domain.model.Money
 import com.example.domain.model.SavingsGoal
+import com.example.domain.model.SavingsContribution
 import com.example.domain.model.SavingsGoalSummary
 import com.example.domain.usecase.FormatMoneyUseCase
 import java.util.Locale
@@ -76,7 +77,8 @@ fun SavingsGoalsScreen(
     onDismissMessage = viewModel::dismissMessage,
     onCreateGoal = viewModel::createGoal,
     onAddContribution = viewModel::addContribution,
-    onDeleteGoal = viewModel::deleteGoal,
+    onSetGoalArchived = viewModel::setGoalArchived,
+    onVoidContribution = viewModel::voidContribution,
     onEditGoal = viewModel::updateGoal,
     modifier = modifier,
   )
@@ -91,7 +93,8 @@ fun SavingsGoalsContent(
   onDismissMessage: () -> Unit,
   onCreateGoal: (name: String, currencyCode: String, targetDecimal: String, note: String?, deadlineText: String, onSuccess: () -> Unit) -> Unit,
   onAddContribution: (summary: SavingsGoalSummary, amountDecimal: String, note: String?, onSuccess: () -> Unit) -> Unit,
-  onDeleteGoal: (goalId: String, onSuccess: () -> Unit) -> Unit,
+  onSetGoalArchived: (goalId: String, archived: Boolean, onSuccess: () -> Unit) -> Unit,
+  onVoidContribution: (contributionId: String, onSuccess: () -> Unit) -> Unit,
   onEditGoal: (goal: SavingsGoal, name: String, currencyCode: String, targetDecimal: String, note: String?, deadlineText: String, onSuccess: () -> Unit) -> Unit = { _, _, _, _, _, _, _ -> },
   hasLoadError: Boolean = false,
   onRetryLoadGoals: () -> Unit = {},
@@ -100,7 +103,8 @@ fun SavingsGoalsContent(
   var showCreateDialog by remember { mutableStateOf(false) }
   var editing by remember { mutableStateOf<SavingsGoalSummary?>(null) }
   var contributingTo by remember { mutableStateOf<SavingsGoalSummary?>(null) }
-  var deleting by remember { mutableStateOf<SavingsGoalSummary?>(null) }
+  var archiving by remember { mutableStateOf<SavingsGoalSummary?>(null) }
+  var voiding by remember { mutableStateOf<SavingsContribution?>(null) }
 
   Column(
     modifier =
@@ -184,7 +188,8 @@ fun SavingsGoalsContent(
             summary = summary,
             onContribute = { contributingTo = summary },
             onEdit = { editing = summary },
-            onDelete = { deleting = summary },
+            onToggleArchive = { archiving = summary },
+            onVoidContribution = { contributionId -> voiding = summary.contributions.firstOrNull { it.id == contributionId } },
           )
         }
       }
@@ -219,17 +224,36 @@ fun SavingsGoalsContent(
     )
   }
 
-  deleting?.let { summary ->
+  archiving?.let { summary ->
+    val archive = !summary.goal.isArchived
     SkyplusConfirmDialog(
-      title = "Delete goal?",
-      message = "This removes the goal and every contribution recorded against it. Your accounts and transactions are not affected.",
-      confirmLabel = "Delete",
+      title = if (archive) "Archive goal?" else "Restore goal?",
+      message = if (archive) {
+        "This goal will be hidden from active work. Its contribution history and saved total remain preserved. You can restore it later."
+      } else {
+        "This goal will return to active work. All original contribution records remain unchanged."
+      },
+      confirmLabel = if (archive) "Archive" else "Restore",
+      destructive = false,
+      onConfirm = {
+        onSetGoalArchived(summary.goal.id, archive) { archiving = null }
+        archiving = null
+      },
+      onDismiss = { archiving = null },
+    )
+  }
+
+  voiding?.let { contribution ->
+    SkyplusConfirmDialog(
+      title = "Void contribution?",
+      message = "This contribution will be excluded from the saved total, but its original amount, date and note remain in history. This action cannot be undone.",
+      confirmLabel = "Void contribution",
       destructive = true,
       onConfirm = {
-        onDeleteGoal(summary.goal.id) { deleting = null }
-        deleting = null
+        onVoidContribution(contribution.id) { voiding = null }
+        voiding = null
       },
-      onDismiss = { deleting = null },
+      onDismiss = { voiding = null },
     )
   }
 }
@@ -239,7 +263,8 @@ private fun GoalCard(
   summary: SavingsGoalSummary,
   onContribute: () -> Unit,
   onEdit: () -> Unit,
-  onDelete: () -> Unit,
+  onToggleArchive: () -> Unit,
+  onVoidContribution: (contributionId: String) -> Unit,
 ) {
   val extended = OceanTheme.colors
   val formatter = remember { FormatMoneyUseCase() }
@@ -278,6 +303,9 @@ private fun GoalCard(
               tone = BadgeTone.POSITIVE,
             )
           }
+          if (summary.goal.isArchived) {
+            OceanStatusBadge(text = "Archived", tone = BadgeTone.WARNING)
+          }
         }
         Text(
           text = "${summary.contributionCount} contributions",
@@ -307,15 +335,11 @@ private fun GoalCard(
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
           )
         }
-        IconButton(
-          onClick = onDelete,
-          modifier = Modifier.testTag("delete_goal_${summary.goal.id}"),
+        TextButton(
+          onClick = onToggleArchive,
+          modifier = Modifier.testTag("archive_goal_${summary.goal.id}"),
         ) {
-          Icon(
-            imageVector = Icons.Rounded.Delete,
-            contentDescription = "Delete goal",
-            tint = MaterialTheme.colorScheme.error,
-          )
+          Text(if (summary.goal.isArchived) "Restore" else "Archive")
         }
       }
     }
@@ -378,11 +402,52 @@ private fun GoalCard(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.testTag("goal_remaining_${summary.goal.id}"),
       )
-      SkyplusTertiaryButton(
-        text = "Add money",
-        onClick = onContribute,
-        modifier = Modifier.testTag("contribute_goal_${summary.goal.id}"),
-      )
+      if (!summary.goal.isArchived) {
+        SkyplusTertiaryButton(
+          text = "Add money",
+          onClick = onContribute,
+          modifier = Modifier.testTag("contribute_goal_${summary.goal.id}"),
+        )
+      }
+    }
+
+    if (summary.contributions.isNotEmpty()) {
+      Spacer(modifier = Modifier.height(OceanSpacing.sm))
+      Text("Contribution history", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+      summary.contributions.forEach { contribution ->
+        Row(
+          modifier = Modifier.fillMaxWidth().testTag("contribution_${contribution.id}"),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Column(modifier = Modifier.weight(1f)) {
+            val amountText =
+              if (Money.isSupportedCurrency(contribution.currencyCode)) {
+                formatter.format(Money.fromMinorUnits(contribution.amountMinor, contribution.currencyCode))
+              } else {
+                "${contribution.currencyCode} ${contribution.amountMinor}"
+              }
+            Text(amountText, style = MaterialTheme.typography.bodyMedium)
+            contribution.note?.takeIf { it.isNotBlank() }?.let {
+              Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(
+              if (contribution.isVoided) "Voided • ${GoalDeadlineParser.format(contribution.contributedAt)}"
+              else GoalDeadlineParser.format(contribution.contributedAt),
+              style = MaterialTheme.typography.labelSmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+          if (contribution.isVoided) {
+            OceanStatusBadge(text = "Voided", tone = BadgeTone.WARNING)
+          } else {
+            TextButton(
+              onClick = { onVoidContribution(contribution.id) },
+              modifier = Modifier.testTag("void_contribution_${contribution.id}"),
+            ) { Text("Void") }
+          }
+        }
+      }
     }
   }
 }

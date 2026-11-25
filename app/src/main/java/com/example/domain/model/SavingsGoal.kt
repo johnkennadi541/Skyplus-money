@@ -20,6 +20,7 @@ data class SavingsGoal(
   val note: String? = null,
   val createdAt: Long = System.currentTimeMillis(),
   val updatedAt: Long = System.currentTimeMillis(),
+  val isArchived: Boolean = false,
 ) {
   val target: Money
     get() = Money.fromMinorUnits(targetMinor, currencyCode)
@@ -36,6 +37,8 @@ data class SavingsContribution(
   val contributedAt: Long = System.currentTimeMillis(),
   val note: String? = null,
   val createdAt: Long = System.currentTimeMillis(),
+  val isVoided: Boolean = false,
+  val voidedAt: Long? = null,
 ) {
   val amount: Money
     get() = Money.fromMinorUnits(amountMinor, currencyCode)
@@ -48,6 +51,7 @@ data class SavingsGoalSummary(
   val remainingMinor: Long,
   val progressPercent: BigDecimal,
   val contributionCount: Int,
+  val contributions: List<SavingsContribution> = emptyList(),
 ) {
   val saved: Money
     get() = Money.fromMinorUnits(savedMinor, goal.currencyCode)

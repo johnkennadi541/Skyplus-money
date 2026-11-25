@@ -266,7 +266,7 @@ abstract class SavingsGoalVersion8Database : androidx.room.RoomDatabase()
 class SavingsGoalRoomMigrationIntegrationTest {
 
   @Test
-  fun `Room opens a complete version 8 database through the production 8 to 10 migrations`() {
+  fun `Room opens a complete version 8 database through the production 8 to 11 migrations`() {
     val context = RuntimeEnvironment.getApplication()
     val dbName = "savings-room-migration-integration.db"
     context.deleteDatabase(dbName)
@@ -298,13 +298,14 @@ class SavingsGoalRoomMigrationIntegrationTest {
         .addMigrations(
           DatabaseMigrations.MIGRATION_8_9,
           DatabaseMigrations.MIGRATION_9_10,
+          DatabaseMigrations.MIGRATION_10_11,
         )
         .build()
 
     try {
       val database = migrated.openHelper.writableDatabase
 
-      assertEquals(10, database.version)
+      assertEquals(11, database.version)
       assertEquals(1, database.query("SELECT COUNT(*) FROM financial_accounts").use { cursor ->
         cursor.moveToFirst()
         cursor.getInt(0)

@@ -66,15 +66,13 @@ interface SavingsGoalDao {
     updatedAt: Long,
   ): Int
 
-  @Query("DELETE FROM savings_goals WHERE userId = :userId AND id = :id")
-  suspend fun deleteGoal(userId: String, id: String): Int
 
   @Insert(onConflict = OnConflictStrategy.ABORT)
   suspend fun insertContribution(contribution: SavingsContributionEntity)
 
-  @Query("DELETE FROM savings_contributions WHERE userId = :userId AND id = :id")
-  suspend fun deleteContribution(userId: String, id: String): Int
+  @Query("UPDATE savings_goals SET isArchived = :archived, updatedAt = :updatedAt WHERE userId = :userId AND id = :goalId")
+  suspend fun setGoalArchivedScoped(userId: String, goalId: String, archived: Boolean, updatedAt: Long): Int
 
-  @Query("DELETE FROM savings_contributions WHERE userId = :userId AND goalId = :goalId")
-  suspend fun deleteContributionsForGoal(userId: String, goalId: String): Int
+  @Query("UPDATE savings_contributions SET isVoided = 1, voidedAt = :voidedAt WHERE userId = :userId AND id = :contributionId AND isVoided = 0")
+  suspend fun voidContributionScoped(userId: String, contributionId: String, voidedAt: Long): Int
 }
