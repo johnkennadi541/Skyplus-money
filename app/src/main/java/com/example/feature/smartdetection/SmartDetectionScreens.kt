@@ -549,7 +549,11 @@ fun ReviewQueueScreen(
   val reviewQueue by viewModel.reviewQueue.collectAsStateWithLifecycle()
   val accounts by viewModel.accounts.collectAsStateWithLifecycle()
   val savedMerchantCategory by viewModel.merchantCategoryOverride.collectAsStateWithLifecycle()
+  val authSessionVersion by viewModel.authSessionVersion.collectAsStateWithLifecycle()
   var itemToApprove by remember { mutableStateOf<TransactionDetectionEvent?>(null) }
+
+  // Never keep a correction dialog (or its category selection) across account changes.
+  LaunchedEffect(authSessionVersion) { itemToApprove = null }
 
   Scaffold(
     topBar = {
@@ -603,6 +607,7 @@ fun ReviewQueueScreen(
       event = item,
       accounts = accounts,
       preferredCategory = savedMerchantCategory,
+      onMerchantChanged = { viewModel.loadMerchantCategoryOverride(it) },
       onDismiss = { itemToApprove = null },
       onConfirm = { accountId, type, category, merchant, amountDecimal, rememberMerchantCategory ->
         viewModel.approveReviewItem(
@@ -713,6 +718,7 @@ fun TransactionCorrectionDialog(
   event: TransactionDetectionEvent,
   accounts: List<FinancialAccount>,
   preferredCategory: String? = null,
+  onMerchantChanged: (String?) -> Unit = {},
   onDismiss: () -> Unit,
   onConfirm: (
     accountId: String,
@@ -735,20 +741,43 @@ fun TransactionCorrectionDialog(
         ?: accounts.firstOrNull()?.id.orEmpty()
     )
   }
-  var selectedCategory by remember(event.id, preferredCategory) {
+  var merchantText by remember(event.id) { mutableStateOf(event.detectedMerchant.orEmpty()) }
+  var selectedCategory by remember(event.id) {
     mutableStateOf(
-      when {
-        selectedType == TransactionType.EXPENSE && preferredCategory != null && preferredCategory in TransactionCategories.EXPENSE_CATEGORIES -> preferredCategory
-        selectedType == TransactionType.INCOME -> TransactionCategories.INCOME_CATEGORIES.first()
-        selectedType == TransactionType.REFUND || selectedType == TransactionType.REVERSAL -> "Refunds"
-        else -> MerchantCategoryResolver.resolve(event.detectedMerchant, selectedType)
+      when (selectedType) {
+        TransactionType.INCOME -> TransactionCategories.INCOME_CATEGORIES.first()
+        TransactionType.REFUND, TransactionType.REVERSAL -> "Refunds"
+        else -> MerchantCategoryResolver.resolve(merchantText, selectedType)
           ?: TransactionCategories.EXPENSE_CATEGORIES.first()
       }
     )
   }
+  var hasUserSelectedCategory by remember(event.id) { mutableStateOf(false) }
   var rememberForMerchant by remember(event.id) { mutableStateOf(false) }
-  var merchantText by remember { mutableStateOf(event.detectedMerchant.orEmpty()) }
   var amountText by remember { mutableStateOf(event.detectedMoney.toBigDecimal().toPlainString()) }
+
+  fun defaultCategory(merchant: String, type: TransactionType): String =
+    when (type) {
+      TransactionType.INCOME -> TransactionCategories.INCOME_CATEGORIES.first()
+      TransactionType.REFUND, TransactionType.REVERSAL -> "Refunds"
+      else -> MerchantCategoryResolver.resolve(merchant, type)
+        ?: TransactionCategories.EXPENSE_CATEGORIES.first()
+    }
+
+  // A late preference response may initialize the category, but must never overwrite
+  // a category the user has already selected for the current merchant.
+  LaunchedEffect(event.id, merchantText, selectedType, preferredCategory) {
+    if (!hasUserSelectedCategory) {
+      selectedCategory =
+        if (selectedType == TransactionType.EXPENSE &&
+          preferredCategory in TransactionCategories.EXPENSE_CATEGORIES
+        ) {
+          preferredCategory!!
+        } else {
+          defaultCategory(merchantText, selectedType)
+        }
+    }
+  }
 
   val categories =
     if (selectedType == TransactionType.INCOME || selectedType == TransactionType.REFUND || selectedType == TransactionType.REVERSAL) {
@@ -788,12 +817,8 @@ fun TransactionCorrectionDialog(
               selected = selectedType == type,
               onClick = {
                 selectedType = type
-                selectedCategory = when (type) {
-                  TransactionType.INCOME -> TransactionCategories.INCOME_CATEGORIES.first()
-                  TransactionType.REFUND, TransactionType.REVERSAL -> "Refunds"
-                  else -> MerchantCategoryResolver.resolve(event.detectedMerchant, type)
-                    ?: TransactionCategories.EXPENSE_CATEGORIES.first()
-                }
+                hasUserSelectedCategory = false
+                selectedCategory = defaultCategory(merchantText, type)
                 rememberForMerchant = false
               },
               label = { Text(type.name) },
@@ -830,7 +855,10 @@ fun TransactionCorrectionDialog(
           categories.forEach { cat ->
             FilterChip(
               selected = selectedCategory == cat,
-              onClick = { selectedCategory = cat },
+              onClick = {
+                selectedCategory = cat
+                hasUserSelectedCategory = true
+              },
               label = { Text(cat) },
               modifier = Modifier.testTag("category_chip_$cat"),
             )
@@ -850,7 +878,13 @@ fun TransactionCorrectionDialog(
 
         OutlinedTextField(
           value = merchantText,
-          onValueChange = { merchantText = it },
+          onValueChange = { updatedMerchant ->
+            merchantText = updatedMerchant
+            hasUserSelectedCategory = false
+            rememberForMerchant = false
+            selectedCategory = defaultCategory(updatedMerchant, selectedType)
+            onMerchantChanged(updatedMerchant.ifBlank { null })
+          },
           label = { Text("Merchant / Payee") },
           singleLine = true,
           modifier = Modifier.fillMaxWidth().testTag("correction_merchant_input"),
