@@ -33,7 +33,7 @@ import org.robolectric.annotation.Config
 
 /**
  * Credit card persistence: association with the ledger account, validation, UID isolation, and the
- * guarantee that removing a card never removes the account or its transactions.
+ * guarantee that archiving a card never removes the account or its transactions.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
