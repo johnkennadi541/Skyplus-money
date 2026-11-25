@@ -752,7 +752,7 @@ fun TransactionCorrectionDialog(
       }
     )
   }
-  var hasUserSelectedCategory by remember(event.id) { mutableStateOf(false) }
+  var userSelectedCategory by remember(event.id) { mutableStateOf<String?>(null) }
   var rememberForMerchant by remember(event.id) { mutableStateOf(false) }
   var amountText by remember { mutableStateOf(event.detectedMoney.toBigDecimal().toPlainString()) }
 
@@ -764,18 +764,16 @@ fun TransactionCorrectionDialog(
         ?: TransactionCategories.EXPENSE_CATEGORIES.first()
     }
 
-  // A late preference response may initialize the category, but must never overwrite
-  // a category the user has already selected for the current merchant.
-  LaunchedEffect(event.id, merchantText, selectedType, preferredCategory) {
-    if (!hasUserSelectedCategory) {
-      selectedCategory =
-        if (selectedType == TransactionType.EXPENSE &&
-          preferredCategory != null && preferredCategory in TransactionCategories.EXPENSE_CATEGORIES
-        ) {
-          preferredCategory!!
-        } else {
-          defaultCategory(merchantText, selectedType)
-        }
+  // A late preference response may initialize the category, but an explicit user
+  // selection for this merchant always takes precedence until the merchant/type changes.
+  LaunchedEffect(event.id, merchantText, selectedType, preferredCategory, userSelectedCategory) {
+    selectedCategory = userSelectedCategory ?: if (
+      selectedType == TransactionType.EXPENSE &&
+        preferredCategory != null && preferredCategory in TransactionCategories.EXPENSE_CATEGORIES
+    ) {
+      preferredCategory
+    } else {
+      defaultCategory(merchantText, selectedType)
     }
   }
 
@@ -817,7 +815,7 @@ fun TransactionCorrectionDialog(
               selected = selectedType == type,
               onClick = {
                 selectedType = type
-                hasUserSelectedCategory = false
+                userSelectedCategory = null
                 selectedCategory = defaultCategory(merchantText, type)
                 rememberForMerchant = false
               },
@@ -857,7 +855,7 @@ fun TransactionCorrectionDialog(
               selected = selectedCategory == cat,
               onClick = {
                 selectedCategory = cat
-                hasUserSelectedCategory = true
+                userSelectedCategory = cat
               },
               label = { Text(cat) },
               modifier = Modifier.testTag("category_chip_$cat"),
@@ -880,7 +878,7 @@ fun TransactionCorrectionDialog(
           value = merchantText,
           onValueChange = { updatedMerchant ->
             merchantText = updatedMerchant
-            hasUserSelectedCategory = false
+            userSelectedCategory = null
             rememberForMerchant = false
             selectedCategory = defaultCategory(updatedMerchant, selectedType)
             onMerchantChanged(updatedMerchant.ifBlank { null })
