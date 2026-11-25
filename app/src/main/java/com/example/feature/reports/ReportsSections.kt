@@ -234,6 +234,14 @@ fun IncomeExpenseReportSection(
       currencyCode = currency,
     )
 
+    if (report.completedRefundCount > 0) {
+      Text(
+        text = "Refunds & reversals are included in Net Expenses, but are not assigned to expense categories because the original expense is not linked.",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+
     if (report.incomeByCategory.isNotEmpty()) {
       CategoryBreakdownChartCard(
         title = "Income Sources Breakdown ($currency)",
