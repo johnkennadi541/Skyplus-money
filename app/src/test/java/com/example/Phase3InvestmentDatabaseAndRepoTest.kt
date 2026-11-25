@@ -173,6 +173,62 @@ class Phase3InvestmentDatabaseAndRepoTest {
   }
 
   @Test
+  fun `purchase date is immutable and linked initial ledger dates remain consistent`() = runTest {
+    val repo = buildRepo(AmfiMfApiMarketPriceDataSource(fakeCallFactory { throw IOException("offline") }, testDispatchers))
+    val originalDate = 1_750_000_000_000L
+    val created =
+      repo.createHoldingWithInitialBuy(
+        authenticatedUserId = "uid_purchase_date",
+        name = "Index Fund",
+        category = InvestmentCategory.MUTUAL_FUNDS,
+        symbolOrTicker = "123456",
+        isin = null,
+        brokerOrPlatform = "Broker",
+        currencyCode = "INR",
+        purchaseDate = originalDate,
+        quantityDecimal = "10",
+        purchasePriceDecimal = "100",
+        chargesMinor = 0L,
+        currentMarketPriceDecimal = "105",
+        autoPriceUpdateEnabled = false,
+        notes = "Initial note",
+      ).getOrThrow()
+
+    val initialBuyBefore = repo.getTransactionsForHolding("uid_purchase_date", created.id).first().single()
+    val initialPriceBefore = repo.getPriceHistoryForHolding("uid_purchase_date", created.id).first().single()
+    assertEquals(originalDate, created.purchaseDate)
+    assertEquals(originalDate, initialBuyBefore.transactionDate)
+    assertEquals(originalDate, initialPriceBefore.priceDate)
+
+    val rejected =
+      repo.updateHoldingMetadata(
+        authenticatedUserId = "uid_purchase_date",
+        holding = created.copy(purchaseDate = originalDate + 86_400_000L),
+      )
+    assertTrue("Changing the acquisition date must be rejected", rejected.isFailure)
+
+    val unchangedHolding = repo.getHoldingById("uid_purchase_date", created.id)!!
+    val transactionsAfter = repo.getTransactionsForHolding("uid_purchase_date", created.id).first()
+    val historyAfter = repo.getPriceHistoryForHolding("uid_purchase_date", created.id).first()
+    assertEquals(originalDate, unchangedHolding.purchaseDate)
+    assertEquals(1, transactionsAfter.size)
+    assertEquals(originalDate, transactionsAfter.single().transactionDate)
+    assertEquals(1, historyAfter.size)
+    assertEquals(originalDate, historyAfter.single().priceDate)
+
+    // Ordinary metadata edits remain available and do not change the acquisition date.
+    repo.updateHoldingMetadata(
+      authenticatedUserId = "uid_purchase_date",
+      holding = unchangedHolding.copy(name = "Index Fund Updated", notes = "Metadata only"),
+    ).getOrThrow()
+    val metadataUpdated = repo.getHoldingById("uid_purchase_date", created.id)!!
+    assertEquals("Index Fund Updated", metadataUpdated.name)
+    assertEquals(originalDate, metadataUpdated.purchaseDate)
+    assertEquals(originalDate, repo.getTransactionsForHolding("uid_purchase_date", created.id).first().single().transactionDate)
+    assertEquals(originalDate, repo.getPriceHistoryForHolding("uid_purchase_date", created.id).first().priceDate)
+  }
+
+  @Test
   fun `manual price update works offline and never gets overwritten automatically without explicit opt in`() = runTest {
     val repo =
       buildRepo(
