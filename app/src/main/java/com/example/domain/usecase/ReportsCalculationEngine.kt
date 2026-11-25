@@ -302,7 +302,6 @@ class ReportsCalculationEngine @Inject constructor(
     var excludedNonCompleted = 0
 
     val expenseCatGross = linkedMapOf<String, Long>()
-    val expenseCatRefund = linkedMapOf<String, Long>()
     val expenseCatCount = linkedMapOf<String, Int>()
     val incomeCatTotal = linkedMapOf<String, Long>()
     val incomeCatCount = linkedMapOf<String, Int>()
@@ -376,7 +375,7 @@ class ReportsCalculationEngine @Inject constructor(
     // Category rows represent gross completed expenses only. Since the transaction
     // model has no original-expense reference for refunds, attributing a refund to
     // its own category could silently offset an unrelated expense category.
-    val categoryGrossTotal = expenseCatGross.values.fold(0L, Math::addExact)
+    val categoryGrossTotal = expenseCatGross.values.fold(0L) { total, amount -> Math.addExact(total, amount) }
     val expenseByCategory =
       expenseCatGross
         .map { (cat, gross) ->
