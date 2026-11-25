@@ -109,8 +109,12 @@ class BudgetsStaleDisplayTest {
     )
 
   private fun assertHistoryCurrencyPrecision(currencyCode: String, spentMinor: Long, allocatedMinor: Long) {
+    val currencyBudgetStatus =
+      status(stale = true).copy(
+        budget = budget().copy(currencyCode = currencyCode),
+      )
     render(
-      status(stale = true),
+      currencyBudgetStatus,
       periods = listOf(historyPeriod(currencyCode, spentMinor, allocatedMinor)),
     )
 
