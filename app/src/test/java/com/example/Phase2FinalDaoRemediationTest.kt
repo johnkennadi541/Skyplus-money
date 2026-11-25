@@ -804,6 +804,7 @@ class Phase2FinalDaoRemediationTest {
             override fun observeLatestAutoSavedNotice(userId: String) = flowOf<AutoSavedTransactionNotice?>(null)
             override fun clearAutoSavedNotice() = Unit
             override suspend fun getEventById(userId: String, eventId: String) = null
+            override suspend fun getMerchantCategoryOverride(userId: String, merchant: String) = null
             override suspend fun processIncomingEvent(userId: String, rawPackageName: String, senderOrTitle: String, parsed: ParsedFinancialMessage) =
               Result.failure<TransactionDetectionEvent>(IllegalStateException("unused"))
             override suspend fun approveReviewEvent(userId: String, eventId: String, selectedAccountId: String, category: String, merchant: String?, correctedType: TransactionType?, correctedAmountMinor: Long?, rememberMerchantCategory: Boolean) =
