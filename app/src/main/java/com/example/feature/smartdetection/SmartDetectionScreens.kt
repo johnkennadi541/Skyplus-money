@@ -60,6 +60,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -753,6 +754,7 @@ fun TransactionCorrectionDialog(
     )
   }
   var userSelectedCategory by remember(event.id) { mutableStateOf<String?>(null) }
+  val latestUserSelectedCategory = rememberUpdatedState(userSelectedCategory)
   var rememberForMerchant by remember(event.id) { mutableStateOf(false) }
   var amountText by remember { mutableStateOf(event.detectedMoney.toBigDecimal().toPlainString()) }
 
@@ -765,11 +767,11 @@ fun TransactionCorrectionDialog(
     }
 
   // Apply asynchronous saved preferences only while the user has not manually
-  // selected a category. Keep userSelectedCategory out of the effect keys: a manual
-  // selection must not restart this effect and race with a late preference update.
-  // Merchant/type changes explicitly clear the manual selection before this effect runs.
+  // selected a category. Read the latest manual-selection state inside the coroutine,
+  // rather than a value captured when the effect was launched. Merchant/type changes
+  // explicitly clear the manual selection before this effect runs.
   LaunchedEffect(event.id, merchantText, selectedType, preferredCategory) {
-    if (userSelectedCategory == null) {
+    if (latestUserSelectedCategory.value == null) {
       selectedCategory = if (
         selectedType == TransactionType.EXPENSE &&
           preferredCategory != null && preferredCategory in TransactionCategories.EXPENSE_CATEGORIES
