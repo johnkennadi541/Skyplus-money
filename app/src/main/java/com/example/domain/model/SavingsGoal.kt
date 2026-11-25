@@ -51,6 +51,7 @@ data class SavingsGoalSummary(
   val remainingMinor: Long,
   val progressPercent: BigDecimal,
   val contributionCount: Int,
+  val contributions: List<SavingsContribution> = emptyList(),
 ) {
   val saved: Money
     get() = Money.fromMinorUnits(savedMinor, goal.currencyCode)
