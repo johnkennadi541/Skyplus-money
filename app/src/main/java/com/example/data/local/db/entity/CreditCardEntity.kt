@@ -26,6 +26,7 @@ data class CreditCardEntity(
   val paymentDueDayOffset: Int,
   val aprPercent: String,
   val isActive: Boolean,
+  val isArchived: Boolean = false,
   val createdAt: Long,
   val updatedAt: Long,
 ) {
@@ -43,6 +44,7 @@ data class CreditCardEntity(
       paymentDueDayOffset = paymentDueDayOffset,
       aprPercent = aprPercent,
       isActive = isActive,
+      isArchived = isArchived,
       createdAt = createdAt,
       updatedAt = updatedAt,
     )
@@ -62,6 +64,7 @@ data class CreditCardEntity(
         paymentDueDayOffset = domain.paymentDueDayOffset,
         aprPercent = domain.aprPercent,
         isActive = domain.isActive,
+        isArchived = domain.isArchived,
         createdAt = domain.createdAt,
         updatedAt = domain.updatedAt,
       )
