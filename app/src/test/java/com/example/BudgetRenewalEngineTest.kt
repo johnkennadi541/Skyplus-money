@@ -291,7 +291,7 @@ class BudgetRenewalEngineTest {
     val plan = engine.plan(january, transactions, nowMillis = at(2026, 1, 20)) as BudgetRenewalPlan.Due
 
     val archived = plan.closedPeriods.single()
-    assertEquals(BudgetAlertStatus.APPROACHING_75, archived.alertStatus)
+    assertEquals(BudgetAlertStatus.THRESHOLD_REACHED, archived.alertStatus)
     assertEquals(80_00L, archived.spentMinor)
     assertEquals(20_00L, archived.remainingMinor)
   }
