@@ -156,7 +156,7 @@ class Phase2SmartDetectionParserTest {
   @Test
   fun `extracts POS terminal merchant and category`() {
     val parsed = SmartTransactionParser.parse(
-      "POS AMAZON 1,250.00 debited from card ending 7788 Ref POS123456",
+      "POS AMAZON INR 1,250.00 debited from card ending 7788 Ref POS123456",
       "com.example.bank",
       1_700_000_000_000L,
     )!!
