@@ -1,5 +1,6 @@
 package com.example.data.local.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -23,6 +24,7 @@ data class SavingsGoalEntity(
   val note: String?,
   val createdAt: Long,
   val updatedAt: Long,
+  @ColumnInfo(defaultValue = "0") val isArchived: Boolean = false,
 ) {
   fun toDomain(): SavingsGoal =
     SavingsGoal(
@@ -35,6 +37,7 @@ data class SavingsGoalEntity(
       note = note,
       createdAt = createdAt,
       updatedAt = updatedAt,
+      isArchived = isArchived,
     )
 
   companion object {
@@ -49,6 +52,7 @@ data class SavingsGoalEntity(
         note = goal.note,
         createdAt = goal.createdAt,
         updatedAt = goal.updatedAt,
+        isArchived = goal.isArchived,
       )
   }
 }
@@ -84,6 +88,8 @@ data class SavingsContributionEntity(
   val contributedAt: Long,
   val note: String?,
   val createdAt: Long,
+  @ColumnInfo(defaultValue = "0") val isVoided: Boolean = false,
+  @ColumnInfo(defaultValue = "NULL") val voidedAt: Long? = null,
 ) {
   fun toDomain(): SavingsContribution =
     SavingsContribution(
@@ -95,6 +101,8 @@ data class SavingsContributionEntity(
       contributedAt = contributedAt,
       note = note,
       createdAt = createdAt,
+      isVoided = isVoided,
+      voidedAt = voidedAt,
     )
 
   companion object {
@@ -108,6 +116,8 @@ data class SavingsContributionEntity(
         contributedAt = contribution.contributedAt,
         note = contribution.note,
         createdAt = contribution.createdAt,
+        isVoided = contribution.isVoided,
+        voidedAt = contribution.voidedAt,
       )
   }
 }
