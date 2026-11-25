@@ -20,6 +20,9 @@ interface CreditCardRepository {
 
   suspend fun updateCard(authenticatedUserId: String, card: CreditCard): Result<Unit>
 
+  /** Archives or restores card metadata without touching its ledger account or transactions. */
+  suspend fun setCardArchived(userId: String, cardId: String, archived: Boolean): Result<Unit>
+
   /** Removes only the card record. The account and its transactions are never deleted. */
   suspend fun deleteCard(userId: String, cardId: String): Result<Unit>
 }
