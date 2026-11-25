@@ -34,6 +34,9 @@ class SavingsGoalCalculationEngine @Inject constructor() {
       require(contribution.currencyCode.equals(goal.currencyCode, ignoreCase = true)) {
         "Contribution currency must match the goal currency"
       }
+      require(contribution.isVoided == (contribution.voidedAt != null)) {
+        "Voided contribution metadata is inconsistent"
+      }
       require(contribution.amountMinor > 0L) {
         "Contribution amount must be greater than zero"
       }
