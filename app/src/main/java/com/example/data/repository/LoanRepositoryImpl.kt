@@ -10,6 +10,7 @@ import com.example.domain.model.Loan
 import com.example.domain.model.LoanPayment
 import com.example.domain.model.LoanPaymentStatus
 import com.example.domain.model.LoanStatus
+import com.example.domain.model.LoanType
 import com.example.domain.model.Money
 import com.example.domain.repository.LoanRepository
 import com.example.domain.usecase.EmiCalculationEngine
