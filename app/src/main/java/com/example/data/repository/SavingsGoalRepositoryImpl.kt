@@ -117,22 +117,30 @@ constructor(
       }
     }
 
-  override suspend fun deleteGoal(userId: String, goalId: String): Result<Unit> =
+  override suspend fun setGoalArchived(
+    userId: String,
+    goalId: String,
+    archived: Boolean,
+  ): Result<Unit> =
     withContext(dispatchers.io) {
       runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(goalId.isNotBlank()) { "Goal ID is required" }
-
         database.withTransaction {
           val existing =
             savingsGoalDao.getGoalById(userId, goalId)
               ?: throw SecurityException("Goal does not belong to authenticated user")
           require(existing.userId == userId) { "Goal ownership verification failed" }
-
-          // Contributions are meaningless without their goal, so both go in one transaction.
-          savingsGoalDao.deleteContributionsForGoal(userId, existing.id)
-          val rows = savingsGoalDao.deleteGoal(userId, existing.id)
-          check(rows == 1) { "Goal deletion rejected for authenticated user" }
+          if (existing.isArchived != archived) {
+            val rows =
+              savingsGoalDao.setGoalArchivedScoped(
+                userId = userId,
+                goalId = goalId,
+                archived = archived,
+                updatedAt = System.currentTimeMillis(),
+              )
+            check(rows == 1) { "Goal archive update rejected for authenticated user" }
+          }
         }
       }
     }
@@ -149,6 +157,8 @@ constructor(
           val goal =
             savingsGoalDao.getGoalById(authenticatedUserId, contribution.goalId)
               ?: throw SavingsGoalConflictException("Goal does not exist for this user")
+
+          check(!goal.isArchived) { "Archived goals cannot receive new contributions. Restore the goal first." }
 
           SavingsGoalValidation.requireValidContribution(
             contribution = contribution,
@@ -169,7 +179,7 @@ constructor(
       }
     }
 
-  override suspend fun deleteContribution(
+  override suspend fun voidContribution(
     userId: String,
     contributionId: String,
   ): Result<Unit> =
@@ -177,14 +187,19 @@ constructor(
       runCatchingPreservingCancellation {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(contributionId.isNotBlank()) { "Contribution ID is required" }
-
         database.withTransaction {
           val existing =
             savingsGoalDao.getContributionById(userId, contributionId)
               ?: throw SecurityException("Contribution does not belong to authenticated user")
           require(existing.userId == userId) { "Contribution ownership verification failed" }
-          val rows = savingsGoalDao.deleteContribution(userId, contributionId)
-          check(rows == 1) { "Contribution deletion rejected for authenticated user" }
+          check(!existing.isVoided) { "Contribution is already voided" }
+          val rows =
+            savingsGoalDao.voidContributionScoped(
+              userId = userId,
+              contributionId = contributionId,
+              voidedAt = System.currentTimeMillis(),
+            )
+          check(rows == 1) { "Contribution void rejected for authenticated user" }
         }
       }
     }
