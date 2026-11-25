@@ -53,6 +53,8 @@ class SmartDetectionViewModel @Inject constructor(
 
   private val _merchantCategoryOverride = MutableStateFlow<String?>(null)
   val merchantCategoryOverride: StateFlow<String?> = _merchantCategoryOverride.asStateFlow()
+  private val _authSessionVersion = MutableStateFlow(0L)
+  val authSessionVersion: StateFlow<Long> = _authSessionVersion.asStateFlow()
   private var merchantOverrideRequestId: Long = 0L
 
   private val _isPermissionGranted = MutableStateFlow(NotificationPermissionHelper.isNotificationAccessGranted(context))
@@ -60,13 +62,18 @@ class SmartDetectionViewModel @Inject constructor(
 
   init {
     viewModelScope.launch {
+      val sessionGuard = MerchantOverrideSessionGuard()
       authRepository.observeAuthSession()
         .distinctUntilChangedBy { (it as? AuthSessionState.Authenticated)?.user?.uid }
         .collect { session ->
           _userMessage.value = null
-          if (session !is AuthSessionState.Authenticated) {
+          val currentUid = (session as? AuthSessionState.Authenticated)?.user?.uid
+          if (sessionGuard.onUidChanged(currentUid)) {
             merchantOverrideRequestId++
             _merchantCategoryOverride.value = null
+            _authSessionVersion.value = _authSessionVersion.value + 1L
+          }
+          if (session !is AuthSessionState.Authenticated) {
             settingsUseCases.clearAutoSavedNotice()
           }
         }
@@ -347,5 +354,17 @@ class SmartDetectionViewModel @Inject constructor(
 
   fun dismissMessage() {
     _userMessage.value = null
+  }
+}
+
+
+/** Tracks authenticated identity changes so account-scoped UI state can be invalidated. */
+internal class MerchantOverrideSessionGuard {
+  private var lastUid: String? = null
+
+  fun onUidChanged(currentUid: String?): Boolean {
+    if (lastUid == currentUid) return false
+    lastUid = currentUid
+    return true
   }
 }
