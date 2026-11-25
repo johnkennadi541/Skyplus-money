@@ -73,6 +73,9 @@ class FinancialAccountRepositoryImpl @Inject constructor(
           require(existing.userId == authenticatedUserId) {
             "Account ownership verification failed"
           }
+          require(account.currencyCode.equals(existing.currencyCode, ignoreCase = true)) {
+            "Account currency is immutable. Create a new account in the desired currency and record any conversion explicitly."
+          }
           // A card-linked account anchors a credit card record: changing its type or currency
           // would break the card's limit, statement cycle and liability maths.
           val linkedCard = database.creditCardDao().getCardByAccountId(authenticatedUserId, account.id)
