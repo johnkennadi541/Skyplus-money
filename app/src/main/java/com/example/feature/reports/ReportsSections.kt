@@ -45,7 +45,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.core.designsystem.component.BadgeTone
-import com.example.core.designsystem.component.OceanCard
+import com.example.core.designsystem.component.SkyplusSectionCard
 import com.example.core.designsystem.component.OceanStatusBadge
 import com.example.core.designsystem.theme.OceanNumericStyle
 import com.example.core.designsystem.theme.OceanSpacing
@@ -80,7 +80,7 @@ fun OverviewReportSection(
   val ie = report.incomeExpense
 
   Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(OceanSpacing.sm)) {
-    OceanCard(modifier = Modifier.testTag("reports_net_worth_card")) {
+    SkyplusSectionCard(modifier = Modifier.testTag("reports_net_worth_card")) {
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -178,7 +178,7 @@ fun OverviewReportSection(
         KpiBox(
           title = "Net Savings",
           value = fmtMoney(ie.netSavingsMinor, currency),
-          valueColor = if (ie.netSavingsMinor >= 0L) extended.gold else extended.negative,
+          valueColor = if (ie.netSavingsMinor >= 0L) MaterialTheme.colorScheme.primary else extended.negative,
           modifier = Modifier.weight(1f),
         )
         KpiBox(
@@ -731,7 +731,7 @@ fun ExportsAndEmailSection(
         }
         Button(
           onClick = { onOpenEmailPreview(recipientDraft) },
-          colors = ButtonDefaults.buttonColors(containerColor = extended.gold, contentColor = Color.Black),
+          colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
           modifier = Modifier.weight(1f).minimumInteractiveComponentSize().testTag("email_preview_send_button"),
         ) {
           Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -751,7 +751,7 @@ private fun EmptyReportCategoryCard(
 ) {
   OceanCard(modifier = modifier.fillMaxWidth()) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Icon(Icons.Rounded.AccountBalance, contentDescription = null, tint = OceanTheme.colors.gold)
+      Icon(Icons.Rounded.AccountBalance, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
       Spacer(modifier = Modifier.width(OceanSpacing.xs))
       Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
     }
