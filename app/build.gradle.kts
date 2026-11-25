@@ -92,6 +92,24 @@ secrets {
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
 
+/*
+ * Robolectric resolves its Android runtime (android-all) at test execution time.
+ * Use Maven Central's canonical endpoint explicitly instead of Robolectric's
+ * legacy repo1 default, which has repeatedly failed in CI with HttpURLConnection
+ * IOExceptions. Emit full test exceptions so transport and assertion failures
+ * can be distinguished from one another.
+ */
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+  systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2")
+  testLogging {
+    events("failed")
+    exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    showCauses = true
+    showStackTraces = true
+  }
+}
+
+
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
