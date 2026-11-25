@@ -100,7 +100,8 @@ class SavingsGoalsScreenTest {
           onDismissMessage = {},
           onCreateGoal = { name, _, _, _, _, _ -> recorded.createdName = name },
           onAddContribution = { _, _, _, _ -> },
-          onDeleteGoal = { _, _ -> },
+          onSetGoalArchived = { _, _, _ -> },
+          onVoidContribution = { _, _ -> },
           onEditGoal = { _, name, currency, target, note, deadline, _ ->
             recorded.editCalls += 1
             recorded.editedName = name
