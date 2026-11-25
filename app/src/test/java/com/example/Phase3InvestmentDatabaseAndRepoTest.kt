@@ -225,7 +225,7 @@ class Phase3InvestmentDatabaseAndRepoTest {
     assertEquals("Index Fund Updated", metadataUpdated.name)
     assertEquals(originalDate, metadataUpdated.purchaseDate)
     assertEquals(originalDate, repo.getTransactionsForHolding("uid_purchase_date", created.id).first().single().transactionDate)
-    assertEquals(originalDate, repo.getPriceHistoryForHolding("uid_purchase_date", created.id).first().priceDate)
+    assertEquals(originalDate, repo.getPriceHistoryForHolding("uid_purchase_date", created.id).first().single().priceDate)
   }
 
   @Test
