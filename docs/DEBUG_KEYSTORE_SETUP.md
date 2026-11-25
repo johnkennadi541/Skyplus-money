@@ -98,7 +98,10 @@ Approve the deployment when prompted.
 What it does, in order:
 
 1. mints a one-hour GitHub App installation token, scoped to this repository with
-   `environments: write` only, from an action pinned to a commit SHA;
+   `environments: write` only, using `actions/create-github-app-token` **v3.4.0**
+   pinned to the immutable commit
+   `f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc`. Version 3.4.0 runs on Node.js 24, which
+   removes the Node.js 20 deprecation warning the v1 action produced;
 2. refuses to run outside `main`;
 3. verifies the **configuration** that must be in place: required reviewers actually
    configured, and a **custom deployment branch policy listing exactly `main`** with no
