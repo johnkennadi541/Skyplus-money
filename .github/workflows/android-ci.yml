@@ -6,7 +6,7 @@ on:
   pull_request:
     # Feature branches are tested when they open a PR into main, develop or
     # another feature branch (the UI redesign runs on feature/ui-redesign).
-    branches: [ main, develop, 'feature/**' ]
+    branches: [ main, develop, 'feature/**', 'fix/**', 'test/**' ]
   workflow_dispatch:
 
 permissions:
