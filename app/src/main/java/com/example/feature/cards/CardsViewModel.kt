@@ -178,21 +178,5 @@ constructor(
     }
   }
 
-  fun deleteCard(cardId: String, onSuccess: () -> Unit) {
-    val uid = currentUid() ?: return
-    viewModelScope.launch {
-      deleteCreditCardUseCase(uid, cardId)
-        .onSuccess {
-          _userMessage.value = "Card removed. The account and its transactions are unchanged."
-          _isErrorMessage.value = false
-          onSuccess()
-        }
-        .onFailure {
-          _userMessage.value = it.message ?: "Could not remove the card"
-          _isErrorMessage.value = true
-        }
-    }
-  }
-
   private fun currentUid(): String? = activeUid
 }
