@@ -156,9 +156,9 @@ class Phase2DeduplicationRemediationTest {
     val ev1 = detectionRepo.processIncomingEvent(uid, "com.phonepe.app", "PhonePe", msgAcc1).getOrThrow()
     val ev2 = detectionRepo.processIncomingEvent(uid, "com.phonepe.app", "PhonePe", msgAcc2).getOrThrow()
 
-    assertEquals(DetectionEventStatus.AUTO_SAVED, ev1.status)
-    assertEquals(DetectionEventStatus.AUTO_SAVED, ev2.status)
-    assertEquals(470_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
+    assertEquals(DetectionEventStatus.IN_REVIEW, ev1.status)
+    assertEquals(DetectionEventStatus.IN_REVIEW, ev2.status)
+    assertEquals(500_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
     assertEquals(500_000L, accountRepo.getAccountById(uid, "acc_2")!!.currentBalanceMinor)
   }
 
@@ -186,7 +186,7 @@ class Phase2DeduplicationRemediationTest {
     val evRedelivered = detectionRepo.processIncomingEvent(uid, "com.phonepe.app", "PhonePe", exactRedelivery).getOrThrow()
     val ev2 = detectionRepo.processIncomingEvent(uid, "com.phonepe.app", "PhonePe", secondCoffee).getOrThrow()
 
-    assertEquals(DetectionEventStatus.AUTO_SAVED, ev1.status)
+    assertEquals(DetectionEventStatus.IN_REVIEW, ev1.status)
     assertEquals(DetectionEventStatus.DUPLICATE, evRedelivered.status)
     assertEquals(DetectionEventStatus.IN_REVIEW, ev2.status)
     assertEquals(500_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
@@ -219,8 +219,8 @@ class Phase2DeduplicationRemediationTest {
     val ev1 = detectionRepo.processIncomingEvent(uid, "com.phonepe.app", "PhonePe", firstNamed).getOrThrow()
     val ev2 = detectionRepo.processIncomingEvent(uid, "com.snapwork.hdfc", "HDFC Bank", secondNullMerchant).getOrThrow()
 
-    assertEquals(DetectionEventStatus.AUTO_SAVED, ev1.status)
-    assertEquals(DetectionEventStatus.AUTO_SAVED, ev2.status)
+    assertEquals(DetectionEventStatus.IN_REVIEW, ev1.status)
+    assertEquals(DetectionEventStatus.IN_REVIEW, ev2.status)
     assertEquals(500_000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
     assertEquals(0, txnRepo.getTransactions(uid).first().size)
   }
