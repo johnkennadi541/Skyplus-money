@@ -62,10 +62,14 @@ class BudgetThresholdPrecisionTest {
       transactionDate = inside,
     )
 
-  private fun bandFor(allocatedMinor: Long, spentMinor: Long): BudgetAlertStatus =
+  private fun bandFor(
+    allocatedMinor: Long,
+    spentMinor: Long,
+    thresholdPercent: Int = 75,
+  ): BudgetAlertStatus =
     engine
       .calculateBudgetStatus(
-        budget = budget(allocatedMinor),
+        budget = budget(allocatedMinor).copy(warningThresholdPercent = thresholdPercent),
         transactions = listOf(transaction(TransactionType.EXPENSE, spentMinor)),
         nowMillis = inside,
       )
@@ -162,6 +166,22 @@ class BudgetThresholdPrecisionTest {
 
     assertEquals(100.0, status.percentageConsumed, 0.00001)
     assertEquals(BudgetAlertStatus.THRESHOLD_REACHED, status.alertStatus)
+  }
+
+  // ---------------------------------------------------- configured thresholds
+
+  @Test
+  fun `90 percent setting is the sole warning threshold`() {
+    assertEquals(BudgetAlertStatus.NORMAL, bandFor(10_000L, 8_999L, thresholdPercent = 90))
+    assertEquals(BudgetAlertStatus.THRESHOLD_REACHED, bandFor(10_000L, 9_000L, thresholdPercent = 90))
+    assertEquals(BudgetAlertStatus.THRESHOLD_REACHED, bandFor(10_000L, 9_999L, thresholdPercent = 90))
+  }
+
+  @Test
+  fun `100 percent setting warns at limit and overspends only above limit`() {
+    assertEquals(BudgetAlertStatus.NORMAL, bandFor(10_000L, 9_999L, thresholdPercent = 100))
+    assertEquals(BudgetAlertStatus.THRESHOLD_REACHED, bandFor(10_000L, 10_000L, thresholdPercent = 100))
+    assertEquals(BudgetAlertStatus.EXCEEDED_100, bandFor(10_000L, 10_001L, thresholdPercent = 100))
   }
 
   // ------------------------------------------------------------- preservation
