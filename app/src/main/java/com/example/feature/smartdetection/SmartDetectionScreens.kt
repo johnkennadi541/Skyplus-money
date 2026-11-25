@@ -770,7 +770,7 @@ fun TransactionCorrectionDialog(
     if (!hasUserSelectedCategory) {
       selectedCategory =
         if (selectedType == TransactionType.EXPENSE &&
-          preferredCategory in TransactionCategories.EXPENSE_CATEGORIES
+          preferredCategory != null && preferredCategory in TransactionCategories.EXPENSE_CATEGORIES
         ) {
           preferredCategory!!
         } else {
