@@ -315,7 +315,7 @@ fun BudgetReportSection(
         val tone =
           when (row.alertStatus) {
             BudgetAlertStatus.EXCEEDED_100 -> BadgeTone.NEGATIVE
-            BudgetAlertStatus.WARNING_90, BudgetAlertStatus.APPROACHING_75 -> BadgeTone.WARNING
+            BudgetAlertStatus.THRESHOLD_REACHED, BudgetAlertStatus.WARNING_90, BudgetAlertStatus.APPROACHING_75 -> BadgeTone.WARNING
             BudgetAlertStatus.NORMAL -> BadgeTone.POSITIVE
             BudgetAlertStatus.PERIOD_ENDED -> BadgeTone.INFO
           }

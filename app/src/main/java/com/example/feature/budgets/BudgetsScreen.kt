@@ -507,6 +507,7 @@ private fun BudgetCard(
   val (tone, statusLabel) =
     when (status.alertStatus) {
       BudgetAlertStatus.NORMAL -> BadgeTone.POSITIVE to "On Track"
+      BudgetAlertStatus.THRESHOLD_REACHED -> BadgeTone.WARNING to "${budget.warningThresholdPercent}% Reached"
       BudgetAlertStatus.APPROACHING_75 -> BadgeTone.WARNING to "75% Reached"
       BudgetAlertStatus.WARNING_90 -> BadgeTone.WARNING to "90% Warning"
       BudgetAlertStatus.EXCEEDED_100 -> BadgeTone.NEGATIVE to "Overspent"
@@ -516,7 +517,7 @@ private fun BudgetCard(
   val progressColor =
     when (status.alertStatus) {
       BudgetAlertStatus.NORMAL -> OceanTheme.colors.positive
-      BudgetAlertStatus.APPROACHING_75, BudgetAlertStatus.WARNING_90 -> OceanTheme.colors.warning
+      BudgetAlertStatus.THRESHOLD_REACHED, BudgetAlertStatus.APPROACHING_75, BudgetAlertStatus.WARNING_90 -> OceanTheme.colors.warning
       BudgetAlertStatus.EXCEEDED_100 -> OceanTheme.colors.negative
       BudgetAlertStatus.PERIOD_ENDED -> MaterialTheme.colorScheme.outline
     }

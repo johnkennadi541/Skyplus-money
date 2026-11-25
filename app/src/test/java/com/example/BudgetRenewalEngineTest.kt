@@ -207,9 +207,9 @@ class BudgetRenewalEngineTest {
       )
 
     assertEquals(BudgetAlertStatus.NORMAL, status(74_99L).alertStatus)
-    assertEquals(BudgetAlertStatus.APPROACHING_75, status(75_00L).alertStatus)
-    assertEquals(BudgetAlertStatus.WARNING_90, status(90_00L).alertStatus)
-    assertEquals(BudgetAlertStatus.EXCEEDED_100, status(100_00L).alertStatus)
+    assertEquals(BudgetAlertStatus.THRESHOLD_REACHED, status(75_00L).alertStatus)
+    assertEquals(BudgetAlertStatus.THRESHOLD_REACHED, status(90_00L).alertStatus)
+    assertEquals(BudgetAlertStatus.THRESHOLD_REACHED, status(100_00L).alertStatus)
   }
 
   @Test
@@ -291,7 +291,7 @@ class BudgetRenewalEngineTest {
     val plan = engine.plan(january, transactions, nowMillis = at(2026, 1, 20)) as BudgetRenewalPlan.Due
 
     val archived = plan.closedPeriods.single()
-    assertEquals(BudgetAlertStatus.APPROACHING_75, archived.alertStatus)
+    assertEquals(BudgetAlertStatus.THRESHOLD_REACHED, archived.alertStatus)
     assertEquals(80_00L, archived.spentMinor)
     assertEquals(20_00L, archived.remainingMinor)
   }
