@@ -324,7 +324,7 @@ class Phase2SecurityRemediationTest {
   // --- Requirement 7.6: Logout / account-switch state isolation & DAO UID predicates ---
 
   @Test
-  fun `logout and account switch isolate auto-saved notices and DAOs enforce UID predicates`() = runTest {
+  fun `logout and account switch isolate read-only notification state and DAOs enforce UID predicates`() = runTest {
     val uidAlice = "uid_alice"
     val uidBob = "uid_bob"
 
@@ -359,18 +359,18 @@ class Phase2SecurityRemediationTest {
 
     detectionRepo.processIncomingEvent(uidAlice, "com.google.android.apps.nbu.paisa.user", "GPay", parsed).getOrThrow()
 
-    // Notice is visible ONLY for Alice, NEVER for Bob
-    assertNotNull(detectionRepo.observeLatestAutoSavedNotice(uidAlice).first())
+    // Read-only detection must never emit an auto-saved transaction notice.
+    assertNull(detectionRepo.observeLatestAutoSavedNotice(uidAlice).first())
     assertNull(detectionRepo.observeLatestAutoSavedNotice(uidBob).first())
 
     // Cross-user DAO operations must NOT affect Alice's balance or mapping rules
     accountRepo.adjustAccountBalance(uidBob, "acc_alice", -100_000L).getOrThrow()
-    assertEquals(475_000L, accountRepo.getAccountById(uidAlice, "acc_alice")!!.currentBalanceMinor)
+    assertEquals(500_000L, accountRepo.getAccountById(uidAlice, "acc_alice")!!.currentBalanceMinor)
 
     detectionRepo.deleteAccountMappingRule(uidBob, "rule_alice").getOrThrow()
     assertEquals(1, detectionRepo.getAccountMappingRules(uidAlice).first().size)
 
-    // Sign out clears in-memory auto-saved notice
+    // Sign out leaves no auto-saved notice to expose.
     val gateway = FakeGateway()
     val credClient = FakeCredClient()
     val authRepo = AuthRepositoryImpl(gateway, credClient, detectionRepo)
@@ -426,12 +426,12 @@ class Phase2SecurityRemediationTest {
     service.processNotificationContent("com.phonepe.app", "PhonePe", smsLikeNotif, 1_700_000_010_000L)
     assertEquals(0, detectionRepo.getDetectionEvents(uid).first().size)
 
-    // 3. Up-to-date consent -> allowed and processed
+    // 3. Up-to-date consent -> notification may enter Review Queue, but cannot change balance
     fakeConsentRepo.records[uid] =
       ConsentRecord(ConsentRecord.CURRENT_TERMS_VERSION, ConsentRecord.CURRENT_PRIVACY_VERSION, 2000L)
     service.processNotificationContent("com.phonepe.app", "PhonePe", smsLikeNotif, 1_700_000_020_000L)
     assertEquals(1, detectionRepo.getDetectionEvents(uid).first().size)
-    assertEquals(160_000L, accountRepo.getAccountById(uid, "acc_n1")!!.currentBalanceMinor)
+    assertEquals(200_000L, accountRepo.getAccountById(uid, "acc_n1")!!.currentBalanceMinor)
   }
 
   // --- Requirement 5: Consent DataStore error handling + spaced OTP/2FA/digit masking ---
