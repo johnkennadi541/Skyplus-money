@@ -522,7 +522,7 @@ class ReportsCalculationEngineTest {
 
     // Portfolio values stay current; activity totals are limited to the selected window.
     assertEquals(250_000L, report.portfolioSummary.totalValuationMinor)
-    assertEquals(100_000L, report.holdingRows.single().valuationMinor)
+    assertEquals(250_000L, report.holdingRows.single().valuationMinor)
     assertEquals(endMillis, report.portfolioSummary.lastMarketUpdateMillis)
     assertEquals(5_000L, report.periodBuyTotalMinor)
     assertEquals(0L, report.periodSellTotalMinor)
