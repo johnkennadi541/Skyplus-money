@@ -4,6 +4,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -495,8 +497,34 @@ fun SkyplusAppShell(
           NavHost(
             navController = navController,
             startDestination = SkyplusRoute.Home,
-            enterTransition = { fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMedium)) },
-            exitTransition = { fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMedium)) },
+            enterTransition = {
+              fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMedium)) +
+                slideInHorizontally(
+                  animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                  initialOffsetX = { fullWidth -> fullWidth / 18 },
+                )
+            },
+            exitTransition = {
+              fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMedium)) +
+                slideOutHorizontally(
+                  animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                  targetOffsetX = { fullWidth -> -fullWidth / 18 },
+                )
+            },
+            popEnterTransition = {
+              fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMedium)) +
+                slideInHorizontally(
+                  animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                  initialOffsetX = { fullWidth -> -fullWidth / 18 },
+                )
+            },
+            popExitTransition = {
+              fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMedium)) +
+                slideOutHorizontally(
+                  animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                  targetOffsetX = { fullWidth -> fullWidth / 18 },
+                )
+            },
           ) {
             composable<SkyplusRoute.Home> {
               val dashboardState =
