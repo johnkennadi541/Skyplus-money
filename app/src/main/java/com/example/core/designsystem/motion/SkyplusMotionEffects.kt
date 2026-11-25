@@ -2,6 +2,7 @@ package com.example.core.designsystem.motion
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -48,15 +49,26 @@ fun Modifier.skyplusPressScale(
 fun SkyplusFadeSlideIn(
   visible: Boolean,
   modifier: Modifier = Modifier,
+  delayMillis: Int = 0,
   content: @Composable () -> Unit,
 ) {
+  val entranceSpec = tween<Float>(
+    durationMillis = SkyplusMotion.durationMedium,
+    delayMillis = delayMillis.coerceAtLeast(0),
+    easing = SkyplusMotion.standard,
+  )
+  val slideSpec = tween<Int>(
+    durationMillis = SkyplusMotion.durationMedium,
+    delayMillis = delayMillis.coerceAtLeast(0),
+    easing = SkyplusMotion.emphasized,
+  )
   AnimatedVisibility(
     visible = visible,
     modifier = modifier,
     enter =
-      fadeIn(animationSpec = SkyplusMotion.standardSpec(SkyplusMotion.durationMedium)) +
+      fadeIn(animationSpec = entranceSpec) +
         slideInVertically(
-          animationSpec = SkyplusMotion.emphasizedSpec(SkyplusMotion.durationMedium),
+          animationSpec = slideSpec,
           initialOffsetY = { fullHeight -> fullHeight / 12 },
         ),
     exit =

@@ -63,6 +63,7 @@ import com.example.core.designsystem.component.SkyplusInlineMessage
 import com.example.core.designsystem.component.SkyplusMessageTone
 import com.example.core.designsystem.component.SkyplusMetricTile
 import com.example.core.designsystem.component.SkyplusSkeletonCard
+import com.example.core.designsystem.motion.SkyplusFadeSlideIn
 import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
 import com.example.domain.model.AutoSavedTransactionNotice
@@ -203,18 +204,24 @@ fun HomeDashboardScreen(
         )
       }
       else -> {
-        uiState.cards.filterNot { uiState.hiddenCards.contains(it) }.forEach { card ->
-          when (card) {
-            HomeCardId.SUMMARY -> SummaryCard(uiState = uiState, onOpenAccounts = onOpenAccounts)
-            HomeCardId.NET_WORTH -> NetWorthCard(uiState = uiState, onOpenPortfolio = onOpenPortfolio)
-            HomeCardId.CASH_FLOW -> CashFlowCard(uiState = uiState)
-            HomeCardId.CATEGORY_BREAKDOWN -> CategoryCard(uiState = uiState)
-            HomeCardId.RECENT_TRANSACTIONS ->
-              RecentTransactionsCard(uiState = uiState, onOpenTransactions = onOpenTransactions)
+        uiState.cards.filterNot { uiState.hiddenCards.contains(it) }.forEachIndexed { index, card ->
+          SkyplusFadeSlideIn(
+            visible = true,
+            delayMillis = index.coerceAtMost(6) * 45,
+          ) {
+            when (card) {
+              HomeCardId.SUMMARY -> SummaryCard(uiState = uiState, onOpenAccounts = onOpenAccounts)
+              HomeCardId.NET_WORTH -> NetWorthCard(uiState = uiState, onOpenPortfolio = onOpenPortfolio)
+              HomeCardId.CASH_FLOW -> CashFlowCard(uiState = uiState)
+              HomeCardId.CATEGORY_BREAKDOWN -> CategoryCard(uiState = uiState)
+              HomeCardId.RECENT_TRANSACTIONS ->
+                RecentTransactionsCard(uiState = uiState, onOpenTransactions = onOpenTransactions)
+            }
           }
         }
 
-        QuickActionsCard(
+        SkyplusFadeSlideIn(visible = true, delayMillis = 180) {
+          QuickActionsCard(
           onOpenAccounts = onOpenAccounts,
           onOpenTransactions = onOpenTransactions,
           onOpenPortfolio = onOpenPortfolio,
@@ -224,7 +231,8 @@ fun HomeDashboardScreen(
           onOpenLoans = onOpenLoans,
           onOpenSmartDetection = onOpenSmartDetection,
           onOpenReviewQueue = onOpenReviewQueue,
-        )
+          )
+        }
       }
     }
 
