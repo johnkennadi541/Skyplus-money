@@ -364,7 +364,7 @@ class Phase2DatabaseAndRepoTest {
         1_700_000_000_000L,
       )!!
 
-    // First delivery -> AUTO_SAVED
+    // First delivery -> Review Queue; notification parsing must not mutate the ledger
     val event1 =
       detectionRepo.processIncomingEvent(
         userId = uid,
@@ -372,9 +372,9 @@ class Phase2DatabaseAndRepoTest {
         senderOrTitle = "Google Pay",
         parsed = parsedHigh,
       ).getOrThrow()
-    assertEquals(DetectionEventStatus.AUTO_SAVED, event1.status)
-    assertEquals(950_000L, accountRepo.getAccountById(uid, "acc_hdfc")!!.currentBalanceMinor)
-    assertNotNull(detectionRepo.observeLatestAutoSavedNotice(uid).first())
+    assertEquals(DetectionEventStatus.IN_REVIEW, event1.status)
+    assertEquals(1_000_000L, accountRepo.getAccountById(uid, "acc_hdfc")!!.currentBalanceMinor)
+    assertNull(detectionRepo.observeLatestAutoSavedNotice(uid).first())
 
     // Duplicate delivery with same ref / slightly different timestamp -> deduplicated, balance unchanged!
     val duplicateParsed =
@@ -391,7 +391,7 @@ class Phase2DatabaseAndRepoTest {
         parsed = duplicateParsed,
       ).getOrThrow()
     assertEquals(DetectionEventStatus.DUPLICATE, event2.status)
-    assertEquals(950_000L, accountRepo.getAccountById(uid, "acc_hdfc")!!.currentBalanceMinor)
+    assertEquals(1_000_000L, accountRepo.getAccountById(uid, "acc_hdfc")!!.currentBalanceMinor)
 
     // Medium / Pending notification -> enters Review Queue, zero balance impact
     val parsedPending =
@@ -408,7 +408,7 @@ class Phase2DatabaseAndRepoTest {
         parsed = parsedPending,
       ).getOrThrow()
     assertEquals(DetectionEventStatus.IN_REVIEW, reviewEvent.status)
-    assertEquals(950_000L, accountRepo.getAccountById(uid, "acc_hdfc")!!.currentBalanceMinor)
+    assertEquals(1_000_000L, accountRepo.getAccountById(uid, "acc_hdfc")!!.currentBalanceMinor)
 
     // Approve Review item with correction (type=EXPENSE, amount=300.00 INR)
     detectionRepo.approveReviewEvent(
@@ -422,7 +422,7 @@ class Phase2DatabaseAndRepoTest {
     ).getOrThrow()
 
     assertEquals(DetectionEventStatus.APPROVED, detectionRepo.getEventById(uid, reviewEvent.id)?.status)
-    assertEquals(920_000L, accountRepo.getAccountById(uid, "acc_hdfc")!!.currentBalanceMinor)
+    assertEquals(970_000L, accountRepo.getAccountById(uid, "acc_hdfc")!!.currentBalanceMinor)
   }
 
   @Test
