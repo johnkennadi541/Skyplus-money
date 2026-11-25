@@ -101,7 +101,7 @@ fun OverviewReportSection(
         text = fmtMoney(nw.netWorthMinor, currency),
         style = MaterialTheme.typography.headlineMedium,
         fontWeight = FontWeight.Bold,
-        color = if (nw.netWorthMinor >= 0L) extended.gold else extended.negative,
+        color = if (nw.netWorthMinor >= 0L) MaterialTheme.colorScheme.primary else extended.negative,
       )
       Spacer(modifier = Modifier.height(OceanSpacing.sm))
       ReportMetricRow(
@@ -146,7 +146,7 @@ fun OverviewReportSection(
       )
     }
 
-    OceanCard(modifier = Modifier.testTag("reports_financial_dashboard_card")) {
+    SkyplusSectionCard(modifier = Modifier.testTag("reports_financial_dashboard_card")) {
       Text(
         text = "Financial Summary • $windowLabel ($currency)",
         style = MaterialTheme.typography.titleMedium,
@@ -205,7 +205,7 @@ fun IncomeExpenseReportSection(
   val currency = report.currencyCode
 
   Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(OceanSpacing.sm)) {
-    OceanCard(modifier = Modifier.testTag("reports_cashflow_summary_card")) {
+    SkyplusSectionCard(modifier = Modifier.testTag("reports_cashflow_summary_card")) {
       Text(
         text = "Income vs Expense Detail ($currency)",
         style = MaterialTheme.typography.titleMedium,
@@ -216,7 +216,7 @@ fun IncomeExpenseReportSection(
       ReportMetricRow("Gross Expenses (${report.completedExpenseCount})", fmtMoney(report.grossExpensesMinor, currency))
       ReportMetricRow("Refunds & Reversals (${report.completedRefundCount})", fmtMoney(report.totalRefundsAndReversalsMinor, currency), extended.positive)
       ReportMetricRow("Net Expenses", fmtMoney(report.netExpensesMinor, currency), extended.negative, isBold = true)
-      ReportMetricRow("Net Savings (${report.savingsPercentage.toPlainString()}%)", fmtMoney(report.netSavingsMinor, currency), extended.gold, isBold = true)
+      ReportMetricRow("Net Savings (${report.savingsPercentage.toPlainString()}%)", fmtMoney(report.netSavingsMinor, currency), MaterialTheme.colorScheme.primary, isBold = true)
       Spacer(modifier = Modifier.height(OceanSpacing.xs))
       Row(horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs)) {
         OceanStatusBadge(text = "${report.excludedTransferCount} Transfers Excluded", tone = BadgeTone.INFO)
@@ -262,7 +262,7 @@ fun BudgetReportSection(
   }
 
   Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(OceanSpacing.sm)) {
-    OceanCard(modifier = Modifier.testTag("reports_budget_summary_card")) {
+    SkyplusSectionCard(modifier = Modifier.testTag("reports_budget_summary_card")) {
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -291,7 +291,7 @@ fun BudgetReportSection(
       val fraction = (report.utilizationPercent.toFloat() / 100f).coerceIn(0f, 1f)
       LinearProgressIndicator(
         progress = { fraction },
-        color = if (report.overspentBudgetCount > 0) extended.negative else extended.gold,
+        color = if (report.overspentBudgetCount > 0) extended.negative else MaterialTheme.colorScheme.primary,
         trackColor = extended.cardBorder,
         modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
       )
@@ -304,7 +304,7 @@ fun BudgetReportSection(
     }
 
     val dateFmt = remember { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()) }
-    OceanCard(modifier = Modifier.testTag("reports_budget_history_card")) {
+    SkyplusSectionCard(modifier = Modifier.testTag("reports_budget_history_card")) {
       Text(
         text = "Historical Budget Performance",
         style = MaterialTheme.typography.titleMedium,
@@ -362,7 +362,7 @@ fun LoansEmiReportSection(
   }
 
   Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(OceanSpacing.sm)) {
-    OceanCard(modifier = Modifier.testTag("reports_loans_summary_card")) {
+    SkyplusSectionCard(modifier = Modifier.testTag("reports_loans_summary_card")) {
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -381,7 +381,7 @@ fun LoansEmiReportSection(
       Spacer(modifier = Modifier.height(OceanSpacing.xs))
       ReportMetricRow("Original Principal", fmtMoney(report.totalPrincipalMinor, currencyCode))
       ReportMetricRow("Outstanding Principal", fmtMoney(report.totalOutstandingMinor, currencyCode), extended.negative, isBold = true)
-      ReportMetricRow("Scheduled Monthly EMI", fmtMoney(report.totalMonthlyEmiMinor, currencyCode), extended.gold)
+      ReportMetricRow("Scheduled Monthly EMI", fmtMoney(report.totalMonthlyEmiMinor, currencyCode), MaterialTheme.colorScheme.primary)
       ReportMetricRow("Period EMI Paid (${report.periodPaymentsCount} payments)", fmtMoney(report.periodTotalEmiPaidMinor, currencyCode), extended.positive)
       ReportMetricRow("Period Interest Paid", fmtMoney(report.periodInterestPaidMinor, currencyCode), extended.warning)
       ReportMetricRow("All-Time Interest Paid", fmtMoney(report.allTimeInterestPaidMinor, currencyCode))
@@ -389,7 +389,7 @@ fun LoansEmiReportSection(
 
     val dateFmt = remember { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()) }
     if (report.overdueLoans.isNotEmpty() || report.upcomingLoans.isNotEmpty()) {
-      OceanCard(modifier = Modifier.testTag("reports_loans_schedule_card")) {
+      SkyplusSectionCard(modifier = Modifier.testTag("reports_loans_schedule_card")) {
         Text(
           text = "Overdue & Upcoming EMI Schedule",
           style = MaterialTheme.typography.titleMedium,
@@ -434,7 +434,7 @@ fun InvestmentsReportSection(
 
   val summary = report.portfolioSummary
   Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(OceanSpacing.sm)) {
-    OceanCard(modifier = Modifier.testTag("reports_investments_summary_card")) {
+    SkyplusSectionCard(modifier = Modifier.testTag("reports_investments_summary_card")) {
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -476,7 +476,7 @@ fun InvestmentsReportSection(
       currencyCode = currencyCode,
     )
 
-    OceanCard(modifier = Modifier.testTag("reports_investments_holdings_card")) {
+    SkyplusSectionCard(modifier = Modifier.testTag("reports_investments_holdings_card")) {
       Text(
         text = "Holdings Valuation & Return (${report.holdingRows.size})",
         style = MaterialTheme.typography.titleMedium,
@@ -540,7 +540,7 @@ fun ShoppingReportSection(
   }
 
   Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(OceanSpacing.sm)) {
-    OceanCard(modifier = Modifier.testTag("reports_shopping_summary_card")) {
+    SkyplusSectionCard(modifier = Modifier.testTag("reports_shopping_summary_card")) {
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -568,7 +568,7 @@ fun ShoppingReportSection(
     }
 
     if (report.categoryBreakdown.isNotEmpty()) {
-      OceanCard(modifier = Modifier.testTag("reports_shopping_categories_card")) {
+      SkyplusSectionCard(modifier = Modifier.testTag("reports_shopping_categories_card")) {
         Text(text = "Shopping Category Breakdown", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(OceanSpacing.xs))
         report.categoryBreakdown.forEach { cat ->
@@ -581,7 +581,7 @@ fun ShoppingReportSection(
     }
 
     if (report.storeBreakdown.isNotEmpty()) {
-      OceanCard(modifier = Modifier.testTag("reports_shopping_stores_card")) {
+      SkyplusSectionCard(modifier = Modifier.testTag("reports_shopping_stores_card")) {
         Text(text = "Store Spend Breakdown", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(OceanSpacing.xs))
         report.storeBreakdown.forEach { st ->
@@ -616,7 +616,7 @@ fun ExportsAndEmailSection(
   }
 
   Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(OceanSpacing.sm)) {
-    OceanCard(modifier = Modifier.testTag("reports_export_card")) {
+    SkyplusSectionCard(modifier = Modifier.testTag("reports_export_card")) {
       Text(
         text = "Export Sanitized Financial Statements",
         style = MaterialTheme.typography.titleMedium,
@@ -640,7 +640,7 @@ fun ExportsAndEmailSection(
           horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
           verticalAlignment = Alignment.CenterVertically,
         ) {
-          Icon(icon, contentDescription = null, tint = extended.gold, modifier = Modifier.size(20.dp))
+          Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
           Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
@@ -668,7 +668,7 @@ fun ExportsAndEmailSection(
       }
     }
 
-    OceanCard(modifier = Modifier.testTag("reports_email_settings_card")) {
+    SkyplusSectionCard(modifier = Modifier.testTag("reports_email_settings_card")) {
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -749,7 +749,7 @@ private fun EmptyReportCategoryCard(
   body: String,
   modifier: Modifier = Modifier,
 ) {
-  OceanCard(modifier = modifier.fillMaxWidth()) {
+  SkyplusSectionCard(modifier = modifier.fillMaxWidth()) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       Icon(Icons.Rounded.AccountBalance, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
       Spacer(modifier = Modifier.width(OceanSpacing.xs))
