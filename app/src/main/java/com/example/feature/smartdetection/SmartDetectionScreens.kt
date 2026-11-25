@@ -60,7 +60,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -743,18 +742,7 @@ fun TransactionCorrectionDialog(
     )
   }
   var merchantText by remember(event.id) { mutableStateOf(event.detectedMerchant.orEmpty()) }
-  var selectedCategory by remember(event.id) {
-    mutableStateOf(
-      when (selectedType) {
-        TransactionType.INCOME -> TransactionCategories.INCOME_CATEGORIES.first()
-        TransactionType.REFUND, TransactionType.REVERSAL -> "Refunds"
-        else -> MerchantCategoryResolver.resolve(merchantText, selectedType)
-          ?: TransactionCategories.EXPENSE_CATEGORIES.first()
-      }
-    )
-  }
   var userSelectedCategory by remember(event.id) { mutableStateOf<String?>(null) }
-  val latestUserSelectedCategory = rememberUpdatedState(userSelectedCategory)
   var rememberForMerchant by remember(event.id) { mutableStateOf(false) }
   var amountText by remember { mutableStateOf(event.detectedMoney.toBigDecimal().toPlainString()) }
 
@@ -766,13 +754,11 @@ fun TransactionCorrectionDialog(
         ?: TransactionCategories.EXPENSE_CATEGORIES.first()
     }
 
-  // Apply asynchronous saved preferences only while the user has not manually
-  // selected a category. Read the latest manual-selection state inside the coroutine,
-  // rather than a value captured when the effect was launched. Merchant/type changes
-  // explicitly clear the manual selection before this effect runs.
-  LaunchedEffect(event.id, merchantText, selectedType, preferredCategory) {
-    if (latestUserSelectedCategory.value == null) {
-      selectedCategory = if (
+  // Keep one source of truth: an explicit user choice always wins. Saved preferences
+  // and merchant defaults are derived only when there is no manual selection.
+  val selectedCategory =
+    userSelectedCategory
+      ?: if (
         selectedType == TransactionType.EXPENSE &&
           preferredCategory != null && preferredCategory in TransactionCategories.EXPENSE_CATEGORIES
       ) {
@@ -780,8 +766,6 @@ fun TransactionCorrectionDialog(
       } else {
         defaultCategory(merchantText, selectedType)
       }
-    }
-  }
 
   val categories =
     if (selectedType == TransactionType.INCOME || selectedType == TransactionType.REFUND || selectedType == TransactionType.REVERSAL) {
