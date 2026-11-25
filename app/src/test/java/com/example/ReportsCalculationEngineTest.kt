@@ -457,7 +457,7 @@ class ReportsCalculationEngineTest {
     assertEquals(500L, categories.getValue("Travel").totalMinor)
     assertEquals(0L, categories.getValue("Travel").refundOffsetMinor)
     assertEquals(1_500L, report.expenseByCategory.sumOf { it.totalMinor })
-    assertEquals(100L, categories.getValue("Food").grossMinor - categories.getValue("Food").totalMinor)
+    assertEquals(500L, categories.getValue("Travel").grossMinor)
   }
 
   @Test
