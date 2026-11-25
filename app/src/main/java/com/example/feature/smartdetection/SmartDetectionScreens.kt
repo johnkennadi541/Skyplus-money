@@ -764,16 +764,20 @@ fun TransactionCorrectionDialog(
         ?: TransactionCategories.EXPENSE_CATEGORIES.first()
     }
 
-  // A late preference response may initialize the category, but an explicit user
-  // selection for this merchant always takes precedence until the merchant/type changes.
-  LaunchedEffect(event.id, merchantText, selectedType, preferredCategory, userSelectedCategory) {
-    selectedCategory = userSelectedCategory ?: if (
-      selectedType == TransactionType.EXPENSE &&
-        preferredCategory != null && preferredCategory in TransactionCategories.EXPENSE_CATEGORIES
-    ) {
-      preferredCategory
-    } else {
-      defaultCategory(merchantText, selectedType)
+  // Apply asynchronous saved preferences only while the user has not manually
+  // selected a category. Keep userSelectedCategory out of the effect keys: a manual
+  // selection must not restart this effect and race with a late preference update.
+  // Merchant/type changes explicitly clear the manual selection before this effect runs.
+  LaunchedEffect(event.id, merchantText, selectedType, preferredCategory) {
+    if (userSelectedCategory == null) {
+      selectedCategory = if (
+        selectedType == TransactionType.EXPENSE &&
+          preferredCategory != null && preferredCategory in TransactionCategories.EXPENSE_CATEGORIES
+      ) {
+        preferredCategory
+      } else {
+        defaultCategory(merchantText, selectedType)
+      }
     }
   }
 
