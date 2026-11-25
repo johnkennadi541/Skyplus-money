@@ -195,6 +195,43 @@ class Phase2DatabaseAndRepoTest {
   }
 
   @Test
+  fun `account update cannot cross UID boundaries even when ownership is spoofed`() = runTest {
+    val ownerUid = "uid_account_owner"
+    val attackerUid = "uid_account_attacker"
+    val original = FinancialAccount(
+      id = "uid_scoped_account",
+      userId = ownerUid,
+      name = "Owner Savings",
+      type = AccountType.BANK,
+      currencyCode = "INR",
+      initialBalanceMinor = 250_000L,
+      currentBalanceMinor = 250_000L,
+    )
+    accountRepo.createAccount(ownerUid, original).getOrThrow()
+
+    // Simulate a caller trying to relabel another user's account as their own.
+    val attemptedUpdate = accountRepo.updateAccount(
+      attackerUid,
+      original.copy(
+        userId = attackerUid,
+        name = "Tampered Account",
+        currencyCode = "USD",
+        initialBalanceMinor = 1L,
+        currentBalanceMinor = 1L,
+      ),
+    )
+
+    assertTrue("A different UID must not update or relabel the account", attemptedUpdate.isFailure)
+    val preserved = accountRepo.getAccountById(ownerUid, original.id)!!
+    assertEquals(ownerUid, preserved.userId)
+    assertEquals("Owner Savings", preserved.name)
+    assertEquals("INR", preserved.currencyCode)
+    assertEquals(250_000L, preserved.initialBalanceMinor)
+    assertEquals(250_000L, preserved.currentBalanceMinor)
+    assertNull(accountRepo.getAccountById(attackerUid, original.id))
+  }
+
+  @Test
   fun `account currency is immutable even before the first transaction`() = runTest {
     val uid = "uid_account_currency_empty"
     val account = FinancialAccount(
