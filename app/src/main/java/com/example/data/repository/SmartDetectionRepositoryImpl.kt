@@ -502,7 +502,6 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     context.detectionDataStore.data
       .map { prefs ->
         val notifEnabled = prefs[booleanPreferencesKey("notif_detection_$userId")] ?: true
-        val autoSave = false // Legacy preference is intentionally ignored; explicit approval is mandatory.
         val packages =
           prefs[stringSetPreferencesKey("permitted_pkgs_$userId")] ?: DetectionSettings.DEFAULT_PERMITTED_PACKAGES
 
