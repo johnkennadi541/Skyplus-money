@@ -69,6 +69,14 @@ constructor(private val creditCardRepository: CreditCardRepository) {
 }
 
 @Singleton
+class SetCreditCardArchivedUseCase
+@Inject
+constructor(private val creditCardRepository: CreditCardRepository) {
+  suspend operator fun invoke(userId: String, cardId: String, archived: Boolean): Result<Unit> =
+    creditCardRepository.setCardArchived(userId, cardId, archived)
+}
+
+@Singleton
 class DeleteCreditCardUseCase
 @Inject
 constructor(private val creditCardRepository: CreditCardRepository) {
