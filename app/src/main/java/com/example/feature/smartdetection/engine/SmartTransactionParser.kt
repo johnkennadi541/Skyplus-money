@@ -30,7 +30,7 @@ object SmartTransactionParser {
 
   private val AMOUNT_PATTERN =
     Pattern.compile(
-      "(?:(?:₹|Rs\\.?|€|£|(?:$SUPPORTED_CURRENCY_CODES_PATTERN)\\b)\\s*([0-9,]+(?:\\.[0-9]{1,4})?))|(?:([0-9,]+(?:\\.[0-9]{1,4})?)\\s*(?:$SUPPORTED_CURRENCY_CODES_PATTERN)\\b)",
+      "(?:(?:₹|\\$|Rs\\.?|€|£|(?:$SUPPORTED_CURRENCY_CODES_PATTERN)\\b)\\s*([0-9,]+(?:\\.[0-9]{1,4})?))|(?:([0-9,]+(?:\\.[0-9]{1,4})?)\\s*(?:$SUPPORTED_CURRENCY_CODES_PATTERN)\\b)",
       Pattern.CASE_INSENSITIVE,
     )
 
@@ -115,6 +115,8 @@ object SmartTransactionParser {
 
   private val MERCHANT_PATTERNS =
     listOf(
+      // POS terminal alerts commonly place the merchant immediately after POS.
+      Pattern.compile("\\bPOS\\s+([A-Za-z0-9&.,'\\-\\s]{2,32}?)(?:\\s+(?:on|from|using|card|ref|utr|txn|for)\\b|\\s+[A-Z]{3}\\b|\\s+[0-9,]+(?:\\.[0-9]+)?|[.,]|$)", Pattern.CASE_INSENSITIVE),
       Pattern.compile("\\b(?:paid to|sent to|at|to|from)\\b\\s+([A-Za-z0-9&.,'\\-\\s]{2,32}?)(?:\\s+on|\\s+via|\\s+using|\\s+for|\\s+upi|\\s+ref|\\s+utr|\\s+vpa|\\.|,|$)", Pattern.CASE_INSENSITIVE),
       Pattern.compile("\\b(?:vpa|merchant)\\b\\s+([A-Za-z0-9@.\\-_]{3,32})", Pattern.CASE_INSENSITIVE),
       Pattern.compile("Info:\\s*([A-Za-z0-9\\-_/]{3,24})", Pattern.CASE_INSENSITIVE),
@@ -155,6 +157,7 @@ object SmartTransactionParser {
       when {
         codeMatcher.find() -> codeMatcher.group()
         matchedSubstring.contains("₹") || matchedSubstring.contains("RS") -> "INR"
+        matchedSubstring.contains("$") -> "USD" // Dollar symbol is ambiguous across currencies; force manual review below.
         matchedSubstring.contains("€") -> "EUR"
         matchedSubstring.contains("£") -> "GBP"
         else -> return null
@@ -290,11 +293,14 @@ object SmartTransactionParser {
     }
 
     val finalConfidence = confidenceScore.coerceIn(0.0f, 1.0f)
+    val ambiguousDollarSymbol = matchedSubstring.contains("$") && !Regex("\\bUSD\\b").containsMatchIn(matchedSubstring)
+    if (ambiguousDollarSymbol) confidenceReasons.add("Dollar symbol is ambiguous; manual currency confirmation required")
     val confidenceLevel =
       when {
         finalConfidence >= 0.80f &&
           status == TransactionStatus.COMPLETED &&
           !directionAmbiguous &&
+          !ambiguousDollarSymbol &&
           type != TransactionType.TRANSFER -> DetectionConfidence.HIGH
         finalConfidence >= 0.50f -> DetectionConfidence.MEDIUM
         else -> DetectionConfidence.LOW
