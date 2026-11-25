@@ -66,10 +66,9 @@ data class SavingsGoalEntity(
  * fail-closed SQLCipher path turns into an unusable app. Making the rebuild always succeed would
  * mean deleting orphans, which is silent data loss.
  *
- * Integrity is instead guaranteed by [com.example.data.repository.SavingsGoalRepositoryImpl], which
- * deletes a goal's contributions inside the same transaction as the goal itself, and that path is
- * covered by tests. The foreign key would only add protection against direct DAO writes that bypass
- * the repository, which do not exist today.
+ * Goal deletion is deliberately unavailable: goals are archived and contribution rows are retained.
+ * Repository writes are UID-scoped and transactional; voiding marks a contribution without removing
+ * its original amount, date or note.
  */
 @Entity(
   tableName = "savings_contributions",
