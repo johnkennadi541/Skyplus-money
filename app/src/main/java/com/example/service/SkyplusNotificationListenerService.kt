@@ -55,6 +55,8 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
   override fun onNotificationPosted(sbn: StatusBarNotification?) {
     super.onNotificationPosted(sbn)
     if (sbn == null) return
+    // Filter ongoing/group-summary metadata before any extras/body access.
+    if (!NotificationCapturePolicy.shouldCapture(sbn.isOngoing, sbn.notification.flags)) return
 
     val packageName = sbn.packageName ?: return
     val defaultSmsPackage = Telephony.Sms.getDefaultSmsPackage(this) ?: return
