@@ -225,25 +225,6 @@ class SmartDetectionViewModel @Inject constructor(
     }
   }
 
-  fun toggleAutoSave(enabled: Boolean) {
-    viewModelScope.launch {
-      val session = authRepository.observeAuthSession().first()
-      val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
-      if (uid.isNullOrBlank()) {
-        _userMessage.value = "Update failed: Authentication required"
-        return@launch
-      }
-      val current = settingsUseCases.getSettings(uid).first()
-      settingsUseCases.updateSettings(uid, current.copy(userId = uid, isAutoSaveHighConfidenceEnabled = enabled))
-        .onSuccess {
-          _userMessage.value =
-            if (enabled) "High-confidence auto-save enabled"
-            else "Auto-save disabled; all items go to Review Queue"
-        }
-        .onFailure { error -> _userMessage.value = "Update failed: ${error.message}" }
-    }
-  }
-
   fun togglePermittedPackage(packageName: String, permitted: Boolean) {
     viewModelScope.launch {
       val session = authRepository.observeAuthSession().first()
