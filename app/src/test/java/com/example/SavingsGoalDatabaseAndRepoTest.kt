@@ -26,7 +26,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Savings goal persistence: ownership, currency integrity, derived totals and retained history.
+ * Savings goal persistence: ownership, currency integrity, derived totals and retained history (archive/void).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
