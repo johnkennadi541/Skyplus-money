@@ -169,6 +169,9 @@ class Phase3LoanDatabaseAndRepoTest {
       afterPayment.copy(startDate = afterPayment.startDate + 86_400_000L),
       afterPayment.copy(nextDueDate = afterPayment.nextDueDate + 86_400_000L),
       afterPayment.copy(loanType = LoanType.HOME),
+      afterPayment.copy(amountPaidMinor = afterPayment.amountPaidMinor + 1L),
+      afterPayment.copy(outstandingPrincipalMinor = afterPayment.outstandingPrincipalMinor - 1L),
+      afterPayment.copy(status = LoanStatus.COMPLETED),
     )
 
     invalidTermEdits.forEach { attemptedEdit ->
@@ -200,6 +203,7 @@ class Phase3LoanDatabaseAndRepoTest {
     assertEquals(afterPayment.nextDueDate, updated.nextDueDate)
     assertEquals(afterPayment.amountPaidMinor, updated.amountPaidMinor)
     assertEquals(afterPayment.outstandingPrincipalMinor, updated.outstandingPrincipalMinor)
+    assertEquals("Payment-derived loan status must remain unchanged", afterPayment.status, updated.status)
     assertEquals(historyBefore, loanRepo.getPaymentsForLoan(userA, loan.id).first())
   }
 
