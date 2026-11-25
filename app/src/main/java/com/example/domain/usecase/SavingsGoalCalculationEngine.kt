@@ -65,6 +65,7 @@ class SavingsGoalCalculationEngine @Inject constructor() {
       remainingMinor = remainingMinor(goal, saved),
       progressPercent = progressPercent(goal, saved),
       contributionCount = contributions.count { !it.isVoided },
+      contributions = contributions.sortedByDescending { it.contributedAt },
     )
   }
 
