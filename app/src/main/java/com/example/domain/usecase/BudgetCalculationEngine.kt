@@ -82,7 +82,7 @@ class BudgetCalculationEngine @Inject constructor() {
         isStale -> BudgetAlertStatus.PERIOD_ENDED
         budget.amountMinor <= 0L -> BudgetAlertStatus.NORMAL
         spentScaled > allocated.multiply(HUNDRED) -> BudgetAlertStatus.EXCEEDED_100
-        spentScaled >= allocated.multiply(BigDecimal.valueOf(budget.warningThresholdPercent.coerceIn(1, 100))) ->
+        spentScaled >= allocated.multiply(BigDecimal.valueOf(budget.warningThresholdPercent.coerceIn(1, 100).toLong())) ->
           BudgetAlertStatus.THRESHOLD_REACHED
         else -> BudgetAlertStatus.NORMAL
       }
