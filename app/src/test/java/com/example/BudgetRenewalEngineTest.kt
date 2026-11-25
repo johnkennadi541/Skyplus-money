@@ -207,9 +207,9 @@ class BudgetRenewalEngineTest {
       )
 
     assertEquals(BudgetAlertStatus.NORMAL, status(74_99L).alertStatus)
-    assertEquals(BudgetAlertStatus.APPROACHING_75, status(75_00L).alertStatus)
-    assertEquals(BudgetAlertStatus.WARNING_90, status(90_00L).alertStatus)
-    assertEquals(BudgetAlertStatus.EXCEEDED_100, status(100_00L).alertStatus)
+    assertEquals(BudgetAlertStatus.THRESHOLD_REACHED, status(75_00L).alertStatus)
+    assertEquals(BudgetAlertStatus.THRESHOLD_REACHED, status(90_00L).alertStatus)
+    assertEquals(BudgetAlertStatus.THRESHOLD_REACHED, status(100_00L).alertStatus)
   }
 
   @Test
