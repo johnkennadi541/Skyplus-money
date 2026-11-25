@@ -29,10 +29,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.core.designsystem.component.BadgeTone
-import com.example.core.designsystem.component.OceanCard
+import com.example.core.designsystem.component.SkyplusSectionCard
 import com.example.core.designsystem.component.OceanStatusBadge
 import com.example.core.designsystem.theme.OceanSpacing
-import com.example.core.designsystem.theme.OceanTheme
 import com.example.domain.model.AuthenticatedUser
 
 @Composable
@@ -43,8 +42,6 @@ fun AuthFoundationScreen(
   onSignOut: () -> Unit = {},
 ) {
   BackHandler(onBack = onNavigateBack)
-  val extended = OceanTheme.colors
-
   val phase1Milestones =
     listOf(
       "Google Sign-In (Credential Manager + Firebase Auth)" to
@@ -83,7 +80,7 @@ fun AuthFoundationScreen(
     }
 
     if (authenticatedUser != null) {
-      OceanCard {
+      SkyplusSectionCard {
         OceanStatusBadge(text = "Authenticated Session Active", tone = BadgeTone.POSITIVE)
         Spacer(modifier = Modifier.height(OceanSpacing.sm))
         Text(
@@ -113,13 +110,13 @@ fun AuthFoundationScreen(
           onClick = onSignOut,
           modifier =
             Modifier.fillMaxWidth().minimumInteractiveComponentSize().testTag("auth_sign_out_button"),
-          colors = ButtonDefaults.outlinedButtonColors(contentColor = extended.negative),
+          colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
         ) {
           Text(text = stringResource(R.string.auth_sign_out))
         }
       }
     } else {
-      OceanCard {
+      SkyplusSectionCard {
         OceanStatusBadge(text = "No Fake Login • Phase 1 Gate", tone = BadgeTone.WARNING)
         Spacer(modifier = Modifier.height(OceanSpacing.sm))
         Text(
@@ -136,7 +133,7 @@ fun AuthFoundationScreen(
       }
     }
 
-    OceanCard {
+    SkyplusSectionCard {
       Text(
         text = "Phase 1 Authentication Milestones",
         style = MaterialTheme.typography.titleMedium,

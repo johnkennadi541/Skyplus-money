@@ -48,10 +48,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.core.designsystem.component.BadgeTone
-import com.example.core.designsystem.component.OceanCard
+import com.example.core.designsystem.component.SkyplusSectionCard
 import com.example.core.designsystem.component.OceanStatusBadge
 import com.example.core.designsystem.theme.OceanSpacing
-import com.example.core.designsystem.theme.OceanTheme
 
 @Composable
 fun LegalConsentScreen(
@@ -67,7 +66,6 @@ fun LegalConsentScreen(
   var showFullTerms by rememberSaveable { mutableStateOf(false) }
   var showFullPrivacy by rememberSaveable { mutableStateOf(false) }
 
-  val extended = OceanTheme.colors
   val canAccept = termsAccepted && privacyAccepted
 
   Scaffold(
@@ -100,7 +98,7 @@ fun LegalConsentScreen(
           OutlinedButton(
             onClick = onSignOut,
             modifier = Modifier.minimumInteractiveComponentSize().testTag("legal_sign_out_button"),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = extended.negative),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
           ) {
             Icon(
               imageVector = Icons.AutoMirrored.Rounded.Logout,
@@ -111,7 +109,7 @@ fun LegalConsentScreen(
           }
         }
 
-        OceanCard {
+        SkyplusSectionCard {
           Text(
             text = stringResource(R.string.legal_consent_title),
             style = MaterialTheme.typography.headlineSmall,
@@ -125,7 +123,7 @@ fun LegalConsentScreen(
           )
         }
 
-        OceanCard(modifier = Modifier.testTag("legal_review_notice_card")) {
+        SkyplusSectionCard(modifier = Modifier.testTag("legal_review_notice_card")) {
           OceanStatusBadge(text = "Legal Review Required", tone = BadgeTone.WARNING)
           Spacer(modifier = Modifier.height(OceanSpacing.xs))
           Text(
@@ -136,18 +134,18 @@ fun LegalConsentScreen(
         }
 
         if (consentErrorMessageRes != null) {
-          OceanCard(modifier = Modifier.testTag("consent_error_banner")) {
+          SkyplusSectionCard(modifier = Modifier.testTag("consent_error_banner")) {
             Row(verticalAlignment = Alignment.CenterVertically) {
               Icon(
                 imageVector = Icons.Rounded.ErrorOutline,
                 contentDescription = null,
-                tint = extended.negative,
+                tint = MaterialTheme.colorScheme.error,
               )
               Spacer(modifier = Modifier.width(OceanSpacing.xs))
               Text(
                 text = stringResource(consentErrorMessageRes),
                 style = MaterialTheme.typography.bodySmall,
-                color = extended.negative,
+                color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.weight(1f),
               )
             }
@@ -164,7 +162,7 @@ fun LegalConsentScreen(
         }
 
         // Terms & Conditions Card
-        OceanCard {
+        SkyplusSectionCard {
           Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
               imageVector = Icons.Rounded.Gavel,
@@ -223,7 +221,7 @@ fun LegalConsentScreen(
               checked = termsAccepted,
               onCheckedChange = null,
               modifier = Modifier.testTag("terms_checkbox"),
-              colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.secondary),
+              colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary),
             )
             Spacer(modifier = Modifier.width(OceanSpacing.xs))
             Text(
@@ -235,12 +233,12 @@ fun LegalConsentScreen(
         }
 
         // Privacy Policy Card
-        OceanCard {
+        SkyplusSectionCard {
           Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
               imageVector = Icons.Rounded.Security,
               contentDescription = null,
-              tint = MaterialTheme.colorScheme.tertiary,
+              tint = MaterialTheme.colorScheme.secondary,
             )
             Spacer(modifier = Modifier.width(OceanSpacing.sm))
             Text(
@@ -294,7 +292,7 @@ fun LegalConsentScreen(
               checked = privacyAccepted,
               onCheckedChange = null,
               modifier = Modifier.testTag("privacy_checkbox"),
-              colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.tertiary),
+              colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary),
             )
             Spacer(modifier = Modifier.width(OceanSpacing.xs))
             Text(
@@ -316,8 +314,8 @@ fun LegalConsentScreen(
           shape = MaterialTheme.shapes.medium,
           colors =
             ButtonDefaults.buttonColors(
-              containerColor = MaterialTheme.colorScheme.secondary,
-              contentColor = MaterialTheme.colorScheme.onSecondary,
+              containerColor = MaterialTheme.colorScheme.primary,
+              contentColor = MaterialTheme.colorScheme.onPrimary,
               disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
               disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             ),

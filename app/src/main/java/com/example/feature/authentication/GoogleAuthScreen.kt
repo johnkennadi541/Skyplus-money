@@ -3,7 +3,6 @@ package com.example.feature.authentication
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,8 +42,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -55,14 +52,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.core.designsystem.component.BadgeTone
-import com.example.core.designsystem.component.OceanCard
+import com.example.core.designsystem.component.SkyplusSectionCard
 import com.example.core.designsystem.component.OceanStatusBadge
 import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
 
 @Composable
 fun AuthLoadingScreen(modifier: Modifier = Modifier) {
-  val extended = OceanTheme.colors
   Scaffold(
     modifier = modifier.fillMaxSize().testTag("auth_loading_screen"),
     contentWindowInsets = WindowInsets.safeDrawing,
@@ -83,7 +79,7 @@ fun AuthLoadingScreen(modifier: Modifier = Modifier) {
           modifier = Modifier.size(72.dp).clip(RoundedCornerShape(18.dp)),
         )
         CircularProgressIndicator(
-          color = extended.gold,
+          color = MaterialTheme.colorScheme.primary,
           modifier = Modifier.size(32.dp),
           strokeWidth = 3.dp,
         )
@@ -133,7 +129,7 @@ fun GoogleAuthScreen(
         ) {
           OceanStatusBadge(
             text = stringResource(R.string.auth_screen_badge),
-            tone = BadgeTone.GOLD,
+            tone = BadgeTone.INFO,
           )
           IconButton(
             onClick = onToggleTheme,
@@ -144,63 +140,48 @@ fun GoogleAuthScreen(
               imageVector =
                 if (extended.isDark) Icons.Rounded.LightMode else Icons.Rounded.DarkMode,
               contentDescription = stringResource(R.string.cd_toggle_theme),
-              tint = extended.gold,
+              tint = MaterialTheme.colorScheme.primary,
             )
           }
         }
 
-        Surface(
-          modifier = Modifier.fillMaxWidth(),
-          shape = MaterialTheme.shapes.large,
-          border = BorderStroke(1.dp, extended.cardBorder),
-          color = Color.Transparent,
-        ) {
-          Box(
-            modifier =
-              Modifier.background(
-                  Brush.linearGradient(
-                    listOf(extended.heroGradientStart, extended.heroGradientEnd)
-                  )
-                )
-                .padding(OceanSpacing.lg)
+        SkyplusSectionCard(modifier = Modifier.fillMaxWidth()) {
+          Column(
+            modifier = Modifier.fillMaxWidth().padding(OceanSpacing.sm),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(OceanSpacing.sm),
           ) {
-            Column(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalAlignment = Alignment.CenterHorizontally,
-              verticalArrangement = Arrangement.spacedBy(OceanSpacing.sm),
-            ) {
-              Image(
-                painter = painterResource(id = R.drawable.skyplus_money_icon_1795025038411),
-                contentDescription = stringResource(R.string.cd_brand_emblem),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(18.dp)),
-              )
-              Text(
-                text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.headlineMedium,
-                color = Color.White,
-                textAlign = TextAlign.Center,
-              )
-              Text(
-                text = stringResource(R.string.app_tagline),
-                style = MaterialTheme.typography.titleSmall,
-                color = extended.gold,
-                textAlign = TextAlign.Center,
-              )
-              Spacer(modifier = Modifier.height(OceanSpacing.xxs))
-              Text(
-                text = stringResource(R.string.auth_screen_title),
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.White,
-                textAlign = TextAlign.Center,
-              )
-              Text(
-                text = stringResource(R.string.auth_screen_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFFD3E4F4),
-                textAlign = TextAlign.Center,
-              )
-            }
+            Image(
+              painter = painterResource(id = R.drawable.skyplus_money_icon_1795025038411),
+              contentDescription = stringResource(R.string.cd_brand_emblem),
+              contentScale = ContentScale.Crop,
+              modifier = Modifier.size(72.dp).clip(RoundedCornerShape(18.dp)),
+            )
+            Text(
+              text = stringResource(R.string.app_name),
+              style = MaterialTheme.typography.headlineMedium,
+              color = MaterialTheme.colorScheme.onSurface,
+              textAlign = TextAlign.Center,
+            )
+            Text(
+              text = stringResource(R.string.app_tagline),
+              style = MaterialTheme.typography.titleSmall,
+              color = MaterialTheme.colorScheme.primary,
+              textAlign = TextAlign.Center,
+            )
+            Spacer(modifier = Modifier.height(OceanSpacing.xxs))
+            Text(
+              text = stringResource(R.string.auth_screen_title),
+              style = MaterialTheme.typography.titleLarge,
+              color = MaterialTheme.colorScheme.onSurface,
+              textAlign = TextAlign.Center,
+            )
+            Text(
+              text = stringResource(R.string.auth_screen_subtitle),
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              textAlign = TextAlign.Center,
+            )
           }
         }
 
@@ -248,7 +229,7 @@ fun GoogleAuthScreen(
           }
         }
 
-        OceanCard {
+        SkyplusSectionCard {
           Button(
             onClick = { onContinueWithGoogle(context) },
             enabled = !uiState.isSigningIn,
@@ -260,14 +241,14 @@ fun GoogleAuthScreen(
             shape = MaterialTheme.shapes.medium,
             colors =
               ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.secondary,
-                contentColor = MaterialTheme.colorScheme.onSecondary,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
               ),
           ) {
             if (uiState.isSigningIn) {
               CircularProgressIndicator(
                 modifier = Modifier.size(20.dp).testTag("auth_loading_indicator"),
-                color = MaterialTheme.colorScheme.onSecondary,
+                color = MaterialTheme.colorScheme.onPrimary,
                 strokeWidth = 2.dp,
               )
               Spacer(modifier = Modifier.width(OceanSpacing.sm))
@@ -295,7 +276,7 @@ fun GoogleAuthScreen(
             Icon(
               imageVector = Icons.Rounded.Lock,
               contentDescription = null,
-              tint = extended.gold,
+              tint = MaterialTheme.colorScheme.primary,
               modifier = Modifier.size(16.dp),
             )
             Spacer(modifier = Modifier.width(OceanSpacing.xs))
