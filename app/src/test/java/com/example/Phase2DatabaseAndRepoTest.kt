@@ -228,7 +228,7 @@ class Phase2DatabaseAndRepoTest {
     assertEquals("INR", preserved.currencyCode)
     assertEquals(250_000L, preserved.initialBalanceMinor)
     assertEquals(250_000L, preserved.currentBalanceMinor)
-    assertNull(accountRepo.getAccountById(attackerUid, original.id))
+    assertEquals(null, accountRepo.getAccountById(attackerUid, original.id))
   }
 
   @Test
