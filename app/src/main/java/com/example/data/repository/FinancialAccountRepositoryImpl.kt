@@ -84,6 +84,9 @@ class FinancialAccountRepositoryImpl @Inject constructor(
               "Cannot change the currency of an account linked to a credit card"
             }
           }
+          require(account.currencyCode.equals(existing.currencyCode, ignoreCase = true)) {
+            "Account currency is immutable. Create a new account in the desired currency and record any conversion explicitly."
+          }
 
           val immutableEntity =
             FinancialAccountEntity.fromDomain(

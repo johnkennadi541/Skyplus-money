@@ -150,6 +150,111 @@ class Phase2DatabaseAndRepoTest {
   }
 
   @Test
+  fun `account currency change is rejected and preserves ledger history and balances`() = runTest {
+    val uid = "uid_account_currency_lock"
+    val original = FinancialAccount(
+      id = "currency_locked_account",
+      userId = uid,
+      name = "Primary Account",
+      type = AccountType.BANK,
+      currencyCode = "INR",
+      initialBalanceMinor = 500_000L,
+      currentBalanceMinor = 500_000L,
+    )
+    accountRepo.createAccount(uid, original).getOrThrow()
+    txnRepo.recordExpense(
+      uid,
+      FinancialTransaction(
+        id = "currency_locked_expense",
+        userId = uid,
+        accountId = original.id,
+        type = TransactionType.EXPENSE,
+        amountMinor = 25_000L,
+        currencyCode = "INR",
+        category = "Food",
+      ),
+    ).getOrThrow()
+
+    val before = accountRepo.getAccountById(uid, original.id)!!
+    val transactionsBefore = txnRepo.getTransactions(uid).first()
+    val result = accountRepo.updateAccount(
+      uid,
+      before.copy(
+        currencyCode = "USD",
+        initialBalanceMinor = 50_000L,
+        currentBalanceMinor = 47_500L,
+      ),
+    )
+
+    assertTrue("An existing account currency must not be reinterpreted", result.isFailure)
+    val after = accountRepo.getAccountById(uid, original.id)!!
+    assertEquals("INR", after.currencyCode)
+    assertEquals(before.initialBalanceMinor, after.initialBalanceMinor)
+    assertEquals(before.currentBalanceMinor, after.currentBalanceMinor)
+    assertEquals(transactionsBefore, txnRepo.getTransactions(uid).first())
+  }
+
+  @Test
+  fun `account update cannot cross UID boundaries even when ownership is spoofed`() = runTest {
+    val ownerUid = "uid_account_owner"
+    val attackerUid = "uid_account_attacker"
+    val original = FinancialAccount(
+      id = "uid_scoped_account",
+      userId = ownerUid,
+      name = "Owner Savings",
+      type = AccountType.BANK,
+      currencyCode = "INR",
+      initialBalanceMinor = 250_000L,
+      currentBalanceMinor = 250_000L,
+    )
+    accountRepo.createAccount(ownerUid, original).getOrThrow()
+
+    // Simulate a caller trying to relabel another user's account as their own.
+    val attemptedUpdate = accountRepo.updateAccount(
+      attackerUid,
+      original.copy(
+        userId = attackerUid,
+        name = "Tampered Account",
+        currencyCode = "USD",
+        initialBalanceMinor = 1L,
+        currentBalanceMinor = 1L,
+      ),
+    )
+
+    assertTrue("A different UID must not update or relabel the account", attemptedUpdate.isFailure)
+    val preserved = accountRepo.getAccountById(ownerUid, original.id)!!
+    assertEquals(ownerUid, preserved.userId)
+    assertEquals("Owner Savings", preserved.name)
+    assertEquals("INR", preserved.currencyCode)
+    assertEquals(250_000L, preserved.initialBalanceMinor)
+    assertEquals(250_000L, preserved.currentBalanceMinor)
+    assertEquals(null, accountRepo.getAccountById(attackerUid, original.id))
+  }
+
+  @Test
+  fun `account currency is immutable even before the first transaction`() = runTest {
+    val uid = "uid_account_currency_empty"
+    val account = FinancialAccount(
+      id = "empty_currency_locked_account",
+      userId = uid,
+      name = "Empty Account",
+      type = AccountType.BANK,
+      currencyCode = "KWD",
+      initialBalanceMinor = 12_345L,
+      currentBalanceMinor = 12_345L,
+    )
+    accountRepo.createAccount(uid, account).getOrThrow()
+
+    val result = accountRepo.updateAccount(uid, account.copy(currencyCode = "INR"))
+
+    assertTrue("Currency changes require a dedicated conversion workflow", result.isFailure)
+    val preserved = accountRepo.getAccountById(uid, account.id)!!
+    assertEquals("KWD", preserved.currencyCode)
+    assertEquals(12_345L, preserved.initialBalanceMinor)
+    assertEquals(12_345L, preserved.currentBalanceMinor)
+  }
+
+  @Test
   fun `income expense refund edit delete and pending failed status balance math are exact`() = runTest {
     val uid = "uid_math"
     accountRepo.createAccount(
