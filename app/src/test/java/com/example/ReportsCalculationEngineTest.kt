@@ -415,4 +415,121 @@ class ReportsCalculationEngineTest {
       assertTrue("Label must be non-blank for $period", w.label.isNotBlank())
     }
   }
+  @Test
+  fun `investment report separates current holdings snapshot from selected period activity`() {
+    val historicalWindow =
+      ReportDateWindow(
+        periodType = ReportPeriodType.CUSTOM,
+        startDateMillis = outsideMillis,
+        endDateMillis = midMillis,
+        label = "Historical period",
+      )
+    val currentHolding =
+      InvestmentHolding(
+        id = "inv_current",
+        userId = uid,
+        name = "Current Index Fund",
+        category = InvestmentCategory.MUTUAL_FUNDS,
+        currencyCode = "INR",
+        purchaseDate = outsideMillis,
+        quantityDecimal = "100",
+        totalInvestedMinor = 150_000L,
+        totalBuyCostMinor = 150_000L,
+        currentMarketPriceDecimal = "2500",
+        currentValuationMinor = 250_000L,
+        lastPriceUpdateDate = endMillis,
+        realizedPnlMinor = 10_000L,
+      )
+    val transactions =
+      listOf(
+        InvestmentTransaction(
+          id = "buy_in_period",
+          holdingId = currentHolding.id,
+          userId = uid,
+          type = InvestmentTransactionType.BUY,
+          transactionDate = midMillis,
+          quantityDecimal = "2",
+          unitPriceDecimal = "250",
+          grossAmountMinor = 5_000L,
+          chargesMinor = 0L,
+          netAmountMinor = 5_000L,
+        ),
+        InvestmentTransaction(
+          id = "buy_after_period",
+          holdingId = currentHolding.id,
+          userId = uid,
+          type = InvestmentTransactionType.BUY,
+          transactionDate = endMillis,
+          quantityDecimal = "4",
+          unitPriceDecimal = "250",
+          grossAmountMinor = 10_000L,
+          chargesMinor = 0L,
+          netAmountMinor = 10_000L,
+        ),
+      )
+    val history =
+      listOf(
+        InvestmentPriceHistory(
+          id = "history_old",
+          holdingId = currentHolding.id,
+          userId = uid,
+          priceDate = outsideMillis,
+          unitPriceDecimal = "1500",
+          valuationMinor = 150_000L,
+          totalInvestedMinor = 150_000L,
+          realizedPnlMinor = 0L,
+          currencyCode = "INR",
+          source = PriceSourceType.MANUAL,
+          providerLabel = "Manual",
+        ),
+        InvestmentPriceHistory(
+          id = "history_in_period",
+          holdingId = currentHolding.id,
+          userId = uid,
+          priceDate = midMillis,
+          unitPriceDecimal = "1800",
+          valuationMinor = 180_000L,
+          totalInvestedMinor = 150_000L,
+          realizedPnlMinor = 5_000L,
+          currencyCode = "INR",
+          source = PriceSourceType.MANUAL,
+          providerLabel = "Manual",
+        ),
+        InvestmentPriceHistory(
+          id = "history_after_period",
+          holdingId = currentHolding.id,
+          userId = uid,
+          priceDate = endMillis,
+          unitPriceDecimal = "2500",
+          valuationMinor = 250_000L,
+          totalInvestedMinor = 150_000L,
+          realizedPnlMinor = 10_000L,
+          currencyCode = "INR",
+          source = PriceSourceType.MANUAL,
+          providerLabel = "Manual",
+        ),
+      )
+
+    val report =
+      engine.computeInvestmentReport(
+        currencyCode = "INR",
+        window = historicalWindow,
+        holdings = listOf(currentHolding),
+        investmentTransactions = transactions,
+        priceHistory = history,
+        nowMillis = endMillis,
+      )
+
+    // Portfolio values stay current; activity totals are limited to the selected window.
+    assertEquals(250_000L, report.portfolioSummary.totalValuationMinor)
+    assertEquals(250_000L, report.holdingRows.single().valuationMinor)
+    assertEquals(endMillis, report.portfolioSummary.lastMarketUpdateMillis)
+    assertEquals(5_000L, report.periodBuyTotalMinor)
+    assertEquals(0L, report.periodSellTotalMinor)
+
+    // The historical growth timeline must not include a price-history point after the window.
+    assertEquals(2, report.portfolioSummary.growthPoints.size)
+    assertEquals(midMillis, report.portfolioSummary.growthPoints.last().timestampMillis)
+  }
+
 }
