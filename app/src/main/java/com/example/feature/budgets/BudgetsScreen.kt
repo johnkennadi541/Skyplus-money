@@ -75,10 +75,7 @@ import com.example.domain.model.BudgetSummary
 import com.example.domain.model.FinancialAccount
 import com.example.domain.model.TransactionCategories
 import com.example.domain.usecase.FormatMoneyUseCase
-import java.math.BigDecimal
-import java.text.NumberFormat
 import java.text.SimpleDateFormat
-import java.util.Currency
 import java.util.Date
 import java.util.Locale
 
@@ -822,17 +819,15 @@ private fun BudgetPeriodRow(period: com.example.domain.model.BudgetPeriod) {
   val dateFormat = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
   val range =
     "${dateFormat.format(Date(period.periodStart))} – ${dateFormat.format(Date(period.periodEnd))}"
-  val currency = remember(period.currencyCode) { Currency.getInstance(period.currencyCode) }
-  val numberFormat =
-    remember(currency) {
-      NumberFormat.getCurrencyInstance(Locale.getDefault()).apply {
-        this.currency = currency
-        minimumFractionDigits = 2
-        maximumFractionDigits = 2
-      }
-    }
-  val spentText = numberFormat.format(BigDecimal.valueOf(period.spentMinor, 2))
-  val allocatedText = numberFormat.format(BigDecimal.valueOf(period.allocatedMinor, 2))
+  // Format archived amounts with the same ISO 4217 precision rules used by live money values.
+  val spentText =
+    FormatMoneyUseCase().format(
+      com.example.domain.model.Money.fromMinorUnits(period.spentMinor, period.currencyCode),
+    )
+  val allocatedText =
+    FormatMoneyUseCase().format(
+      com.example.domain.model.Money.fromMinorUnits(period.allocatedMinor, period.currencyCode),
+    )
 
   Surface(
     modifier = Modifier.fillMaxWidth().testTag("budget_period_${period.id}"),
