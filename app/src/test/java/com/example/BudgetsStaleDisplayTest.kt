@@ -8,6 +8,7 @@ import com.example.core.designsystem.theme.SkyplusOceanTheme
 import com.example.domain.model.AccountType
 import com.example.domain.model.Budget
 import com.example.domain.model.BudgetAlertStatus
+import com.example.domain.model.BudgetPeriod
 import com.example.domain.model.BudgetPeriodType
 import com.example.domain.model.BudgetStatus
 import com.example.domain.model.BudgetSummary
@@ -74,17 +75,74 @@ class BudgetsStaleDisplayTest {
   private fun render(
     status: BudgetStatus,
     summaries: Map<String, BudgetSummary> = emptyMap(),
+    periods: List<BudgetPeriod> = emptyList(),
   ) {
+    val visibleCurrency = periods.firstOrNull()?.currencyCode ?: account.currencyCode
     composeTestRule.setContent {
       SkyplusOceanTheme(themePreference = ThemePreference.DARK) {
         BudgetsContent(
           budgets = listOf(status),
           summaries = summaries,
-          accounts = listOf(account),
+          periods = periods,
+          accounts = listOf(account.copy(currencyCode = visibleCurrency)),
         )
       }
     }
     composeTestRule.waitForIdle()
+  }
+
+  private fun historyPeriod(currencyCode: String, spentMinor: Long, allocatedMinor: Long) =
+    BudgetPeriod(
+      id = "history_$currencyCode",
+      userId = uid,
+      budgetId = "budget_history",
+      category = "Food & Dining",
+      currencyCode = currencyCode,
+      periodType = BudgetPeriodType.MONTHLY,
+      periodStart = 1_000L,
+      periodEnd = 2_000L,
+      allocatedMinor = allocatedMinor,
+      spentMinor = spentMinor,
+      remainingMinor = allocatedMinor - spentMinor,
+      alertStatus = BudgetAlertStatus.NORMAL,
+      closedAt = 3_000L,
+    )
+
+  private fun assertHistoryCurrencyPrecision(currencyCode: String, spentMinor: Long, allocatedMinor: Long) {
+    render(
+      status(stale = true),
+      periods = listOf(historyPeriod(currencyCode, spentMinor, allocatedMinor)),
+    )
+
+    val expectedSpent =
+      com.example.domain.usecase.FormatMoneyUseCase()
+        .format(Money.fromMinorUnits(spentMinor, currencyCode))
+    val expectedAllocated =
+      com.example.domain.usecase.FormatMoneyUseCase()
+        .format(Money.fromMinorUnits(allocatedMinor, currencyCode))
+    composeTestRule
+      .onNodeWithTag("budget_period_history_$currencyCode")
+      .assertTextContains("Spent $expectedSpent of $expectedAllocated", substring = true)
+  }
+
+  @Test
+  fun `KWD budget history displays three fraction digits`() {
+    assertHistoryCurrencyPrecision("KWD", 12_345L, 20_000L)
+  }
+
+  @Test
+  fun `JPY budget history displays zero fraction digits`() {
+    assertHistoryCurrencyPrecision("JPY", 1_234L, 2_000L)
+  }
+
+  @Test
+  fun `INR budget history displays two fraction digits`() {
+    assertHistoryCurrencyPrecision("INR", 1_234L, 2_000L)
+  }
+
+  @Test
+  fun `USD budget history displays two fraction digits`() {
+    assertHistoryCurrencyPrecision("USD", 1_234L, 2_000L)
   }
 
   @Test
