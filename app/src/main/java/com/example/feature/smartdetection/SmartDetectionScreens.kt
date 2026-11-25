@@ -806,7 +806,6 @@ fun TransactionCorrectionDialog(
               onClick = {
                 selectedType = type
                 userSelectedCategory = null
-                selectedCategory = defaultCategory(merchantText, type)
                 rememberForMerchant = false
               },
               label = { Text(type.name) },
@@ -844,7 +843,6 @@ fun TransactionCorrectionDialog(
             FilterChip(
               selected = selectedCategory == cat,
               onClick = {
-                selectedCategory = cat
                 userSelectedCategory = cat
               },
               label = { Text(cat) },
@@ -870,7 +868,6 @@ fun TransactionCorrectionDialog(
             merchantText = updatedMerchant
             userSelectedCategory = null
             rememberForMerchant = false
-            selectedCategory = defaultCategory(updatedMerchant, selectedType)
             onMerchantChanged(updatedMerchant.ifBlank { null })
           },
           label = { Text("Merchant / Payee") },
