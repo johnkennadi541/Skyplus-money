@@ -2,8 +2,10 @@ package com.example
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollToNode
 import com.example.core.designsystem.theme.SkyplusOceanTheme
 import com.example.domain.model.AccountType
 import com.example.domain.model.Budget
@@ -124,6 +126,9 @@ class BudgetsStaleDisplayTest {
     val expectedAllocated =
       com.example.domain.usecase.FormatMoneyUseCase()
         .format(Money.fromMinorUnits(allocatedMinor, currencyCode))
+    composeTestRule
+      .onNodeWithTag("budgets_list")
+      .performScrollToNode(hasTestTag("budget_period_history_$currencyCode"))
     composeTestRule
       .onNodeWithTag("budget_period_history_$currencyCode")
       .assertTextContains("Spent $expectedSpent of $expectedAllocated", substring = true)
