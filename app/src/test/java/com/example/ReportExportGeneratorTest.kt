@@ -134,7 +134,7 @@ class ReportExportGeneratorTest {
         FinancialTransaction(
           id = "csv_guard_txn", userId = "csv_guard_uid", accountId = "csv_guard_account",
           type = TransactionType.EXPENSE, amountMinor = 1_000L, currencyCode = "INR",
-          category = "Food", merchantOrPayee = " \\t=HYPERLINK(\\\"https://example.invalid\\\")",
+          category = "Food", merchantOrPayee = " \t=1+1",
           transactionDate = 1_751_200_000_000L, status = TransactionStatus.COMPLETED,
         ),
       ),
@@ -149,7 +149,7 @@ class ReportExportGeneratorTest {
       nowMillis = 1_752_000_000_000L,
     )
     val csvText = String(exportGenerator.generateExport(snapshot, ReportExportFormat.CSV).bytes, StandardCharsets.UTF_8)
-    assertTrue(csvText.contains("' \\t=HYPERLINK"))
+    assertTrue(csvText.contains("' \t=1+1"))
   }
 
   @Test
