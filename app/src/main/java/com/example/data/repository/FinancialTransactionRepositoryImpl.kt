@@ -66,6 +66,7 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
         require(sourceTransaction.userId == authenticatedUserId) {
           "Transaction ownership cannot be assigned across users"
         }
+        require(sourceTransaction.amountMinor > 0L) { "Transfer amount must be greater than zero" }
         database.withTransaction {
           val sourceAccount =
             accountDao.getAccountById(authenticatedUserId, sourceTransaction.accountId)
@@ -153,6 +154,7 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
         require(transaction.userId == authenticatedUserId) {
           "Transaction ownership cannot be assigned across users"
         }
+        require(transaction.amountMinor > 0L) { "Transaction amount must be greater than zero" }
         database.withTransaction {
           val account =
             accountDao.getAccountById(authenticatedUserId, transaction.accountId)
@@ -196,12 +198,18 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
         ) {
           "Transaction ownership cannot be transferred or modified across users"
         }
+        require(updatedTransaction.amountMinor > 0L) {
+          "Transaction amount must be greater than zero"
+        }
         database.withTransaction {
           val existing =
             transactionDao.getTransactionById(authenticatedUserId, updatedTransaction.id)
               ?: throw SecurityException("Transaction does not belong to authenticated user")
           require(existing.userId == authenticatedUserId) {
             "Transaction ownership verification failed"
+          }
+          require(existing.amountMinor > 0L) {
+            "Persisted transaction amount is invalid; refusing to alter account balances."
           }
           require(existing.type != TransactionType.TRANSFER.name &&
             updatedTransaction.type != TransactionType.TRANSFER
