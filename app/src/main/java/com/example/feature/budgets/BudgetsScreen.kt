@@ -92,6 +92,7 @@ fun BudgetsScreen(
   val accounts by viewModel.accounts.collectAsStateWithLifecycle()
   val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
   val isErrorMessage by viewModel.isErrorMessage.collectAsStateWithLifecycle()
+  val isCalculationError by viewModel.isCalculationError.collectAsStateWithLifecycle()
   val selectedCurrency by viewModel.selectedCurrency.collectAsStateWithLifecycle()
   val budgetPeriods by viewModel.budgetPeriods.collectAsStateWithLifecycle()
 
@@ -102,9 +103,11 @@ fun BudgetsScreen(
     accounts = accounts,
     userMessage = userMessage,
     isErrorMessage = isErrorMessage,
+    isCalculationError = isCalculationError,
     selectedCurrency = selectedCurrency,
     onSelectCurrency = { viewModel.selectCurrency(it) },
     onDismissMessage = { viewModel.dismissMessage() },
+    onRetryCalculation = { viewModel.retryBudgetCalculation() },
     onCreateBudget = { name, category, amountDecimal, currency, periodType, customStart, customEnd, threshold, onSuccess ->
       viewModel.createBudget(name, category, amountDecimal, currency, periodType, customStart, customEnd, threshold, onSuccess)
     },
@@ -126,9 +129,11 @@ fun BudgetsContent(
   accounts: List<FinancialAccount>,
   userMessage: String? = null,
   isErrorMessage: Boolean = false,
+  isCalculationError: Boolean = false,
   selectedCurrency: String? = null,
   onSelectCurrency: (String?) -> Unit = {},
   onDismissMessage: () -> Unit = {},
+  onRetryCalculation: () -> Unit = {},
   onCreateBudget: (String, String, String, String, BudgetPeriodType, Long?, Long?, Int, () -> Unit) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
   onUpdateBudget: (Budget, () -> Unit) -> Unit = { _, _ -> },
   onDeleteBudget: (String, () -> Unit) -> Unit = { _, _ -> },
@@ -218,8 +223,17 @@ fun BudgetsContent(
                   color = if (isErrorMessage) OceanTheme.colors.negative else MaterialTheme.colorScheme.onPrimaryContainer,
                 )
               }
-              TextButton(onClick = onDismissMessage) {
-                Text("Dismiss")
+              if (isCalculationError) {
+                TextButton(
+                  onClick = onRetryCalculation,
+                  modifier = Modifier.testTag("retry_budget_calculation_button"),
+                ) {
+                  Text("Retry")
+                }
+              } else {
+                TextButton(onClick = onDismissMessage) {
+                  Text("Dismiss")
+                }
               }
             }
           }
