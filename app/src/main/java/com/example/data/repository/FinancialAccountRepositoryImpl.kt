@@ -171,7 +171,8 @@ class FinancialAccountRepositoryImpl @Inject constructor(
       runCatching {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(accountId.isNotBlank()) { "Account ID is required" }
-        accountDao.adjustBalance(userId, accountId, deltaMinor, System.currentTimeMillis())
+        val rowsUpdated = accountDao.adjustBalance(userId, accountId, deltaMinor, System.currentTimeMillis())
+        check(rowsUpdated == 1) { "Account balance adjustment rejected for authenticated user or overflow" }
       }
     }
 }
