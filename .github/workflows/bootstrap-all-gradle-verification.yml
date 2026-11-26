@@ -1,4 +1,4 @@
-name: Bootstrap complete Gradle verification metadata
+name: Bootstrap Gradle verification metadata through real tasks
 on:
   push:
     branches:
@@ -15,29 +15,16 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - name: Resolve compile and runtime dependency classpaths and record SHA-256
+      - name: Resolve dependencies through actual CI tasks and record SHA-256
         shell: bash
         run: |
           set -euo pipefail
-          cat > "$RUNNER_TEMP/resolve-all.init.gradle" <<'GRADLE'
-          gradle.projectsEvaluated {
-            gradle.rootProject.tasks.register("resolveAllForVerification") {
-              doLast {
-                gradle.rootProject.allprojects.each { p ->
-                  p.configurations.findAll { cfg ->
-                    cfg.canBeResolved && !cfg.name.startsWith("_") &&
-                      (cfg.name.endsWith("CompileClasspath") || cfg.name.endsWith("RuntimeClasspath") || cfg.name.endsWith("AnnotationProcessor"))
-                  }.each { cfg ->
-                    println("Resolving ${p.path}:${cfg.name}")
-                    cfg.incoming.artifactView { lenient(false) }.artifacts.artifactFiles.files
-                  }
-                }
-              }
-            }
-          }
-          GRADLE
           chmod +x ./gradlew
-          ./gradlew --no-daemon --refresh-dependencies --write-verification-metadata sha256 -I "$RUNNER_TEMP/resolve-all.init.gradle" resolveAllForVerification
+          ./gradlew --no-daemon --refresh-dependencies --write-verification-metadata sha256 \
+            :app:compileDebugKotlin \
+            :app:testDebugUnitTest \
+            :app:lintDebug \
+            :app:compileDebugAndroidTestKotlin
           test -s gradle/verification-metadata.xml
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
