@@ -364,7 +364,9 @@ class Phase2SecurityRemediationTest {
     assertNull(detectionRepo.observeLatestAutoSavedNotice(uidBob).first())
 
     // Cross-user DAO operations must NOT affect Alice's balance or mapping rules
-    accountRepo.adjustAccountBalance(uidBob, "acc_alice", -100_000L).getOrThrow()
+    val crossUserBalanceUpdate =
+      accountRepo.adjustAccountBalance(uidBob, "acc_alice", -100_000L)
+    assertTrue("Cross-user balance adjustment must fail closed", crossUserBalanceUpdate.isFailure)
     assertEquals(475_000L, accountRepo.getAccountById(uidAlice, "acc_alice")!!.currentBalanceMinor)
 
     detectionRepo.deleteAccountMappingRule(uidBob, "rule_alice").getOrThrow()
