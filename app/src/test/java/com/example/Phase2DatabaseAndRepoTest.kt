@@ -378,6 +378,43 @@ class Phase2DatabaseAndRepoTest {
   }
 
   @Test
+  fun `account balance adjustment rejects Long overflow without changing stored balance`() = runTest {
+    val uid = "uid_balance_overflow_guard"
+    val maxAccount = FinancialAccount(
+      id = "overflow_max", userId = uid, name = "Max", type = AccountType.BANK,
+      currencyCode = "INR", initialBalanceMinor = Long.MAX_VALUE,
+      currentBalanceMinor = Long.MAX_VALUE,
+    )
+    accountRepo.createAccount(uid, maxAccount).getOrThrow()
+
+    val directAdjustment = accountRepo.adjustAccountBalance(uid, maxAccount.id, 1L)
+    assertTrue(directAdjustment.isFailure)
+    assertEquals(Long.MAX_VALUE, accountRepo.getAccountById(uid, maxAccount.id)!!.currentBalanceMinor)
+
+    val minAccount = FinancialAccount(
+      id = "overflow_min", userId = uid, name = "Min", type = AccountType.WALLET,
+      currencyCode = "INR", initialBalanceMinor = Long.MIN_VALUE,
+      currentBalanceMinor = Long.MIN_VALUE,
+    )
+    accountRepo.createAccount(uid, minAccount).getOrThrow()
+    val directUnderflow = accountRepo.adjustAccountBalance(uid, minAccount.id, -1L)
+    assertTrue(directUnderflow.isFailure)
+    assertEquals(Long.MIN_VALUE, accountRepo.getAccountById(uid, minAccount.id)!!.currentBalanceMinor)
+
+    val overflowIncome = txnRepo.recordIncome(
+      uid,
+      FinancialTransaction(
+        id = "overflow_income", userId = uid, accountId = maxAccount.id,
+        type = TransactionType.INCOME, amountMinor = 1L,
+        currencyCode = "INR", category = "Other Income",
+      ),
+    )
+    assertTrue(overflowIncome.isFailure)
+    assertTrue(txnRepo.getTransactionById(uid, "overflow_income") == null)
+    assertEquals(Long.MAX_VALUE, accountRepo.getAccountById(uid, maxAccount.id)!!.currentBalanceMinor)
+  }
+
+  @Test
   fun `transaction repository rejects nonpositive amounts without mutating ledger or balances`() = runTest {
     val uid = "uid_positive_amount_guard"
     val primary = FinancialAccount(

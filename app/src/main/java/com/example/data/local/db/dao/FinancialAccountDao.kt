@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.example.data.local.db.entity.FinancialAccountEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -79,12 +80,31 @@ interface FinancialAccountDao {
   @Query(
     "UPDATE financial_accounts SET currentBalanceMinor = currentBalanceMinor + :deltaMinor, updatedAt = :updatedAt WHERE userId = :userId AND id = :accountId"
   )
+  suspend fun adjustBalanceScoped(
+    userId: String,
+    accountId: String,
+    deltaMinor: Long,
+    updatedAt: Long,
+  ): Int
+
+  /**
+   * Applies a balance delta only when the resulting Long value is representable.
+   * The read/check/write sequence is transactional so an overflow cannot silently corrupt a balance.
+   */
+  @Transaction
   suspend fun adjustBalance(
     userId: String,
     accountId: String,
     deltaMinor: Long,
     updatedAt: Long = System.currentTimeMillis(),
-  )
+  ) {
+    require(userId.isNotBlank()) { "Authenticated user ID is required" }
+    val account = getAccountById(userId, accountId)
+      ?: throw IllegalArgumentException("Account not found for authenticated user")
+    Math.addExact(account.currentBalanceMinor, deltaMinor)
+    val rowsUpdated = adjustBalanceScoped(userId, accountId, deltaMinor, updatedAt)
+    check(rowsUpdated == 1) { "Account balance update rejected for authenticated user" }
+  }
 
   @Query(
     "UPDATE financial_accounts SET currentBalanceMinor = :newBalanceMinor, updatedAt = :updatedAt WHERE userId = :userId AND id = :accountId"

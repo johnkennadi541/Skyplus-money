@@ -12,10 +12,10 @@
 - **UID Isolation:** Consent records, financial accounts, financial transactions, detection events, and account mapping rules are strictly keyed and queried by Firebase `userId` (`uid`).
 
 ## 3. Local Financial Database Encryption (Phase 2)
-- **Room + SQLCipher:** `AppDatabase` (version 2) is configured in `DatabaseModule` with `net.sqlcipher.database.SupportFactory` and `SQLiteDatabase.loadLibs(context)`.
+- **Room + SQLCipher:** `AppDatabase` is currently schema version 11 and is configured in `DatabaseModule` with `net.sqlcipher.database.SupportFactory` and `SQLiteDatabase.loadLibs(context)`. Production opens use the explicit non-destructive migration chain from version 1 through version 11 (`MIGRATION_1_2` through `MIGRATION_10_11`).
 - **Android Keystore Passphrase:** `DatabasePassphraseProvider` generates a cryptographically random 256-bit (32-byte) database passphrase wrapped with an AES-256-GCM master key stored in `AndroidKeyStore`.
-- **Backup Restriction:** `android:allowBackup="false"` is enforced in `AndroidManifest.xml`.
-- **Non-Destructive Migrations:** `DatabaseMigrations.MIGRATION_1_2` preserves all existing financial records; destructive fallbacks (`fallbackToDestructiveMigration`) are prohibited.
+- **Backup Restriction:** `android:allowBackup="false"` is enforced in `AndroidManifest.xml`. `backup_rules.xml` and Android 12+ `data_extraction_rules.xml` additionally exclude the encrypted database and its WAL/SHM/journal sidecars, the Keystore-wrapped passphrase vault preferences, and notification-detection settings from cloud backup and device transfer.
+- **Non-Destructive Migrations:** All registered Room migrations from 1→11 are explicit; destructive fallbacks (`fallbackToDestructiveMigration`) are prohibited. The complete 8→11 migration path is covered by integration validation.
 
 ## 4. Smart Transaction Detection Privacy & Google Play Policy Controls (Phase 2)
 - **Zero OTP / PIN / CVV Persistence:** `SmartTransactionParser` rejects any alert matching `\b(OTP|One Time Password|secret code|verification code|security code|do not share|CVV|CVC|PIN|MPIN|TPIN|UPI PIN|ATM PIN|password|passcode)\b` before extraction.
