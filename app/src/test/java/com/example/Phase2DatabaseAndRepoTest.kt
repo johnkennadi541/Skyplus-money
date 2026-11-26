@@ -337,6 +337,47 @@ class Phase2DatabaseAndRepoTest {
   }
 
   @Test
+  fun `transaction edit uses persisted old row not caller supplied snapshot for balance reversal`() = runTest {
+    val uid = "uid_transaction_snapshot_guard"
+    val primary = FinancialAccount(
+      id = "snapshot_primary", userId = uid, name = "Primary", type = AccountType.BANK,
+      currencyCode = "INR", initialBalanceMinor = 100_000L, currentBalanceMinor = 100_000L,
+    )
+    val secondary = FinancialAccount(
+      id = "snapshot_secondary", userId = uid, name = "Secondary", type = AccountType.WALLET,
+      currencyCode = "INR", initialBalanceMinor = 100_000L, currentBalanceMinor = 100_000L,
+    )
+    accountRepo.createAccount(uid, primary).getOrThrow()
+    accountRepo.createAccount(uid, secondary).getOrThrow()
+
+    val expense = txnRepo.recordExpense(
+      uid,
+      FinancialTransaction(
+        id = "snapshot_expense", userId = uid, accountId = primary.id,
+        type = TransactionType.EXPENSE, amountMinor = 10_000L,
+        currencyCode = "INR", category = "Food",
+      ),
+    ).getOrThrow()
+    assertEquals(90_000L, accountRepo.getAccountById(uid, primary.id)!!.currentBalanceMinor)
+
+    // Simulate a stale or forged caller snapshot. Only the persisted row may drive reversal.
+    val forgedOldSnapshot = expense.copy(
+      accountId = secondary.id, type = TransactionType.INCOME, amountMinor = 90_000L,
+    )
+    txnRepo.updateTransaction(
+      authenticatedUserId = uid,
+      updatedTransaction = expense.copy(amountMinor = 15_000L),
+      oldTransaction = forgedOldSnapshot,
+    ).getOrThrow()
+
+    assertEquals(85_000L, accountRepo.getAccountById(uid, primary.id)!!.currentBalanceMinor)
+    assertEquals(100_000L, accountRepo.getAccountById(uid, secondary.id)!!.currentBalanceMinor)
+    val persisted = txnRepo.getTransactionById(uid, expense.id)!!
+    assertEquals(primary.id, persisted.accountId)
+    assertEquals(15_000L, persisted.amountMinor)
+  }
+
+  @Test
   fun `transfer edit is rejected without mutating either linked leg or balance`() = runTest {
     val uid = "uid_transfer_edit_guard"
     accountRepo.createAccount(
