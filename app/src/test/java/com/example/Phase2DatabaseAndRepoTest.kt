@@ -584,6 +584,51 @@ class Phase2DatabaseAndRepoTest {
   }
 
   @Test
+  fun `transfer repository rejects invalid amounts and identical accounts`() = runTest {
+    val uid = "uid_transfer_repository_validation"
+    val account = FinancialAccount(
+      id = "transfer_validation_account", userId = uid, name = "Bank",
+      type = AccountType.BANK, currencyCode = "INR",
+      initialBalanceMinor = 100_000L, currentBalanceMinor = 100_000L,
+    )
+    accountRepo.createAccount(uid, account).getOrThrow()
+
+    val zeroAmount = txnRepo.recordTransfer(
+      authenticatedUserId = uid,
+      sourceTransaction = FinancialTransaction(
+        id = "zero_transfer", userId = uid, accountId = account.id,
+        type = TransactionType.TRANSFER, amountMinor = 0L,
+        currencyCode = "INR", category = TransactionCategories.TRANSFER_OUT_CATEGORY,
+      ),
+      destinationAccountId = "other_account",
+    )
+    val negativeAmount = txnRepo.recordTransfer(
+      authenticatedUserId = uid,
+      sourceTransaction = FinancialTransaction(
+        id = "negative_transfer", userId = uid, accountId = account.id,
+        type = TransactionType.TRANSFER, amountMinor = -1L,
+        currencyCode = "INR", category = TransactionCategories.TRANSFER_OUT_CATEGORY,
+      ),
+      destinationAccountId = "other_account",
+    )
+    val sameAccount = txnRepo.recordTransfer(
+      authenticatedUserId = uid,
+      sourceTransaction = FinancialTransaction(
+        id = "same_account_transfer", userId = uid, accountId = account.id,
+        type = TransactionType.TRANSFER, amountMinor = 1_000L,
+        currencyCode = "INR", category = TransactionCategories.TRANSFER_OUT_CATEGORY,
+      ),
+      destinationAccountId = account.id,
+    )
+
+    assertTrue(zeroAmount.isFailure)
+    assertTrue(negativeAmount.isFailure)
+    assertTrue(sameAccount.isFailure)
+    assertTrue(txnRepo.getTransactions(uid).first().isEmpty())
+    assertEquals(100_000L, accountRepo.getAccountById(uid, account.id)!!.currentBalanceMinor)
+  }
+
+  @Test
   fun `general transaction path rejects standalone transfer entries`() = runTest {
     val uid = "uid_general_transfer_guard"
     val account = FinancialAccount(
