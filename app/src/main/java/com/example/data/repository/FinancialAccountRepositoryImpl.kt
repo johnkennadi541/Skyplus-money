@@ -92,6 +92,9 @@ class FinancialAccountRepositoryImpl @Inject constructor(
             FinancialAccountEntity.fromDomain(
               account.copy(
                 userId = existing.userId,
+                // Account metadata edits must never overwrite ledger-derived balances from a stale UI snapshot.
+                initialBalanceMinor = existing.initialBalanceMinor,
+                currentBalanceMinor = existing.currentBalanceMinor,
                 createdAt = existing.createdAt,
                 updatedAt = System.currentTimeMillis(),
               )
