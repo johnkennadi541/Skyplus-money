@@ -459,6 +459,31 @@ class Phase2DatabaseAndRepoTest {
     assertTrue(txnRepo.getTransactionById(uid, "overflow_income") == null)
     assertEquals(Long.MAX_VALUE, accountRepo.getAccountById(uid, maxAccount.id)!!.currentBalanceMinor)
 
+    // An edit that overflows after reversing the old entry must roll back the reversal too.
+    val editAccount = FinancialAccount(
+      id = "overflow_edit_account", userId = uid, name = "Edit", type = AccountType.BANK,
+      currencyCode = "INR", initialBalanceMinor = 100_000L, currentBalanceMinor = 100_000L,
+    )
+    accountRepo.createAccount(uid, editAccount).getOrThrow()
+    val originalExpense = txnRepo.recordExpense(
+      uid,
+      FinancialTransaction(
+        id = "overflow_edit_expense", userId = uid, accountId = editAccount.id,
+        type = TransactionType.EXPENSE, amountMinor = 10_000L,
+        currencyCode = "INR", category = "Food",
+      ),
+    ).getOrThrow()
+    val failedEdit = txnRepo.updateTransaction(
+      authenticatedUserId = uid,
+      updatedTransaction = originalExpense.copy(type = TransactionType.INCOME, amountMinor = Long.MAX_VALUE),
+      oldTransaction = originalExpense,
+    )
+    assertTrue(failedEdit.isFailure)
+    assertEquals(90_000L, accountRepo.getAccountById(uid, editAccount.id)!!.currentBalanceMinor)
+    val unchangedTransaction = txnRepo.getTransactionById(uid, originalExpense.id)!!
+    assertEquals(TransactionType.EXPENSE, unchangedTransaction.type)
+    assertEquals(10_000L, unchangedTransaction.amountMinor)
+
     // A failed first leg must roll back both transfer rows and every balance mutation.
     val source = FinancialAccount(
       id = "transfer_underflow_source", userId = uid, name = "Source", type = AccountType.BANK,
