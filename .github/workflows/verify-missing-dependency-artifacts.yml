@@ -26,6 +26,7 @@ jobs:
           org/junit/junit-bom/5.11.0-M2/junit-bom-5.11.0-M2.module
           org/jetbrains/kotlin/kotlin-gradle-plugins-bom/2.2.10/kotlin-gradle-plugins-bom-2.2.10.module
           org/jetbrains/kotlin/kotlin-gradle-plugins-bom/2.2.10/kotlin-gradle-plugins-bom-2.2.10.pom
+          org/jetbrains/intellij/deps/kotlinx/kotlinx-coroutines-bom/1.8.0-intellij-14/kotlinx-coroutines-bom-1.8.0-intellij-14.pom
           EOF
           while IFS= read -r path; do
             [ -n "$path" ] || continue
