@@ -24,6 +24,7 @@ jobs:
     name: Build signed release APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    environment: release-signing
 
     steps:
       - name: Checkout repository
