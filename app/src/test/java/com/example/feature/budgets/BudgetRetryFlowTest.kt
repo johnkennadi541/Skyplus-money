@@ -18,6 +18,7 @@ class BudgetRetryFlowTest {
     val retrySignal = MutableStateFlow(0)
     var attempts = 0
     val received = mutableListOf<String>()
+    var successfulEmissions = 0
     val source =
       flow {
         attempts += 1
@@ -30,7 +31,7 @@ class BudgetRetryFlowTest {
         source
           .retryOnSignal(
             retrySignal = retrySignal,
-            onSuccess = {},
+            onSuccess = { successfulEmissions += 1 },
             onFailure = { "safe-empty-state" },
           )
           .collect { received += it }
@@ -39,15 +40,18 @@ class BudgetRetryFlowTest {
     runCurrent()
     assertEquals(1, attempts)
     assertEquals(listOf("safe-empty-state"), received)
+    assertEquals(0, successfulEmissions)
 
     retrySignal.value = 1
     runCurrent()
     assertEquals(2, attempts)
     assertEquals(listOf("safe-empty-state", "safe-empty-state"), received)
+    assertEquals(0, successfulEmissions)
 
     retrySignal.value = 2
     runCurrent()
     assertEquals(3, attempts)
+    assertEquals(1, successfulEmissions)
     assertEquals(
       listOf("safe-empty-state", "safe-empty-state", "fresh-budget-data"),
       received,
