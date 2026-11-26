@@ -53,6 +53,7 @@ class AuthViewModelAndRepositoryTest {
     var deferredResult: CompletableDeferred<GoogleCredentialResult>? = null
     var requestCalls: Int = 0
     var clearCalls: Int = 0
+    var clearFailure: Exception? = null
 
     override suspend fun requestGoogleIdToken(context: Context): GoogleCredentialResult {
       requestCalls += 1
@@ -62,6 +63,7 @@ class AuthViewModelAndRepositoryTest {
 
     override suspend fun clearCredentialState() {
       clearCalls += 1
+      clearFailure?.let { throw it }
     }
   }
 
@@ -72,6 +74,7 @@ class AuthViewModelAndRepositoryTest {
     var signInCalls: Int = 0
     var lastToken: String? = null
     var signOutCalls: Int = 0
+    var signOutFailure: Exception? = null
 
     override fun observeSession(): Flow<AuthSessionState> = sessionFlow
 
@@ -107,6 +110,7 @@ class AuthViewModelAndRepositoryTest {
 
     override suspend fun signOut() {
       signOutCalls += 1
+      signOutFailure?.let { throw it }
       sessionFlow.value = AuthSessionState.Unauthenticated
     }
   }
@@ -272,6 +276,29 @@ class AuthViewModelAndRepositoryTest {
       assertEquals(AuthSessionState.Unauthenticated, viewModel.uiState.value.sessionState)
       assertEquals(R.string.auth_error_session_expired, viewModel.uiState.value.feedbackMessageRes)
     }
+
+  @Test
+  fun `Firebase sign out is attempted even when Google credential cleanup fails`() = runTest {
+    credentialClient.clearFailure = IllegalStateException("Credential Manager unavailable")
+
+    val result = repository.signOut()
+
+    assertTrue(result is AuthResult.Success)
+    assertEquals(1, firebaseGateway.signOutCalls)
+    assertEquals(1, credentialClient.clearCalls)
+    assertEquals(AuthSessionState.Unauthenticated, firebaseGateway.sessionFlow.value)
+  }
+
+  @Test
+  fun `Google credential cleanup is attempted even when Firebase sign out fails`() = runTest {
+    firebaseGateway.signOutFailure = IllegalStateException("Firebase sign out failed")
+
+    val result = runCatching { repository.signOut() }
+
+    assertTrue(result.isFailure)
+    assertEquals(1, firebaseGateway.signOutCalls)
+    assertEquals(1, credentialClient.clearCalls)
+  }
 
   @Test
   fun `repeated login taps while in flight are ignored and signOut clears credential state`() =
