@@ -1,0 +1,27 @@
+name: Verify kotlinx coroutines BOM 1.6.4 checksum
+on:
+  push:
+    branches:
+      - security/verify-coroutines-bom-164
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download from Maven Central endpoints and compare exact bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          url1="https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-bom/1.6.4/kotlinx-coroutines-bom-1.6.4.pom"
+          url2="https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-bom/1.6.4/kotlinx-coroutines-bom-1.6.4.pom"
+          curl --fail --silent --show-error --location "$url1" -o coroutines-bom-1.6.4-a.pom
+          curl --fail --silent --show-error --location "$url2" -o coroutines-bom-1.6.4-b.pom
+          cmp coroutines-bom-1.6.4-a.pom coroutines-bom-1.6.4-b.pom
+          sha256sum coroutines-bom-1.6.4-a.pom
+          sha256sum -c <(sha256sum coroutines-bom-1.6.4-a.pom)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: coroutines-bom-1.6.4-verification
+          path: coroutines-bom-1.6.4-a.pom
+          retention-days: 7
