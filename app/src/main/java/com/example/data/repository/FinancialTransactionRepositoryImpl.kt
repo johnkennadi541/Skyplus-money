@@ -208,11 +208,17 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
           ) {
             "Transfer transactions cannot be edited. Delete and recreate the transfer to preserve both linked entries and account balances."
           }
-          requireNotNull(accountDao.getAccountById(authenticatedUserId, existing.accountId)) {
-            "Original account not found for authenticated user"
+          val originalAccount =
+            accountDao.getAccountById(authenticatedUserId, existing.accountId)
+              ?: throw IllegalArgumentException("Original account not found for authenticated user")
+          val destinationAccount =
+            accountDao.getAccountById(authenticatedUserId, updatedTransaction.accountId)
+              ?: throw IllegalArgumentException("Destination account not found for authenticated user")
+          require(existing.currencyCode.equals(originalAccount.currencyCode, ignoreCase = true)) {
+            "Persisted transaction currency does not match its original account currency; refusing to alter balances."
           }
-          requireNotNull(accountDao.getAccountById(authenticatedUserId, updatedTransaction.accountId)) {
-            "Destination account not found for authenticated user"
+          require(updatedTransaction.currencyCode.equals(destinationAccount.currencyCode, ignoreCase = true)) {
+            "Currency mismatch: transaction currency ${updatedTransaction.currencyCode} does not match destination account currency ${destinationAccount.currencyCode}"
           }
 
           val now = System.currentTimeMillis()

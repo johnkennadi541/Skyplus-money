@@ -378,6 +378,48 @@ class Phase2DatabaseAndRepoTest {
   }
 
   @Test
+  fun `transaction edit rejects currency mismatch without changing either account balance`() = runTest {
+    val uid = "uid_transaction_currency_guard"
+    val inr = FinancialAccount(
+      id = "currency_inr", userId = uid, name = "INR", type = AccountType.BANK,
+      currencyCode = "INR", initialBalanceMinor = 100_000L, currentBalanceMinor = 100_000L,
+    )
+    val kwd = FinancialAccount(
+      id = "currency_kwd", userId = uid, name = "KWD", type = AccountType.WALLET,
+      currencyCode = "KWD", initialBalanceMinor = 100_000L, currentBalanceMinor = 100_000L,
+    )
+    accountRepo.createAccount(uid, inr).getOrThrow()
+    accountRepo.createAccount(uid, kwd).getOrThrow()
+
+    val expense = txnRepo.recordExpense(
+      uid,
+      FinancialTransaction(
+        id = "currency_guard_expense", userId = uid, accountId = inr.id,
+        type = TransactionType.EXPENSE, amountMinor = 10_000L,
+        currencyCode = "INR", category = "Food",
+      ),
+    ).getOrThrow()
+
+    val result = txnRepo.updateTransaction(
+      authenticatedUserId = uid,
+      updatedTransaction = expense.copy(
+        accountId = kwd.id,
+        amountMinor = 15_000L,
+        currencyCode = "INR",
+      ),
+      oldTransaction = expense,
+    )
+
+    assertTrue(result.isFailure)
+    assertEquals(90_000L, accountRepo.getAccountById(uid, inr.id)!!.currentBalanceMinor)
+    assertEquals(100_000L, accountRepo.getAccountById(uid, kwd.id)!!.currentBalanceMinor)
+    val persisted = txnRepo.getTransactionById(uid, expense.id)!!
+    assertEquals(inr.id, persisted.accountId)
+    assertEquals("INR", persisted.currencyCode)
+    assertEquals(10_000L, persisted.amountMinor)
+  }
+
+  @Test
   fun `transfer edit is rejected without mutating either linked leg or balance`() = runTest {
     val uid = "uid_transfer_edit_guard"
     accountRepo.createAccount(
