@@ -233,4 +233,83 @@ class BudgetCalculationEngineTest {
     assertEquals(40.0, kwdSummary.averageUtilizationPercent, 0.001)
     assertEquals(0, kwdSummary.overspentBudgetCount)
   }
+
+  @Test(expected = ArithmeticException::class)
+  fun `expense aggregation overflow fails closed`() {
+    val budget = createBudget(amountMinor = Long.MAX_VALUE)
+    val transactions =
+      listOf(
+        createTxn(type = TransactionType.EXPENSE, amountMinor = Long.MAX_VALUE),
+        createTxn(type = TransactionType.EXPENSE, amountMinor = 1L),
+      )
+
+    engine.calculateBudgetStatus(budget, transactions, nowMillis = withinRangeTime)
+  }
+
+  @Test(expected = ArithmeticException::class)
+  fun `refund aggregation overflow fails closed`() {
+    val budget = createBudget(amountMinor = 100L)
+    val transactions =
+      listOf(
+        createTxn(type = TransactionType.REFUND, amountMinor = Long.MAX_VALUE),
+        createTxn(type = TransactionType.REVERSAL, amountMinor = 1L),
+      )
+
+    engine.calculateBudgetStatus(budget, transactions, nowMillis = withinRangeTime)
+  }
+
+  @Test(expected = ArithmeticException::class)
+  fun `remaining amount subtraction overflow fails closed`() {
+    val budget = createBudget(amountMinor = Long.MIN_VALUE)
+    val transactions = listOf(createTxn(type = TransactionType.EXPENSE, amountMinor = 1L))
+
+    engine.calculateBudgetStatus(budget, transactions, nowMillis = withinRangeTime)
+  }
+
+  @Test(expected = ArithmeticException::class)
+  fun `overspending subtraction overflow fails closed`() {
+    val budget = createBudget(amountMinor = -1L)
+    val transactions =
+      listOf(createTxn(type = TransactionType.EXPENSE, amountMinor = Long.MAX_VALUE))
+
+    engine.calculateBudgetStatus(budget, transactions, nowMillis = withinRangeTime)
+  }
+
+  @Test(expected = ArithmeticException::class)
+  fun `summary allocated aggregation overflow fails closed`() {
+    val budget = createBudget(amountMinor = Long.MAX_VALUE)
+    val status =
+      engine.calculateBudgetStatus(budget, emptyList(), nowMillis = withinRangeTime)
+
+    engine.calculateSummaries(listOf(status, status.copy(budget = budget.copy(id = "second"))))
+  }
+
+  @Test(expected = ArithmeticException::class)
+  fun `summary spent aggregation overflow fails closed`() {
+    val budget = createBudget(amountMinor = Long.MAX_VALUE)
+    val status =
+      engine.calculateBudgetStatus(
+        budget,
+        listOf(createTxn(type = TransactionType.EXPENSE, amountMinor = Long.MAX_VALUE)),
+        nowMillis = withinRangeTime,
+      )
+
+    engine.calculateSummaries(listOf(status, status.copy(budget = budget.copy(id = "second"))))
+  }
+
+  @Test(expected = ArithmeticException::class)
+  fun `summary remaining subtraction overflow fails closed`() {
+    val budget = createBudget(amountMinor = 0L)
+    val status =
+      engine.calculateBudgetStatus(
+        budget,
+        emptyList(),
+        nowMillis = withinRangeTime,
+      ).copy(
+        spentMoney = com.example.domain.model.Money.fromMinorUnits(Long.MIN_VALUE, "USD"),
+      )
+
+    engine.calculateSummaries(listOf(status))
+  }
+
 }
