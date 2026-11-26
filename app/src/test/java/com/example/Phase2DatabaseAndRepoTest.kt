@@ -378,6 +378,37 @@ class Phase2DatabaseAndRepoTest {
   }
 
   @Test
+  fun `editing account metadata with stale snapshot preserves ledger balance and opening balance`() = runTest {
+    val uid = "uid_stale_account_edit_guard"
+    val account = FinancialAccount(
+      id = "stale_edit_account", userId = uid, name = "Original",
+      type = AccountType.BANK, currencyCode = "INR",
+      initialBalanceMinor = 100_000L, currentBalanceMinor = 100_000L,
+    )
+    accountRepo.createAccount(uid, account).getOrThrow()
+
+    // Simulate an edit dialog holding an account snapshot before a new transaction is recorded.
+    val staleSnapshot = accountRepo.getAccountById(uid, account.id)!!
+    txnRepo.recordExpense(
+      uid,
+      FinancialTransaction(
+        id = "stale_edit_expense", userId = uid, accountId = account.id,
+        type = TransactionType.EXPENSE, amountMinor = 10_000L,
+        currencyCode = "INR", category = "Food",
+      ),
+    ).getOrThrow()
+    assertEquals(90_000L, accountRepo.getAccountById(uid, account.id)!!.currentBalanceMinor)
+
+    accountRepo.updateAccount(uid, staleSnapshot.copy(name = "Renamed")).getOrThrow()
+
+    val persisted = accountRepo.getAccountById(uid, account.id)!!
+    assertEquals("Renamed", persisted.name)
+    assertEquals(100_000L, persisted.initialBalanceMinor)
+    assertEquals(90_000L, persisted.currentBalanceMinor)
+    assertEquals(10_000L, txnRepo.getTransactionById(uid, "stale_edit_expense")!!.amountMinor)
+  }
+
+  @Test
   fun `account balance adjustment rejects Long overflow without changing stored balance`() = runTest {
     val uid = "uid_balance_overflow_guard"
     val maxAccount = FinancialAccount(
