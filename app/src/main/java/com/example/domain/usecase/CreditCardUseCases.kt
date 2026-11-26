@@ -69,30 +69,10 @@ constructor(private val creditCardRepository: CreditCardRepository) {
 }
 
 @Singleton
-class DeleteCreditCardUseCase
+class SetCreditCardArchivedUseCase
 @Inject
 constructor(private val creditCardRepository: CreditCardRepository) {
-  suspend operator fun invoke(userId: String, cardId: String): Result<Unit> =
-    creditCardRepository.deleteCard(userId, cardId)
+  suspend operator fun invoke(userId: String, cardId: String, archived: Boolean): Result<Unit> =
+    creditCardRepository.setCardArchived(userId, cardId, archived)
 }
 
-/** The outstanding total per currency, for callers that only need the liability figure. */
-@Singleton
-class ObserveCreditCardLiabilityUseCase
-@Inject
-constructor(
-  private val creditCardRepository: CreditCardRepository,
-  private val accountRepository: FinancialAccountRepository,
-  private val calculationEngine: CreditCardCalculationEngine,
-) {
-  operator fun invoke(userId: String): Flow<Map<String, Long>> =
-    combine(
-      creditCardRepository.observeCards(userId),
-      accountRepository.getAccounts(userId),
-    ) { cards, accounts ->
-      calculationEngine
-        .summariseAll(cards, accounts)
-        .groupBy { it.card.currencyCode }
-        .mapValues { (_, summaries) -> calculationEngine.totalOutstandingMinor(summaries) }
-    }
-}

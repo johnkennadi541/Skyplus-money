@@ -11,8 +11,8 @@ import com.example.domain.model.FinancialAccount
 import com.example.domain.repository.AuthRepository
 import com.example.domain.repository.FinancialAccountRepository
 import com.example.domain.usecase.CreateCreditCardUseCase
-import com.example.domain.usecase.DeleteCreditCardUseCase
 import com.example.domain.usecase.ObserveCreditCardsUseCase
+import com.example.domain.usecase.SetCreditCardArchivedUseCase
 import com.example.domain.usecase.UpdateCreditCardUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -37,7 +37,7 @@ constructor(
   observeCreditCardsUseCase: ObserveCreditCardsUseCase,
   private val createCreditCardUseCase: CreateCreditCardUseCase,
   private val updateCreditCardUseCase: UpdateCreditCardUseCase,
-  private val deleteCreditCardUseCase: DeleteCreditCardUseCase,
+  private val setCreditCardArchivedUseCase: SetCreditCardArchivedUseCase,
 ) : ViewModel() {
 
   private val _userMessage = MutableStateFlow<String?>(null)
@@ -158,17 +158,21 @@ constructor(
     }
   }
 
-  fun deleteCard(cardId: String, onSuccess: () -> Unit) {
+  fun setCardArchived(cardId: String, archived: Boolean, onSuccess: () -> Unit) {
     val uid = currentUid() ?: return
     viewModelScope.launch {
-      deleteCreditCardUseCase(uid, cardId)
+      setCreditCardArchivedUseCase(uid, cardId, archived)
         .onSuccess {
-          _userMessage.value = "Card removed. The account and its transactions are unchanged."
+          _userMessage.value = if (archived) {
+            "Card archived. Its outstanding balance and transaction history are preserved."
+          } else {
+            "Card restored."
+          }
           _isErrorMessage.value = false
           onSuccess()
         }
         .onFailure {
-          _userMessage.value = it.message ?: "Could not remove the card"
+          _userMessage.value = it.message ?: "Could not update the card archive"
           _isErrorMessage.value = true
         }
     }

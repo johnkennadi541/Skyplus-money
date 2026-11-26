@@ -212,8 +212,32 @@ class SavingsGoalMigration8To9Test {
 
 /**
  * Exercises the migration through Room itself: a complete v8 entity schema is created by Room,
- * then the production v9 AppDatabase opens the same file and validates its complete schema.
+ * then the production AppDatabase opens the same file and validates its complete schema.
  */
+@androidx.room.Entity(
+  tableName = "credit_cards",
+  indices = [
+    androidx.room.Index(value = ["accountId"], unique = true),
+    androidx.room.Index(value = ["userId"]),
+  ],
+)
+data class CreditCardV8Entity(
+  @androidx.room.PrimaryKey val id: String,
+  val userId: String,
+  val accountId: String,
+  val issuerName: String,
+  val network: String,
+  val last4: String,
+  val creditLimitMinor: Long,
+  val currencyCode: String,
+  val billingCycleDay: Int,
+  val paymentDueDayOffset: Int,
+  val aprPercent: String,
+  val isActive: Boolean,
+  val createdAt: Long,
+  val updatedAt: Long,
+)
+
 @androidx.room.Database(
   entities = [
     com.example.data.local.db.entity.FinancialAccountEntity::class,
@@ -222,7 +246,7 @@ class SavingsGoalMigration8To9Test {
     com.example.data.local.db.entity.AccountMappingRuleEntity::class,
     com.example.data.local.db.entity.BudgetEntity::class,
     com.example.data.local.db.entity.BudgetPeriodEntity::class,
-    com.example.data.local.db.entity.CreditCardEntity::class,
+    CreditCardV8Entity::class,
     com.example.data.local.db.entity.LoanEntity::class,
     com.example.data.local.db.entity.LoanPaymentEntity::class,
     com.example.data.local.db.entity.InvestmentHoldingEntity::class,
@@ -242,7 +266,7 @@ abstract class SavingsGoalVersion8Database : androidx.room.RoomDatabase()
 class SavingsGoalRoomMigrationIntegrationTest {
 
   @Test
-  fun `Room opens a complete version 8 database through the production 8 to 9 migration`() {
+  fun `Room opens a complete version 8 database through the production 8 to 10 migrations`() {
     val context = RuntimeEnvironment.getApplication()
     val dbName = "savings-room-migration-integration.db"
     context.deleteDatabase(dbName)
@@ -271,13 +295,16 @@ class SavingsGoalRoomMigrationIntegrationTest {
         com.example.data.local.db.AppDatabase::class.java,
         dbName,
       )
-        .addMigrations(DatabaseMigrations.MIGRATION_8_9)
+        .addMigrations(
+          DatabaseMigrations.MIGRATION_8_9,
+          DatabaseMigrations.MIGRATION_9_10,
+        )
         .build()
 
     try {
       val database = migrated.openHelper.writableDatabase
 
-      assertEquals(9, database.version)
+      assertEquals(10, database.version)
       assertEquals(1, database.query("SELECT COUNT(*) FROM financial_accounts").use { cursor ->
         cursor.moveToFirst()
         cursor.getInt(0)

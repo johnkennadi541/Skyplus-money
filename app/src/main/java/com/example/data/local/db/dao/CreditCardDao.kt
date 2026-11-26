@@ -54,6 +54,9 @@ interface CreditCardDao {
     updatedAt: Long,
   ): Int
 
+  @Query("UPDATE credit_cards SET isArchived = :isArchived, updatedAt = :updatedAt WHERE userId = :userId AND id = :id")
+  suspend fun setArchivedScoped(userId: String, id: String, isArchived: Boolean, updatedAt: Long): Int
+
   /** Removes only the card record; the ledger account and its transactions are untouched. */
   @Query("DELETE FROM credit_cards WHERE userId = :userId AND id = :id")
   suspend fun deleteCard(userId: String, id: String): Int
