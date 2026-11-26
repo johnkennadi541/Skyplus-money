@@ -36,7 +36,7 @@ jobs:
           :app:compileDebugKotlin
           :app:testDebugUnitTest
           :app:lintDebug
-          :app:assembleDebugAndroidTest
+          :app:compileDebugAndroidTestKotlin
           --no-daemon
           --stacktrace
 
