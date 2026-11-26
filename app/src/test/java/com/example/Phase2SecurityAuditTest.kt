@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.core.common.DispatcherProvider
+import com.example.core.database.DatabaseContract
+import androidx.room.Database
 import com.example.core.security.DatabasePassphraseProvider
 import com.example.data.local.db.AppDatabase
 import com.example.data.local.db.entity.TransactionDetectionEventEntity
@@ -80,6 +82,13 @@ class Phase2SecurityAuditTest {
   @After
   fun tearDown() {
     database.close()
+  }
+
+  @Test
+  fun `database schema contract stays aligned with the Room database version`() {
+    val roomVersion = AppDatabase::class.java.getAnnotation(Database::class.java).version
+    assertEquals(roomVersion, DatabaseContract.SCHEMA_VERSION_TARGET)
+    assertEquals(11, roomVersion)
   }
 
   @Test

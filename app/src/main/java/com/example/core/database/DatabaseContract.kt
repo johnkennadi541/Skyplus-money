@@ -6,7 +6,7 @@ package com.example.core.database
  */
 object DatabaseContract {
   const val DATABASE_NAME: String = "skyplus_money_encrypted.db"
-  const val SCHEMA_VERSION_TARGET: Int = 2
+  const val SCHEMA_VERSION_TARGET: Int = 11
   const val ENCRYPTION_ENGINE: String = "Room + SQLCipher (Android Keystore Passphrase)"
-  const val STATUS: String = "Phase 2 Active — SQLCipher Encrypted Room Database"
+  const val STATUS: String = "Phase 6 Active — SQLCipher Encrypted Room Database"
 }

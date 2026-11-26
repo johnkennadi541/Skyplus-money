@@ -12,7 +12,7 @@
 - **UID Isolation:** Consent records, financial accounts, financial transactions, detection events, and account mapping rules are strictly keyed and queried by Firebase `userId` (`uid`).
 
 ## 3. Local Financial Database Encryption (Phase 2)
-- **Room + SQLCipher:** `AppDatabase` (version 2) is configured in `DatabaseModule` with `net.sqlcipher.database.SupportFactory` and `SQLiteDatabase.loadLibs(context)`.
+- **Room + SQLCipher:** `AppDatabase` (version 11) is configured in `DatabaseModule` with `net.sqlcipher.database.SupportFactory` and `SQLiteDatabase.loadLibs(context)`.
 - **Android Keystore Passphrase:** `DatabasePassphraseProvider` generates a cryptographically random 256-bit (32-byte) database passphrase wrapped with an AES-256-GCM master key stored in `AndroidKeyStore`.
 - **Backup Restriction:** `android:allowBackup="false"` is enforced in `AndroidManifest.xml`.
 - **Non-Destructive Migrations:** `DatabaseMigrations.MIGRATION_1_2` preserves all existing financial records; destructive fallbacks (`fallbackToDestructiveMigration`) are prohibited.
