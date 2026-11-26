@@ -15,7 +15,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - name: Resolve every resolvable configuration and record SHA-256
+      - name: Resolve public dependency configurations and record SHA-256
         shell: bash
         run: |
           set -euo pipefail
@@ -24,7 +24,7 @@ jobs:
             gradle.rootProject.tasks.register("resolveAllForVerification") {
               doLast {
                 gradle.rootProject.allprojects.each { p ->
-                  p.configurations.findAll { it.canBeResolved }.each { cfg ->
+                  p.configurations.findAll { it.canBeResolved && !it.name.startsWith("_") }.each { cfg ->
                     println("Resolving ${p.path}:${cfg.name}")
                     cfg.incoming.artifactView { lenient(false) }.artifacts.artifactFiles.files
                   }
