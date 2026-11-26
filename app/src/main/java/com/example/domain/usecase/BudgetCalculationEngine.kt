@@ -25,6 +25,8 @@ class BudgetCalculationEngine @Inject constructor() {
     transactions: List<FinancialTransaction>,
     nowMillis: Long = System.currentTimeMillis(),
   ): BudgetStatus {
+    // Every aggregate and difference uses checked Long arithmetic. Overflow must fail closed
+    // rather than wrap and present a plausible but incorrect financial amount.
     var totalExpensesMinor = 0L
     var totalRefundsMinor = 0L
     var matchingTxnCount = 0
@@ -38,11 +40,11 @@ class BudgetCalculationEngine @Inject constructor() {
 
       when (txn.type) {
         TransactionType.EXPENSE -> {
-          totalExpensesMinor += txn.amountMinor
+          totalExpensesMinor = Math.addExact(totalExpensesMinor, txn.amountMinor)
           matchingTxnCount++
         }
         TransactionType.REFUND, TransactionType.REVERSAL -> {
-          totalRefundsMinor += txn.amountMinor
+          totalRefundsMinor = Math.addExact(totalRefundsMinor, txn.amountMinor)
           matchingTxnCount++
         }
         TransactionType.INCOME,
@@ -54,9 +56,9 @@ class BudgetCalculationEngine @Inject constructor() {
       }
     }
 
-    val netSpentMinor = max(0L, totalExpensesMinor - totalRefundsMinor)
-    val remainingMinor = budget.amountMinor - netSpentMinor
-    val overspendingMinor = max(0L, netSpentMinor - budget.amountMinor)
+    val netSpentMinor = max(0L, Math.subtractExact(totalExpensesMinor, totalRefundsMinor))
+    val remainingMinor = Math.subtractExact(budget.amountMinor, netSpentMinor)
+    val overspendingMinor = max(0L, Math.subtractExact(netSpentMinor, budget.amountMinor))
 
     // Display percentage only. It is rounded, so it must never decide an alert band.
     val percentageExact =
@@ -81,9 +83,9 @@ class BudgetCalculationEngine @Inject constructor() {
       when {
         isStale -> BudgetAlertStatus.PERIOD_ENDED
         budget.amountMinor <= 0L -> BudgetAlertStatus.NORMAL
-        spentScaled >= allocated.multiply(HUNDRED) -> BudgetAlertStatus.EXCEEDED_100
-        spentScaled >= allocated.multiply(NINETY) -> BudgetAlertStatus.WARNING_90
-        spentScaled >= allocated.multiply(SEVENTY_FIVE) -> BudgetAlertStatus.APPROACHING_75
+        spentScaled > allocated.multiply(HUNDRED) -> BudgetAlertStatus.EXCEEDED_100
+        spentScaled >= allocated.multiply(BigDecimal.valueOf(budget.warningThresholdPercent.coerceIn(1, 100).toLong())) ->
+          BudgetAlertStatus.THRESHOLD_REACHED
         else -> BudgetAlertStatus.NORMAL
       }
 
@@ -103,8 +105,6 @@ class BudgetCalculationEngine @Inject constructor() {
 
   private companion object {
     val HUNDRED: BigDecimal = BigDecimal.valueOf(100)
-    val NINETY: BigDecimal = BigDecimal.valueOf(90)
-    val SEVENTY_FIVE: BigDecimal = BigDecimal.valueOf(75)
   }
 
   /**
@@ -119,9 +119,9 @@ class BudgetCalculationEngine @Inject constructor() {
     return activeStatuses
       .groupBy { it.budget.currencyCode }
       .mapValues { (currency, statuses) ->
-        val totalAllocated = statuses.sumOf { it.budget.amountMinor }
-        val totalSpent = statuses.sumOf { it.spentMoney.minorUnits }
-        val totalRemaining = totalAllocated - totalSpent
+        val totalAllocated = statuses.fold(0L) { total, status -> Math.addExact(total, status.budget.amountMinor) }
+        val totalSpent = statuses.fold(0L) { total, status -> Math.addExact(total, status.spentMoney.minorUnits) }
+        val totalRemaining = Math.subtractExact(totalAllocated, totalSpent)
         val avgUtilization =
           if (totalAllocated > 0L) {
             BigDecimal.valueOf(totalSpent)

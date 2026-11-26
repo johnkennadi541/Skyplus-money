@@ -407,6 +407,60 @@ class ReportsCalculationEngineTest {
   }
 
   @Test
+  fun `refunds are not attributed to categories without an original expense link`() {
+    val window =
+      ReportDateWindow(
+        periodType = ReportPeriodType.CUSTOM,
+        startDateMillis = startMillis,
+        endDateMillis = endMillis,
+        label = "Refund category test",
+      )
+    fun transaction(
+      id: String,
+      type: TransactionType,
+      amount: Long,
+      category: String,
+    ) = FinancialTransaction(
+      id = id,
+      userId = uid,
+      accountId = "acc_test",
+      type = type,
+      amountMinor = amount,
+      currencyCode = "INR",
+      category = category,
+      transactionDate = midMillis,
+      status = TransactionStatus.COMPLETED,
+    )
+
+    val report =
+      engine.computeIncomeExpenseReport(
+        currencyCode = "INR",
+        window = window,
+        transactions =
+          listOf(
+            transaction("expense_food", TransactionType.EXPENSE, 1_000L, "Food"),
+            transaction("expense_travel", TransactionType.EXPENSE, 500L, "Travel"),
+            // Even a matching category is not proof that this refund belongs to that expense.
+            transaction("refund_travel", TransactionType.REFUND, 100L, "Travel"),
+            transaction("refund_other", TransactionType.REFUND, 50L, "Other"),
+          ),
+      )
+
+    assertEquals(1_500L, report.grossExpensesMinor)
+    assertEquals(150L, report.totalRefundsAndReversalsMinor)
+    assertEquals(1_350L, report.netExpensesMinor)
+    assertEquals(2, report.completedRefundCount)
+
+    val categories = report.expenseByCategory.associateBy { it.category }
+    assertEquals(setOf("Food", "Travel"), categories.keys)
+    assertEquals(1_000L, categories.getValue("Food").totalMinor)
+    assertEquals(500L, categories.getValue("Travel").totalMinor)
+    assertEquals(0L, categories.getValue("Travel").refundOffsetMinor)
+    assertEquals(1_500L, report.expenseByCategory.sumOf { it.totalMinor })
+    assertEquals(500L, categories.getValue("Travel").grossMinor)
+  }
+
+  @Test
   fun `buildDateWindow generates accurate boundaries for all report periods`() {
     val now = 1_751_500_000_000L
     ReportPeriodType.entries.forEach { period ->
@@ -415,4 +469,121 @@ class ReportsCalculationEngineTest {
       assertTrue("Label must be non-blank for $period", w.label.isNotBlank())
     }
   }
+  @Test
+  fun `investment report separates current holdings snapshot from selected period activity`() {
+    val historicalWindow =
+      ReportDateWindow(
+        periodType = ReportPeriodType.CUSTOM,
+        startDateMillis = outsideMillis,
+        endDateMillis = midMillis,
+        label = "Historical period",
+      )
+    val currentHolding =
+      InvestmentHolding(
+        id = "inv_current",
+        userId = uid,
+        name = "Current Index Fund",
+        category = InvestmentCategory.MUTUAL_FUNDS,
+        currencyCode = "INR",
+        purchaseDate = outsideMillis,
+        quantityDecimal = "100",
+        totalInvestedMinor = 150_000L,
+        totalBuyCostMinor = 150_000L,
+        currentMarketPriceDecimal = "2500",
+        currentValuationMinor = 250_000L,
+        lastPriceUpdateDate = endMillis,
+        realizedPnlMinor = 10_000L,
+      )
+    val transactions =
+      listOf(
+        InvestmentTransaction(
+          id = "buy_in_period",
+          holdingId = currentHolding.id,
+          userId = uid,
+          type = InvestmentTransactionType.BUY,
+          transactionDate = midMillis,
+          quantityDecimal = "2",
+          unitPriceDecimal = "250",
+          grossAmountMinor = 5_000L,
+          chargesMinor = 0L,
+          netAmountMinor = 5_000L,
+        ),
+        InvestmentTransaction(
+          id = "buy_after_period",
+          holdingId = currentHolding.id,
+          userId = uid,
+          type = InvestmentTransactionType.BUY,
+          transactionDate = endMillis,
+          quantityDecimal = "4",
+          unitPriceDecimal = "250",
+          grossAmountMinor = 10_000L,
+          chargesMinor = 0L,
+          netAmountMinor = 10_000L,
+        ),
+      )
+    val history =
+      listOf(
+        InvestmentPriceHistory(
+          id = "history_old",
+          holdingId = currentHolding.id,
+          userId = uid,
+          priceDate = outsideMillis,
+          unitPriceDecimal = "1500",
+          valuationMinor = 150_000L,
+          totalInvestedMinor = 150_000L,
+          realizedPnlMinor = 0L,
+          currencyCode = "INR",
+          source = PriceSourceType.MANUAL,
+          providerLabel = "Manual",
+        ),
+        InvestmentPriceHistory(
+          id = "history_in_period",
+          holdingId = currentHolding.id,
+          userId = uid,
+          priceDate = midMillis,
+          unitPriceDecimal = "1800",
+          valuationMinor = 180_000L,
+          totalInvestedMinor = 150_000L,
+          realizedPnlMinor = 5_000L,
+          currencyCode = "INR",
+          source = PriceSourceType.MANUAL,
+          providerLabel = "Manual",
+        ),
+        InvestmentPriceHistory(
+          id = "history_after_period",
+          holdingId = currentHolding.id,
+          userId = uid,
+          priceDate = endMillis,
+          unitPriceDecimal = "2500",
+          valuationMinor = 250_000L,
+          totalInvestedMinor = 150_000L,
+          realizedPnlMinor = 10_000L,
+          currencyCode = "INR",
+          source = PriceSourceType.MANUAL,
+          providerLabel = "Manual",
+        ),
+      )
+
+    val report =
+      engine.computeInvestmentReport(
+        currencyCode = "INR",
+        window = historicalWindow,
+        holdings = listOf(currentHolding),
+        investmentTransactions = transactions,
+        priceHistory = history,
+        nowMillis = endMillis,
+      )
+
+    // Portfolio values stay current; activity totals are limited to the selected window.
+    assertEquals(250_000L, report.portfolioSummary.totalValuationMinor)
+    assertEquals(250_000L, report.holdingRows.single().valuationMinor)
+    assertEquals(endMillis, report.portfolioSummary.lastMarketUpdateMillis)
+    assertEquals(5_000L, report.periodBuyTotalMinor)
+    assertEquals(0L, report.periodSellTotalMinor)
+
+    // The historical growth timeline must not include a price-history point after the window.
+    assertEquals(2, report.portfolioSummary.growthPoints.size)
+    assertEquals(midMillis, report.portfolioSummary.growthPoints.last().timestampMillis)
+  }
+
 }

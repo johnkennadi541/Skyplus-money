@@ -234,6 +234,14 @@ fun IncomeExpenseReportSection(
       currencyCode = currency,
     )
 
+    if (report.completedRefundCount > 0) {
+      Text(
+        text = "Refunds & reversals are included in Net Expenses, but are not assigned to expense categories because the original expense is not linked.",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+
     if (report.incomeByCategory.isNotEmpty()) {
       CategoryBreakdownChartCard(
         title = "Income Sources Breakdown ($currency)",
@@ -315,7 +323,7 @@ fun BudgetReportSection(
         val tone =
           when (row.alertStatus) {
             BudgetAlertStatus.EXCEEDED_100 -> BadgeTone.NEGATIVE
-            BudgetAlertStatus.WARNING_90, BudgetAlertStatus.APPROACHING_75 -> BadgeTone.WARNING
+            BudgetAlertStatus.THRESHOLD_REACHED, BudgetAlertStatus.WARNING_90, BudgetAlertStatus.APPROACHING_75 -> BadgeTone.WARNING
             BudgetAlertStatus.NORMAL -> BadgeTone.POSITIVE
             BudgetAlertStatus.PERIOD_ENDED -> BadgeTone.INFO
           }
@@ -433,6 +441,9 @@ fun InvestmentsReportSection(
   }
 
   val summary = report.portfolioSummary
+  val latestPriceDate = summary.lastMarketUpdateMillis?.let {
+    SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(it))
+  } ?: "date unavailable"
   Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(OceanSpacing.sm)) {
     OceanCard(modifier = Modifier.testTag("reports_investments_summary_card")) {
       Row(
@@ -441,26 +452,37 @@ fun InvestmentsReportSection(
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Text(
-          text = "Investment Report ($currencyCode)",
+          text = "Current Investment Snapshot ($currencyCode)",
           style = MaterialTheme.typography.titleMedium,
           fontWeight = FontWeight.Bold,
         )
         OceanStatusBadge(text = "India Only", tone = BadgeTone.INFO)
       }
       Spacer(modifier = Modifier.height(OceanSpacing.xs))
+      Text(
+        text = "Current holding values and unrealized P/L use the latest saved prices, not the selected report period. Period purchases and sales use the selected date range; the growth chart uses recorded price history through the selected end date.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      Text(
+        text = "Latest holding price update: $latestPriceDate",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      Spacer(modifier = Modifier.height(OceanSpacing.xs))
       ReportMetricRow("Invested Cost Basis", fmtMoney(summary.totalInvestedMinor, currencyCode))
-      ReportMetricRow("Latest Recorded Valuation", fmtMoney(summary.totalValuationMinor, currencyCode), MaterialTheme.colorScheme.secondary, isBold = true)
+      ReportMetricRow("Current Portfolio Valuation", fmtMoney(summary.totalValuationMinor, currencyCode), MaterialTheme.colorScheme.secondary, isBold = true)
       ReportMetricRow(
-        label = "Unrealized Profit / Loss",
+        label = "Current Unrealized Profit / Loss",
         value = fmtMoney(summary.unrealizedPnlMinor, currencyCode),
         valueColor = if (summary.unrealizedPnlMinor >= 0L) extended.positive else extended.negative,
       )
       ReportMetricRow(
-        label = "Realized Profit / Loss",
+        label = "All-Time Realized Profit / Loss",
         value = fmtMoney(summary.realizedPnlMinor, currencyCode),
         valueColor = if (summary.realizedPnlMinor >= 0L) extended.positive else extended.negative,
       )
-      ReportMetricRow("Period Purchases / Sales", "${fmtMoney(report.periodBuyTotalMinor, currencyCode)} / ${fmtMoney(report.periodSellTotalMinor, currencyCode)}")
+      ReportMetricRow("Selected-Period Purchases / Sales", "${fmtMoney(report.periodBuyTotalMinor, currencyCode)} / ${fmtMoney(report.periodSellTotalMinor, currencyCode)}")
     }
 
     AssetAllocationDonutChart(

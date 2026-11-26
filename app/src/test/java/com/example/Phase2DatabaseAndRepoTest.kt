@@ -150,6 +150,111 @@ class Phase2DatabaseAndRepoTest {
   }
 
   @Test
+  fun `account currency change is rejected and preserves ledger history and balances`() = runTest {
+    val uid = "uid_account_currency_lock"
+    val original = FinancialAccount(
+      id = "currency_locked_account",
+      userId = uid,
+      name = "Primary Account",
+      type = AccountType.BANK,
+      currencyCode = "INR",
+      initialBalanceMinor = 500_000L,
+      currentBalanceMinor = 500_000L,
+    )
+    accountRepo.createAccount(uid, original).getOrThrow()
+    txnRepo.recordExpense(
+      uid,
+      FinancialTransaction(
+        id = "currency_locked_expense",
+        userId = uid,
+        accountId = original.id,
+        type = TransactionType.EXPENSE,
+        amountMinor = 25_000L,
+        currencyCode = "INR",
+        category = "Food",
+      ),
+    ).getOrThrow()
+
+    val before = accountRepo.getAccountById(uid, original.id)!!
+    val transactionsBefore = txnRepo.getTransactions(uid).first()
+    val result = accountRepo.updateAccount(
+      uid,
+      before.copy(
+        currencyCode = "USD",
+        initialBalanceMinor = 50_000L,
+        currentBalanceMinor = 47_500L,
+      ),
+    )
+
+    assertTrue("An existing account currency must not be reinterpreted", result.isFailure)
+    val after = accountRepo.getAccountById(uid, original.id)!!
+    assertEquals("INR", after.currencyCode)
+    assertEquals(before.initialBalanceMinor, after.initialBalanceMinor)
+    assertEquals(before.currentBalanceMinor, after.currentBalanceMinor)
+    assertEquals(transactionsBefore, txnRepo.getTransactions(uid).first())
+  }
+
+  @Test
+  fun `account update cannot cross UID boundaries even when ownership is spoofed`() = runTest {
+    val ownerUid = "uid_account_owner"
+    val attackerUid = "uid_account_attacker"
+    val original = FinancialAccount(
+      id = "uid_scoped_account",
+      userId = ownerUid,
+      name = "Owner Savings",
+      type = AccountType.BANK,
+      currencyCode = "INR",
+      initialBalanceMinor = 250_000L,
+      currentBalanceMinor = 250_000L,
+    )
+    accountRepo.createAccount(ownerUid, original).getOrThrow()
+
+    // Simulate a caller trying to relabel another user's account as their own.
+    val attemptedUpdate = accountRepo.updateAccount(
+      attackerUid,
+      original.copy(
+        userId = attackerUid,
+        name = "Tampered Account",
+        currencyCode = "USD",
+        initialBalanceMinor = 1L,
+        currentBalanceMinor = 1L,
+      ),
+    )
+
+    assertTrue("A different UID must not update or relabel the account", attemptedUpdate.isFailure)
+    val preserved = accountRepo.getAccountById(ownerUid, original.id)!!
+    assertEquals(ownerUid, preserved.userId)
+    assertEquals("Owner Savings", preserved.name)
+    assertEquals("INR", preserved.currencyCode)
+    assertEquals(250_000L, preserved.initialBalanceMinor)
+    assertEquals(250_000L, preserved.currentBalanceMinor)
+    assertEquals(null, accountRepo.getAccountById(attackerUid, original.id))
+  }
+
+  @Test
+  fun `account currency is immutable even before the first transaction`() = runTest {
+    val uid = "uid_account_currency_empty"
+    val account = FinancialAccount(
+      id = "empty_currency_locked_account",
+      userId = uid,
+      name = "Empty Account",
+      type = AccountType.BANK,
+      currencyCode = "KWD",
+      initialBalanceMinor = 12_345L,
+      currentBalanceMinor = 12_345L,
+    )
+    accountRepo.createAccount(uid, account).getOrThrow()
+
+    val result = accountRepo.updateAccount(uid, account.copy(currencyCode = "INR"))
+
+    assertTrue("Currency changes require a dedicated conversion workflow", result.isFailure)
+    val preserved = accountRepo.getAccountById(uid, account.id)!!
+    assertEquals("KWD", preserved.currencyCode)
+    assertEquals(12_345L, preserved.initialBalanceMinor)
+    assertEquals(12_345L, preserved.currentBalanceMinor)
+  }
+
+  @Test
   fun `income expense refund edit delete and pending failed status balance math are exact`() = runTest {
     val uid = "uid_math"
     accountRepo.createAccount(
@@ -229,6 +334,74 @@ class Phase2DatabaseAndRepoTest {
     // Delete income reverses +50.000 cleanly
     txnRepo.deleteTransaction(uid, inc.id).getOrThrow()
     assertEquals(80_000L, accountRepo.getAccountById(uid, "acc_kwd")!!.currentBalanceMinor)
+  }
+
+  @Test
+  fun `transfer edit is rejected without mutating either linked leg or balance`() = runTest {
+    val uid = "uid_transfer_edit_guard"
+    accountRepo.createAccount(
+      uid,
+      FinancialAccount(
+        id = "transfer_edit_source",
+        userId = uid,
+        name = "Source",
+        type = AccountType.BANK,
+        currencyCode = "INR",
+        initialBalanceMinor = 500_000L,
+        currentBalanceMinor = 500_000L,
+      ),
+    )
+    accountRepo.createAccount(
+      uid,
+      FinancialAccount(
+        id = "transfer_edit_destination",
+        userId = uid,
+        name = "Destination",
+        type = AccountType.WALLET,
+        currencyCode = "INR",
+        initialBalanceMinor = 100_000L,
+        currentBalanceMinor = 100_000L,
+      ),
+    )
+
+    val (sourceLeg, _) = txnRepo.recordTransfer(
+      authenticatedUserId = uid,
+      sourceTransaction = FinancialTransaction(
+        userId = uid,
+        accountId = "transfer_edit_source",
+        type = TransactionType.TRANSFER,
+        amountMinor = 100_000L,
+        currencyCode = "INR",
+        category = TransactionCategories.TRANSFER_OUT_CATEGORY,
+      ),
+      destinationAccountId = "transfer_edit_destination",
+    ).getOrThrow()
+
+    val attemptedEdit = txnRepo.updateTransaction(
+      authenticatedUserId = uid,
+      updatedTransaction = sourceLeg.copy(
+        type = TransactionType.EXPENSE,
+        category = "Shopping",
+        linkedTransferId = null,
+        transferDestinationAccountId = null,
+      ),
+      oldTransaction = sourceLeg,
+    )
+
+    assertTrue("A linked transfer must not be converted into an expense", attemptedEdit.isFailure)
+    assertEquals(400_000L, accountRepo.getAccountById(uid, "transfer_edit_source")!!.currentBalanceMinor)
+    assertEquals(200_000L, accountRepo.getAccountById(uid, "transfer_edit_destination")!!.currentBalanceMinor)
+
+    val rowsAfterRejectedEdit = txnRepo.getTransactions(uid).first()
+    assertEquals(2, rowsAfterRejectedEdit.size)
+    assertTrue(rowsAfterRejectedEdit.all { it.type == TransactionType.TRANSFER })
+    assertEquals(1, rowsAfterRejectedEdit.map { it.linkedTransferId }.distinct().size)
+
+    // Deleting the untouched source leg must still reverse both sides of the transfer.
+    txnRepo.deleteTransaction(uid, sourceLeg.id).getOrThrow()
+    assertEquals(500_000L, accountRepo.getAccountById(uid, "transfer_edit_source")!!.currentBalanceMinor)
+    assertEquals(100_000L, accountRepo.getAccountById(uid, "transfer_edit_destination")!!.currentBalanceMinor)
+    assertTrue(txnRepo.getTransactions(uid).first().isEmpty())
   }
 
   @Test
@@ -586,6 +759,8 @@ class Phase2DatabaseAndRepoTest {
           DatabaseMigrations.MIGRATION_6_7,
           DatabaseMigrations.MIGRATION_7_8,
           DatabaseMigrations.MIGRATION_8_9,
+          DatabaseMigrations.MIGRATION_9_10,
+          DatabaseMigrations.MIGRATION_10_11,
         )
         .build()
 

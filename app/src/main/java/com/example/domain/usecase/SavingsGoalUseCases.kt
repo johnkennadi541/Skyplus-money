@@ -62,11 +62,11 @@ constructor(private val repository: SavingsGoalRepository) {
 }
 
 @Singleton
-class DeleteSavingsGoalUseCase
+class SetSavingsGoalArchivedUseCase
 @Inject
 constructor(private val repository: SavingsGoalRepository) {
-  suspend operator fun invoke(userId: String, goalId: String): Result<Unit> =
-    repository.deleteGoal(userId, goalId)
+  suspend operator fun invoke(userId: String, goalId: String, archived: Boolean): Result<Unit> =
+    repository.setGoalArchived(userId, goalId, archived)
 }
 
 @Singleton
@@ -96,9 +96,9 @@ constructor(private val repository: SavingsGoalRepository) {
 }
 
 @Singleton
-class DeleteSavingsContributionUseCase
+class VoidSavingsContributionUseCase
 @Inject
 constructor(private val repository: SavingsGoalRepository) {
   suspend operator fun invoke(userId: String, contributionId: String): Result<Unit> =
-    repository.deleteContribution(userId, contributionId)
+    repository.voidContribution(userId, contributionId)
 }

@@ -1,5 +1,6 @@
 package com.example.data.local.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -26,6 +27,7 @@ data class CreditCardEntity(
   val paymentDueDayOffset: Int,
   val aprPercent: String,
   val isActive: Boolean,
+  @ColumnInfo(defaultValue = "0") val isArchived: Boolean = false,
   val createdAt: Long,
   val updatedAt: Long,
 ) {
@@ -43,6 +45,7 @@ data class CreditCardEntity(
       paymentDueDayOffset = paymentDueDayOffset,
       aprPercent = aprPercent,
       isActive = isActive,
+      isArchived = isArchived,
       createdAt = createdAt,
       updatedAt = updatedAt,
     )
@@ -62,6 +65,7 @@ data class CreditCardEntity(
         paymentDueDayOffset = domain.paymentDueDayOffset,
         aprPercent = domain.aprPercent,
         isActive = domain.isActive,
+        isArchived = domain.isArchived,
         createdAt = domain.createdAt,
         updatedAt = domain.updatedAt,
       )

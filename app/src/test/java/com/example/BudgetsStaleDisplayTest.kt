@@ -3,11 +3,15 @@ package com.example
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollToNode
 import com.example.core.designsystem.theme.SkyplusOceanTheme
 import com.example.domain.model.AccountType
 import com.example.domain.model.Budget
 import com.example.domain.model.BudgetAlertStatus
+import com.example.domain.model.BudgetPeriod
 import com.example.domain.model.BudgetPeriodType
 import com.example.domain.model.BudgetStatus
 import com.example.domain.model.BudgetSummary
@@ -74,17 +78,65 @@ class BudgetsStaleDisplayTest {
   private fun render(
     status: BudgetStatus,
     summaries: Map<String, BudgetSummary> = emptyMap(),
+    periods: List<BudgetPeriod> = emptyList(),
   ) {
+    val visibleCurrency = periods.firstOrNull()?.currencyCode ?: account.currencyCode
     composeTestRule.setContent {
       SkyplusOceanTheme(themePreference = ThemePreference.DARK) {
         BudgetsContent(
           budgets = listOf(status),
           summaries = summaries,
-          accounts = listOf(account),
+          periods = periods,
+          accounts = listOf(account.copy(currencyCode = visibleCurrency)),
         )
       }
     }
     composeTestRule.waitForIdle()
+  }
+
+  private fun historyPeriod(currencyCode: String, spentMinor: Long, allocatedMinor: Long) =
+    BudgetPeriod(
+      id = "history_$currencyCode",
+      userId = uid,
+      budgetId = "budget_history",
+      category = "Food & Dining",
+      currencyCode = currencyCode,
+      periodType = BudgetPeriodType.MONTHLY,
+      periodStart = 1_000L,
+      periodEnd = 2_000L,
+      allocatedMinor = allocatedMinor,
+      spentMinor = spentMinor,
+      remainingMinor = allocatedMinor - spentMinor,
+      alertStatus = BudgetAlertStatus.NORMAL,
+      closedAt = 3_000L,
+    )
+
+  private fun assertHistoryCurrencyPrecision(currencyCode: String, spentMinor: Long, allocatedMinor: Long) {
+    val currencyBudgetStatus =
+      status(stale = true).copy(
+        budget = budget().copy(currencyCode = currencyCode),
+      )
+    render(
+      currencyBudgetStatus,
+      periods = listOf(historyPeriod(currencyCode, spentMinor, allocatedMinor)),
+    )
+
+    val expectedSpent =
+      com.example.domain.usecase.FormatMoneyUseCase()
+        .format(Money.fromMinorUnits(spentMinor, currencyCode))
+    val expectedAllocated =
+      com.example.domain.usecase.FormatMoneyUseCase()
+        .format(Money.fromMinorUnits(allocatedMinor, currencyCode))
+    composeTestRule.onNodeWithTag("budgets_list")
+      .performScrollToNode(hasTestTag("budget_period_history_$currencyCode"))
+    composeTestRule
+      .onNodeWithText("Spent $expectedSpent of $expectedAllocated", substring = true)
+      .assertIsDisplayed()
+  }
+
+  @Test
+  fun `INR budget history displays two fraction digits`() {
+    assertHistoryCurrencyPrecision("INR", 1_234L, 2_000L)
   }
 
   @Test

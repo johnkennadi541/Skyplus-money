@@ -486,4 +486,30 @@ object DatabaseMigrations {
         )
       }
     }
+  /**
+   * Credit-card archive state. Additive only: existing card rows and all linked ledger data remain
+   * intact; existing cards default to visible/unarchived.
+   */
+  val MIGRATION_9_10: Migration =
+    object : Migration(9, 10) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE credit_cards ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+      }
+    }
+
+  /**
+   * GOAL-01 — preserve savings goal and contribution history.
+   *
+   * Additive only. Existing goals and contributions default to active/not voided;
+   * no financial or historical row is deleted or rewritten.
+   */
+  val MIGRATION_10_11: Migration =
+    object : Migration(10, 11) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE savings_goals ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE savings_contributions ADD COLUMN isVoided INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE savings_contributions ADD COLUMN voidedAt INTEGER DEFAULT NULL")
+      }
+    }
+
 }

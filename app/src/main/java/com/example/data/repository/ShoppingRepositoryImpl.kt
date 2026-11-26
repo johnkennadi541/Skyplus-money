@@ -344,6 +344,21 @@ class ShoppingRepositoryImpl @Inject constructor(
 
           val effectiveStore =
             storeNameOverride?.trim()?.takeIf { it.isNotEmpty() } ?: existing.storeName
+
+          // A retry of the same purchase request is a no-op. A changed request must
+          // explicitly move the item back to Remaining before purchase details can change.
+          if (existing.isPurchased) {
+            val isExactRetry =
+              existing.actualUnitPriceMinor == actualUnitMinor &&
+                existing.actualTotalMinor == actualTotalMinor &&
+                existing.purchasedAt == purchasedAt &&
+                existing.storeName == effectiveStore
+            check(isExactRetry) {
+              "Shopping item is already purchased. Move it back to Remaining before changing purchase details."
+            }
+            return@withTransaction existing
+          }
+
           val now = System.currentTimeMillis()
           val updated =
             existing.copy(

@@ -10,9 +10,9 @@ import com.example.domain.model.SavingsGoalSummary
 import com.example.domain.repository.AuthRepository
 import com.example.domain.usecase.AddSavingsContributionUseCase
 import com.example.domain.usecase.CreateSavingsGoalUseCase
-import com.example.domain.usecase.DeleteSavingsContributionUseCase
-import com.example.domain.usecase.DeleteSavingsGoalUseCase
 import com.example.domain.usecase.ObserveSavingsGoalsUseCase
+import com.example.domain.usecase.SetSavingsGoalArchivedUseCase
+import com.example.domain.usecase.VoidSavingsContributionUseCase
 import com.example.domain.usecase.UpdateSavingsGoalUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -38,9 +38,9 @@ constructor(
   observeSavingsGoalsUseCase: ObserveSavingsGoalsUseCase,
   private val createSavingsGoalUseCase: CreateSavingsGoalUseCase,
   private val updateSavingsGoalUseCase: UpdateSavingsGoalUseCase,
-  private val deleteSavingsGoalUseCase: DeleteSavingsGoalUseCase,
+  private val setSavingsGoalArchivedUseCase: SetSavingsGoalArchivedUseCase,
   private val addSavingsContributionUseCase: AddSavingsContributionUseCase,
-  private val deleteSavingsContributionUseCase: DeleteSavingsContributionUseCase,
+  private val voidSavingsContributionUseCase: VoidSavingsContributionUseCase,
 ) : ViewModel() {
 
   private val _userMessage = MutableStateFlow<String?>(null)
@@ -198,15 +198,15 @@ constructor(
     }
   }
 
-  fun deleteGoal(goalId: String, onSuccess: () -> Unit) {
+  fun setGoalArchived(goalId: String, archived: Boolean, onSuccess: () -> Unit) {
     val uid = activeUid ?: return
     viewModelScope.launch {
-      deleteSavingsGoalUseCase(uid, goalId)
+      setSavingsGoalArchivedUseCase(uid, goalId, archived)
         .onSuccess {
-          succeed("Goal and its contributions were removed")
+          succeed(if (archived) "Goal archived. Contribution history is preserved." else "Goal restored.")
           onSuccess()
         }
-        .onFailure { fail(it.message ?: "Could not remove the goal") }
+        .onFailure { fail(it.message ?: "Could not update the goal archive") }
     }
   }
 
@@ -240,15 +240,15 @@ constructor(
     }
   }
 
-  fun deleteContribution(contributionId: String, onSuccess: () -> Unit) {
+  fun voidContribution(contributionId: String, onSuccess: () -> Unit) {
     val uid = activeUid ?: return
     viewModelScope.launch {
-      deleteSavingsContributionUseCase(uid, contributionId)
+      voidSavingsContributionUseCase(uid, contributionId)
         .onSuccess {
-          succeed("Contribution removed")
+          succeed("Contribution voided. The original record remains in history.")
           onSuccess()
         }
-        .onFailure { fail(it.message ?: "Could not remove the contribution") }
+        .onFailure { fail(it.message ?: "Could not void the contribution") }
     }
   }
 

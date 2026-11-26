@@ -75,10 +75,7 @@ import com.example.domain.model.BudgetSummary
 import com.example.domain.model.FinancialAccount
 import com.example.domain.model.TransactionCategories
 import com.example.domain.usecase.FormatMoneyUseCase
-import java.math.BigDecimal
-import java.text.NumberFormat
 import java.text.SimpleDateFormat
-import java.util.Currency
 import java.util.Date
 import java.util.Locale
 
@@ -92,6 +89,7 @@ fun BudgetsScreen(
   val accounts by viewModel.accounts.collectAsStateWithLifecycle()
   val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
   val isErrorMessage by viewModel.isErrorMessage.collectAsStateWithLifecycle()
+  val isCalculationError by viewModel.isCalculationError.collectAsStateWithLifecycle()
   val selectedCurrency by viewModel.selectedCurrency.collectAsStateWithLifecycle()
   val budgetPeriods by viewModel.budgetPeriods.collectAsStateWithLifecycle()
 
@@ -102,9 +100,11 @@ fun BudgetsScreen(
     accounts = accounts,
     userMessage = userMessage,
     isErrorMessage = isErrorMessage,
+    isCalculationError = isCalculationError,
     selectedCurrency = selectedCurrency,
     onSelectCurrency = { viewModel.selectCurrency(it) },
     onDismissMessage = { viewModel.dismissMessage() },
+    onRetryCalculation = { viewModel.retryBudgetCalculation() },
     onCreateBudget = { name, category, amountDecimal, currency, periodType, customStart, customEnd, threshold, onSuccess ->
       viewModel.createBudget(name, category, amountDecimal, currency, periodType, customStart, customEnd, threshold, onSuccess)
     },
@@ -126,9 +126,11 @@ fun BudgetsContent(
   accounts: List<FinancialAccount>,
   userMessage: String? = null,
   isErrorMessage: Boolean = false,
+  isCalculationError: Boolean = false,
   selectedCurrency: String? = null,
   onSelectCurrency: (String?) -> Unit = {},
   onDismissMessage: () -> Unit = {},
+  onRetryCalculation: () -> Unit = {},
   onCreateBudget: (String, String, String, String, BudgetPeriodType, Long?, Long?, Int, () -> Unit) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
   onUpdateBudget: (Budget, () -> Unit) -> Unit = { _, _ -> },
   onDeleteBudget: (String, () -> Unit) -> Unit = { _, _ -> },
@@ -165,7 +167,7 @@ fun BudgetsContent(
         .testTag("budgets_screen"),
   ) {
     LazyColumn(
-      modifier = Modifier.fillMaxSize().widthIn(max = 760.dp),
+      modifier = Modifier.fillMaxSize().widthIn(max = 760.dp).testTag("budgets_list"),
       verticalArrangement = Arrangement.spacedBy(OceanSpacing.md),
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -218,8 +220,17 @@ fun BudgetsContent(
                   color = if (isErrorMessage) OceanTheme.colors.negative else MaterialTheme.colorScheme.onPrimaryContainer,
                 )
               }
-              TextButton(onClick = onDismissMessage) {
-                Text("Dismiss")
+              if (isCalculationError) {
+                TextButton(
+                  onClick = onRetryCalculation,
+                  modifier = Modifier.testTag("retry_budget_calculation_button"),
+                ) {
+                  Text("Retry")
+                }
+              } else {
+                TextButton(onClick = onDismissMessage) {
+                  Text("Dismiss")
+                }
               }
             }
           }
@@ -507,6 +518,7 @@ private fun BudgetCard(
   val (tone, statusLabel) =
     when (status.alertStatus) {
       BudgetAlertStatus.NORMAL -> BadgeTone.POSITIVE to "On Track"
+      BudgetAlertStatus.THRESHOLD_REACHED -> BadgeTone.WARNING to "${budget.warningThresholdPercent}% Reached"
       BudgetAlertStatus.APPROACHING_75 -> BadgeTone.WARNING to "75% Reached"
       BudgetAlertStatus.WARNING_90 -> BadgeTone.WARNING to "90% Warning"
       BudgetAlertStatus.EXCEEDED_100 -> BadgeTone.NEGATIVE to "Overspent"
@@ -516,7 +528,7 @@ private fun BudgetCard(
   val progressColor =
     when (status.alertStatus) {
       BudgetAlertStatus.NORMAL -> OceanTheme.colors.positive
-      BudgetAlertStatus.APPROACHING_75, BudgetAlertStatus.WARNING_90 -> OceanTheme.colors.warning
+      BudgetAlertStatus.THRESHOLD_REACHED, BudgetAlertStatus.APPROACHING_75, BudgetAlertStatus.WARNING_90 -> OceanTheme.colors.warning
       BudgetAlertStatus.EXCEEDED_100 -> OceanTheme.colors.negative
       BudgetAlertStatus.PERIOD_ENDED -> MaterialTheme.colorScheme.outline
     }
@@ -822,17 +834,15 @@ private fun BudgetPeriodRow(period: com.example.domain.model.BudgetPeriod) {
   val dateFormat = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
   val range =
     "${dateFormat.format(Date(period.periodStart))} – ${dateFormat.format(Date(period.periodEnd))}"
-  val currency = remember(period.currencyCode) { Currency.getInstance(period.currencyCode) }
-  val numberFormat =
-    remember(currency) {
-      NumberFormat.getCurrencyInstance(Locale.getDefault()).apply {
-        this.currency = currency
-        minimumFractionDigits = 2
-        maximumFractionDigits = 2
-      }
-    }
-  val spentText = numberFormat.format(BigDecimal.valueOf(period.spentMinor, 2))
-  val allocatedText = numberFormat.format(BigDecimal.valueOf(period.allocatedMinor, 2))
+  // Format archived amounts with the same ISO 4217 precision rules used by live money values.
+  val spentText =
+    FormatMoneyUseCase().format(
+      com.example.domain.model.Money.fromMinorUnits(period.spentMinor, period.currencyCode),
+    )
+  val allocatedText =
+    FormatMoneyUseCase().format(
+      com.example.domain.model.Money.fromMinorUnits(period.allocatedMinor, period.currencyCode),
+    )
 
   Surface(
     modifier = Modifier.fillMaxWidth().testTag("budget_period_${period.id}"),
