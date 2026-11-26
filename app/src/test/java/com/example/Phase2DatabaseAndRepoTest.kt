@@ -497,6 +497,7 @@ class Phase2DatabaseAndRepoTest {
     )
     accountRepo.createAccount(uid, source).getOrThrow()
     accountRepo.createAccount(uid, destination).getOrThrow()
+    val transactionsBeforeTransfer = txnRepo.getTransactions(uid).first().size
     val failedTransfer = txnRepo.recordTransfer(
       authenticatedUserId = uid,
       sourceTransaction = FinancialTransaction(
@@ -509,7 +510,7 @@ class Phase2DatabaseAndRepoTest {
     assertTrue(failedTransfer.isFailure)
     assertEquals(Long.MIN_VALUE, accountRepo.getAccountById(uid, source.id)!!.currentBalanceMinor)
     assertEquals(5_000L, accountRepo.getAccountById(uid, destination.id)!!.currentBalanceMinor)
-    assertTrue(txnRepo.getTransactions(uid).first().isEmpty())
+    assertEquals(transactionsBeforeTransfer, txnRepo.getTransactions(uid).first().size)
   }
 
   @Test
