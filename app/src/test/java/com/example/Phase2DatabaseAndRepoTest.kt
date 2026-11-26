@@ -583,6 +583,30 @@ class Phase2DatabaseAndRepoTest {
   }
 
   @Test
+  fun `general transaction path rejects standalone transfer entries`() = runTest {
+    val uid = "uid_general_transfer_guard"
+    val account = FinancialAccount(
+      id = "acc_general_transfer_guard", userId = uid, name = "Bank",
+      type = AccountType.BANK, currencyCode = "INR",
+      initialBalanceMinor = 100_000L, currentBalanceMinor = 100_000L,
+    )
+    accountRepo.createAccount(uid, account).getOrThrow()
+
+    val result = txnRepo.recordGeneralTransaction(
+      uid,
+      FinancialTransaction(
+        id = "standalone_transfer", userId = uid, accountId = account.id,
+        type = TransactionType.TRANSFER, amountMinor = 10_000L,
+        currencyCode = "INR", category = TransactionCategories.TRANSFER_OUT_CATEGORY,
+      ),
+    )
+
+    assertTrue(result.isFailure)
+    assertTrue(txnRepo.getTransactionById(uid, "standalone_transfer") == null)
+    assertEquals(100_000L, accountRepo.getAccountById(uid, account.id)!!.currentBalanceMinor)
+  }
+
+  @Test
   fun `smart detection cannot approve transfer as a single ledger entry`() = runTest {
     val uid = "uid_detect_transfer_guard"
     accountRepo.createAccount(
