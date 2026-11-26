@@ -1,0 +1,31 @@
+name: Verify Guava parent checksum from independent Maven endpoints
+on:
+  push:
+    branches:
+      - security/verify-guava-parent-3348
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download and compare exact POM bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact="guava-parent-33.4.8-jre.pom"
+          path="com/google/guava/guava-parent/33.4.8-jre/${artifact}"
+          mkdir -p evidence
+          curl --fail --silent --show-error --location "https://repo.maven.apache.org/maven2/${path}" -o "evidence/central.pom"
+          curl --fail --silent --show-error --location "https://repo1.maven.org/maven2/${path}" -o "evidence/repo1.pom"
+          cmp "evidence/central.pom" "evidence/repo1.pom"
+          sha256sum "evidence/central.pom" "evidence/repo1.pom" | tee evidence/SHA256SUMS.txt
+          expected="a03c5199a1be14443df7fd40ba8673b1c6aae04deef6688ce7d573ea489e3a20"
+          actual="$(sha256sum evidence/central.pom | cut -d ' ' -f 1)"
+          test "$actual" = "$expected"
+          printf 'Exact-byte match: PASS\nExpected candidate checksum: %s\n' "$expected" | tee evidence/RESULT.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: guava-parent-33.4.8-verification-evidence
+          path: evidence/
+          retention-days: 7
