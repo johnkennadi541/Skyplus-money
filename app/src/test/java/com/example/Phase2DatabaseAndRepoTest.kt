@@ -426,6 +426,191 @@ class Phase2DatabaseAndRepoTest {
   }
 
   @Test
+  fun `balance overflow and underflow fail without changing financial data`() = runTest {
+    val uid = "uid_balance_overflow_guard"
+    val maxAccount = FinancialAccount(
+      id = "overflow_max", userId = uid, name = "Max", type = AccountType.BANK,
+      currencyCode = "INR", initialBalanceMinor = Long.MAX_VALUE,
+      currentBalanceMinor = Long.MAX_VALUE,
+    )
+    accountRepo.createAccount(uid, maxAccount).getOrThrow()
+
+    assertTrue(accountRepo.adjustAccountBalance(uid, maxAccount.id, 1L).isFailure)
+    assertEquals(Long.MAX_VALUE, accountRepo.getAccountById(uid, maxAccount.id)!!.currentBalanceMinor)
+
+    val minAccount = FinancialAccount(
+      id = "overflow_min", userId = uid, name = "Min", type = AccountType.WALLET,
+      currencyCode = "INR", initialBalanceMinor = Long.MIN_VALUE,
+      currentBalanceMinor = Long.MIN_VALUE,
+    )
+    accountRepo.createAccount(uid, minAccount).getOrThrow()
+    assertTrue(accountRepo.adjustAccountBalance(uid, minAccount.id, -1L).isFailure)
+    assertEquals(Long.MIN_VALUE, accountRepo.getAccountById(uid, minAccount.id)!!.currentBalanceMinor)
+
+    val overflowIncome = txnRepo.recordIncome(
+      uid,
+      FinancialTransaction(
+        id = "overflow_income", userId = uid, accountId = maxAccount.id,
+        type = TransactionType.INCOME, amountMinor = 1L,
+        currencyCode = "INR", category = "Other Income",
+      ),
+    )
+    assertTrue(overflowIncome.isFailure)
+    assertTrue(txnRepo.getTransactionById(uid, "overflow_income") == null)
+    assertEquals(Long.MAX_VALUE, accountRepo.getAccountById(uid, maxAccount.id)!!.currentBalanceMinor)
+
+    // A failed first leg must roll back both transfer rows and every balance mutation.
+    val source = FinancialAccount(
+      id = "transfer_underflow_source", userId = uid, name = "Source", type = AccountType.BANK,
+      currencyCode = "INR", initialBalanceMinor = Long.MIN_VALUE,
+      currentBalanceMinor = Long.MIN_VALUE,
+    )
+    val destination = FinancialAccount(
+      id = "transfer_underflow_destination", userId = uid, name = "Destination",
+      type = AccountType.WALLET, currencyCode = "INR",
+      initialBalanceMinor = 5_000L, currentBalanceMinor = 5_000L,
+    )
+    accountRepo.createAccount(uid, source).getOrThrow()
+    accountRepo.createAccount(uid, destination).getOrThrow()
+    val failedTransfer = txnRepo.recordTransfer(
+      authenticatedUserId = uid,
+      sourceTransaction = FinancialTransaction(
+        id = "overflow_transfer_source", userId = uid, accountId = source.id,
+        type = TransactionType.TRANSFER, amountMinor = 1L,
+        currencyCode = "INR", category = TransactionCategories.TRANSFER_OUT_CATEGORY,
+      ),
+      destinationAccountId = destination.id,
+    )
+    assertTrue(failedTransfer.isFailure)
+    assertEquals(Long.MIN_VALUE, accountRepo.getAccountById(uid, source.id)!!.currentBalanceMinor)
+    assertEquals(5_000L, accountRepo.getAccountById(uid, destination.id)!!.currentBalanceMinor)
+    assertTrue(txnRepo.getTransactions(uid).first().isEmpty())
+  }
+
+  @Test
+  fun `transaction edit reverses persisted row not stale caller snapshot`() = runTest {
+    val uid = "uid_transaction_snapshot_guard"
+    val primary = FinancialAccount(
+      id = "snapshot_primary", userId = uid, name = "Primary", type = AccountType.BANK,
+      currencyCode = "INR", initialBalanceMinor = 100_000L, currentBalanceMinor = 100_000L,
+    )
+    val secondary = FinancialAccount(
+      id = "snapshot_secondary", userId = uid, name = "Secondary", type = AccountType.WALLET,
+      currencyCode = "INR", initialBalanceMinor = 100_000L, currentBalanceMinor = 100_000L,
+    )
+    accountRepo.createAccount(uid, primary).getOrThrow()
+    accountRepo.createAccount(uid, secondary).getOrThrow()
+
+    val expense = txnRepo.recordExpense(
+      uid,
+      FinancialTransaction(
+        id = "snapshot_expense", userId = uid, accountId = primary.id,
+        type = TransactionType.EXPENSE, amountMinor = 10_000L,
+        currencyCode = "INR", category = "Food",
+      ),
+    ).getOrThrow()
+    assertEquals(90_000L, accountRepo.getAccountById(uid, primary.id)!!.currentBalanceMinor)
+
+    val forgedOldSnapshot = expense.copy(
+      accountId = secondary.id, type = TransactionType.INCOME, amountMinor = 90_000L,
+    )
+    txnRepo.updateTransaction(
+      authenticatedUserId = uid,
+      updatedTransaction = expense.copy(amountMinor = 15_000L),
+      oldTransaction = forgedOldSnapshot,
+    ).getOrThrow()
+
+    assertEquals(85_000L, accountRepo.getAccountById(uid, primary.id)!!.currentBalanceMinor)
+    assertEquals(100_000L, accountRepo.getAccountById(uid, secondary.id)!!.currentBalanceMinor)
+    val persisted = txnRepo.getTransactionById(uid, expense.id)!!
+    assertEquals(primary.id, persisted.accountId)
+    assertEquals(15_000L, persisted.amountMinor)
+  }
+
+  @Test
+  fun `stale account metadata edit preserves ledger and opening balances`() = runTest {
+    val uid = "uid_stale_account_edit_guard"
+    val account = FinancialAccount(
+      id = "stale_edit_account", userId = uid, name = "Original",
+      type = AccountType.BANK, currencyCode = "INR",
+      initialBalanceMinor = 100_000L, currentBalanceMinor = 100_000L,
+    )
+    accountRepo.createAccount(uid, account).getOrThrow()
+
+    val staleSnapshot = accountRepo.getAccountById(uid, account.id)!!
+    txnRepo.recordExpense(
+      uid,
+      FinancialTransaction(
+        id = "stale_edit_expense", userId = uid, accountId = account.id,
+        type = TransactionType.EXPENSE, amountMinor = 10_000L,
+        currencyCode = "INR", category = "Food",
+      ),
+    ).getOrThrow()
+    assertEquals(90_000L, accountRepo.getAccountById(uid, account.id)!!.currentBalanceMinor)
+
+    accountRepo.updateAccount(uid, staleSnapshot.copy(name = "Renamed")).getOrThrow()
+
+    val persisted = accountRepo.getAccountById(uid, account.id)!!
+    assertEquals("Renamed", persisted.name)
+    assertEquals(100_000L, persisted.initialBalanceMinor)
+    assertEquals(90_000L, persisted.currentBalanceMinor)
+    assertEquals(10_000L, txnRepo.getTransactionById(uid, "stale_edit_expense")!!.amountMinor)
+  }
+
+  @Test
+  fun `smart detection cannot approve transfer as a single ledger entry`() = runTest {
+    val uid = "uid_detect_transfer_guard"
+    accountRepo.createAccount(
+      uid,
+      FinancialAccount(
+        id = "acc_transfer_guard", userId = uid, name = "Bank 4321",
+        type = AccountType.BANK, currencyCode = "INR",
+        initialBalanceMinor = 500_000L, currentBalanceMinor = 500_000L,
+        accountNumberLast4 = "4321",
+      ),
+    )
+    detectionRepo.updateDetectionSettings(
+      uid,
+      DetectionSettings(
+        userId = uid,
+        isNotificationDetectionEnabled = true,
+        isAutoSaveHighConfidenceEnabled = true,
+      ),
+    )
+
+    val parsedTransfer = SmartTransactionParser.parse(
+      "Rs. 100.00 self transfer between accounts A/c XX4321",
+      "com.snapwork.hdfc",
+      1_700_000_000_000L,
+    )!!
+    assertEquals(TransactionType.TRANSFER, parsedTransfer.type)
+    val event = detectionRepo.processIncomingEvent(
+      userId = uid,
+      rawPackageName = "com.snapwork.hdfc",
+      senderOrTitle = "HDFC Bank",
+      parsed = parsedTransfer,
+    ).getOrThrow()
+    assertEquals(DetectionEventStatus.IN_REVIEW, event.status)
+
+    val beforeBalance = accountRepo.getAccountById(uid, "acc_transfer_guard")!!.currentBalanceMinor
+    val approval = detectionRepo.approveReviewEvent(
+      userId = uid,
+      eventId = event.id,
+      selectedAccountId = "acc_transfer_guard",
+      category = "Transfer",
+      merchant = null,
+      correctedType = TransactionType.TRANSFER,
+    )
+    assertTrue(approval.isFailure)
+    assertEquals(beforeBalance, accountRepo.getAccountById(uid, "acc_transfer_guard")!!.currentBalanceMinor)
+    assertTrue(txnRepo.getTransactions(uid).first().isEmpty())
+    assertEquals(
+      DetectionEventStatus.IN_REVIEW,
+      detectionRepo.getEventById(uid, event.id)?.status,
+    )
+  }
+
+  @Test
   fun `financial data and detection events are strictly isolated by UID`() = runTest {
     accountRepo.createAccount(
       "uid_alice",
