@@ -25,7 +25,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -66,6 +65,10 @@ class BudgetsViewModel @Inject constructor(
   private val _isErrorMessage = MutableStateFlow(false)
   val isErrorMessage: StateFlow<Boolean> = _isErrorMessage.asStateFlow()
 
+  private val _isCalculationError = MutableStateFlow(false)
+  val isCalculationError: StateFlow<Boolean> = _isCalculationError.asStateFlow()
+  private val budgetCalculationRetry = MutableStateFlow(0)
+
   private val _selectedCurrency = MutableStateFlow<String?>(null)
   val selectedCurrency: StateFlow<String?> = _selectedCurrency.asStateFlow()
 
@@ -76,6 +79,7 @@ class BudgetsViewModel @Inject constructor(
         .collect { session ->
           _userMessage.value = null
           _isErrorMessage.value = false
+          _isCalculationError.value = false
 
           // Roll due recurring budgets into the current month. Idempotent, and a failure here must
           // never block the screen: the stale-budget state still shows correctly without it.
@@ -106,17 +110,27 @@ class BudgetsViewModel @Inject constructor(
       .flatMapLatest { session ->
         val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
         if (uid != null) {
-          observeBudgetsWithStatusUseCase(uid)
+          observeBudgetsWithStatusUseCase(uid).retryOnSignal(
+            retrySignal = budgetCalculationRetry,
+            onSuccess = {
+              if (_isCalculationError.value) {
+                _isCalculationError.value = false
+                _isErrorMessage.value = false
+                _userMessage.value = null
+              }
+            },
+            onFailure = {
+              // Fail closed: never expose partial or misleading totals when exact arithmetic fails.
+              _isCalculationError.value = true
+              _isErrorMessage.value = true
+              _userMessage.value =
+                "Budget totals could not be calculated safely. Review the transaction amounts, then retry."
+              Pair(emptyList(), emptyMap())
+            },
+          )
         } else {
           flowOf(Pair(emptyList(), emptyMap()))
         }
-      }
-      .catch {
-        // Fail closed: never expose partial or misleading totals when exact arithmetic fails.
-        _isErrorMessage.value = true
-        _userMessage.value =
-          "Budget totals could not be calculated safely. Please review the transaction amounts and try again."
-        emit(Pair(emptyList(), emptyMap()))
       }
 
   val budgets: StateFlow<List<BudgetStatus>> =
@@ -155,6 +169,12 @@ class BudgetsViewModel @Inject constructor(
   fun dismissMessage() {
     _userMessage.value = null
     _isErrorMessage.value = false
+  }
+
+  fun retryBudgetCalculation() {
+    if (_isCalculationError.value) {
+      budgetCalculationRetry.value += 1
+    }
   }
 
   fun createBudget(
