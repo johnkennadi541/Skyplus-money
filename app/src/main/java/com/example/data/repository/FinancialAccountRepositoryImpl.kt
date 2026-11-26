@@ -171,9 +171,7 @@ class FinancialAccountRepositoryImpl @Inject constructor(
       runCatching {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(accountId.isNotBlank()) { "Account ID is required" }
-        check(accountDao.adjustBalance(userId, accountId, deltaMinor, System.currentTimeMillis()) == 1) {
-          "Account balance adjustment rejected: overflow or account not found."
-        }
+        accountDao.adjustBalance(userId, accountId, deltaMinor, System.currentTimeMillis())
       }
     }
 }

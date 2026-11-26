@@ -85,7 +85,7 @@ interface FinancialAccountDao {
       AND id = :accountId
       AND (
         (:deltaMinor > 0 AND currentBalanceMinor <= 9223372036854775807 - :deltaMinor)
-        OR (:deltaMinor < 0 AND currentBalanceMinor >= -9223372036854775808 - :deltaMinor)
+        OR (:deltaMinor < 0 AND currentBalanceMinor >= (-9223372036854775807 - 1) - :deltaMinor)
         OR :deltaMinor = 0
       )
     """
