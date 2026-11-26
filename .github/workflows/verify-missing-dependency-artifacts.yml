@@ -33,9 +33,9 @@ jobs:
             curl --fail --silent --show-error --location "https://repo.maven.apache.org/maven2/$path" -o "verified/${name}.central"
             curl --fail --silent --show-error --location "https://maven-central.storage-download.googleapis.com/maven2/$path" -o "verified/${name}.mirror"
             cmp "verified/${name}.central" "verified/${name}.mirror"
-            sha256sum "verified/${name}.central" | tee -a verified/SHA256SUMS
             mv "verified/${name}.central" "verified/$name"
             rm "verified/${name}.mirror"
+            sha256sum "verified/$name" | tee -a verified/SHA256SUMS
           done < verified/artifacts.txt
           sha256sum -c verified/SHA256SUMS
           echo "All five artifacts match byte-for-byte across both HTTPS sources."
