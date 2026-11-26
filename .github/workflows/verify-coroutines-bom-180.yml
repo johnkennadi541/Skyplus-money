@@ -1,0 +1,29 @@
+name: Verify kotlinx coroutines BOM artifact
+on:
+  push:
+    branches:
+      - security/verify-coroutines-bom-180
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download from Maven Central and Google mirror; compare and hash
+        shell: bash
+        run: |
+          set -euo pipefail
+          path="org/jetbrains/kotlinx/kotlinx-coroutines-bom/1.8.0/kotlinx-coroutines-bom-1.8.0.pom"
+          curl --fail --location --retry 3 --output artifact.central "https://repo.maven.apache.org/maven2/${path}"
+          curl --fail --location --retry 3 --output artifact.google "https://maven-central.storage-download.googleapis.com/maven2/${path}"
+          cmp artifact.central artifact.google
+          sha256sum artifact.central
+          sha256sum -c <(sha256sum artifact.central)
+          mkdir -p verified
+          cp artifact.central "verified/kotlinx-coroutines-bom-1.8.0.pom"
+          (cd verified && sha256sum kotlinx-coroutines-bom-1.8.0.pom > SHA256SUMS && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: coroutines-bom-1.8.0-verified
+          path: verified/
+          retention-days: 7
