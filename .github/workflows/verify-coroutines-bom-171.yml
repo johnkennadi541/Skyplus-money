@@ -1,0 +1,28 @@
+name: Verify coroutines BOM 1.7.1 checksum from independent Maven endpoints
+on:
+  push:
+    branches:
+      - security/verify-coroutines-bom-171
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download and compare exact POM bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact="kotlinx-coroutines-bom-1.7.1.pom"
+          path="org/jetbrains/kotlinx/kotlinx-coroutines-bom/1.7.1/${artifact}"
+          mkdir -p evidence
+          curl --fail --silent --show-error --location "https://repo.maven.apache.org/maven2/${path}" -o "evidence/central.pom"
+          curl --fail --silent --show-error --location "https://repo1.maven.org/maven2/${path}" -o "evidence/repo1.pom"
+          cmp "evidence/central.pom" "evidence/repo1.pom"
+          sha256sum "evidence/central.pom" "evidence/repo1.pom" | tee evidence/SHA256SUMS.txt
+          printf 'Exact-byte match: PASS\n' | tee evidence/RESULT.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: coroutines-bom-1.7.1-verification-evidence
+          path: evidence/
+          retention-days: 7
