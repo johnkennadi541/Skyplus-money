@@ -390,6 +390,9 @@ class SmartDetectionRepositoryImpl @Inject constructor(
                 .getOrDefault(TransactionType.EXPENSE)
           val finalType =
             if (parsedType == TransactionType.PENDING) TransactionType.EXPENSE else parsedType
+          require(finalType != TransactionType.TRANSFER) {
+            "Detected transfers must be recorded through the paired transfer workflow."
+          }
           val finalAmount = correctedAmountMinor ?: event.detectedAmountMinor
           val safeMerchant = sanitizeMerchant(merchant ?: event.detectedMerchant)
 
@@ -463,6 +466,9 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     }
 
   private suspend fun saveDetectedTransactionInCurrentTx(transaction: FinancialTransaction): Boolean {
+    require(transaction.type != TransactionType.TRANSFER) {
+      "Detected transfers must be recorded through the paired transfer workflow."
+    }
     val account = accountDao.getAccountById(transaction.userId, transaction.accountId) ?: return false
     if (!account.currencyCode.equals(transaction.currencyCode, ignoreCase = true)) return false
 
