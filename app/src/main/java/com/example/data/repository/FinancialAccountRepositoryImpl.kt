@@ -171,6 +171,9 @@ class FinancialAccountRepositoryImpl @Inject constructor(
       runCatching {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(accountId.isNotBlank()) { "Account ID is required" }
+        // Preserve the existing UID-isolation contract: a caller cannot learn whether
+        // another user's account exists, and cross-UID adjustments remain a no-op.
+        if (accountDao.getAccountById(userId, accountId) == null) return@runCatching
         val rowsUpdated = accountDao.adjustBalance(userId, accountId, deltaMinor, System.currentTimeMillis())
         check(rowsUpdated == 1) { "Account balance adjustment rejected for authenticated user or overflow" }
       }
