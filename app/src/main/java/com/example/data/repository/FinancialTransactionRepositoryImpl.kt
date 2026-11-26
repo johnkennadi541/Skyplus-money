@@ -153,6 +153,9 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
         require(transaction.userId == authenticatedUserId) {
           "Transaction ownership cannot be assigned across users"
         }
+        require(transaction.type != TransactionType.TRANSFER) {
+          "Transfers must be recorded through the paired transfer workflow."
+        }
         database.withTransaction {
           val account =
             accountDao.getAccountById(authenticatedUserId, transaction.accountId)
