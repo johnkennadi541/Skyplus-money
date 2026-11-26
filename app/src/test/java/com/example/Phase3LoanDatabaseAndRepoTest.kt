@@ -152,6 +152,62 @@ class Phase3LoanDatabaseAndRepoTest {
   }
 
   @Test
+  fun `loan financial terms are immutable after first payment but metadata remains editable`() = runTest {
+    val loan = buildLoan(userId = userA, principalMinor = 10_000_00L, rate = "12", tenureMonths = 12)
+    loanRepo.createLoan(userA, loan)
+    loanRepo.recordPayment(userA, loan.id, 1_701_000_000_000L, 888_49L).getOrThrow()
+
+    val afterPayment = loanRepo.getLoanById(userA, loan.id)!!
+    val historyBefore = loanRepo.getPaymentsForLoan(userA, loan.id).first()
+    assertEquals(1, historyBefore.size)
+
+    val invalidTermEdits = listOf(
+      afterPayment.copy(principalMinor = afterPayment.principalMinor + 100_00L),
+      afterPayment.copy(annualInterestRatePercent = "15"),
+      afterPayment.copy(tenureMonths = afterPayment.tenureMonths + 1),
+      afterPayment.copy(currencyCode = "INR"),
+      afterPayment.copy(startDate = afterPayment.startDate + 86_400_000L),
+      afterPayment.copy(nextDueDate = afterPayment.nextDueDate + 86_400_000L),
+      afterPayment.copy(loanType = LoanType.HOME),
+      afterPayment.copy(amountPaidMinor = afterPayment.amountPaidMinor + 1L),
+      afterPayment.copy(outstandingPrincipalMinor = afterPayment.outstandingPrincipalMinor - 1L),
+      afterPayment.copy(status = LoanStatus.COMPLETED),
+    )
+
+    invalidTermEdits.forEach { attemptedEdit ->
+      val result = loanRepo.updateLoan(userA, attemptedEdit)
+      assertTrue("Financial term edits must be rejected after a payment", result.isFailure)
+      assertEquals(afterPayment, loanRepo.getLoanById(userA, loan.id))
+      assertEquals(historyBefore, loanRepo.getPaymentsForLoan(userA, loan.id).first())
+    }
+
+    val metadataUpdate = loanRepo.updateLoan(
+      userA,
+      afterPayment.copy(
+        name = "Updated Car Loan",
+        lenderName = "Updated Lender",
+        notes = "Metadata only",
+      ),
+    )
+    assertTrue("Name, lender and notes remain editable", metadataUpdate.isSuccess)
+
+    val updated = loanRepo.getLoanById(userA, loan.id)!!
+    assertEquals("Updated Car Loan", updated.name)
+    assertEquals("Updated Lender", updated.lenderName)
+    assertEquals("Metadata only", updated.notes)
+    assertEquals(afterPayment.principalMinor, updated.principalMinor)
+    assertEquals(afterPayment.annualInterestRatePercent, updated.annualInterestRatePercent)
+    assertEquals(afterPayment.tenureMonths, updated.tenureMonths)
+    assertEquals(afterPayment.currencyCode, updated.currencyCode)
+    assertEquals(afterPayment.startDate, updated.startDate)
+    assertEquals(afterPayment.nextDueDate, updated.nextDueDate)
+    assertEquals(afterPayment.amountPaidMinor, updated.amountPaidMinor)
+    assertEquals(afterPayment.outstandingPrincipalMinor, updated.outstandingPrincipalMinor)
+    assertEquals("Payment-derived loan status must remain unchanged", afterPayment.status, updated.status)
+    assertEquals(historyBefore, loanRepo.getPaymentsForLoan(userA, loan.id).first())
+  }
+
+  @Test
   fun `duplicate payment prevention blocks same day identical payment or repeated idempotency key`() = runTest {
     val loan = buildLoan(userId = userA, principalMinor = 10_000_00L)
     loanRepo.createLoan(userA, loan)
