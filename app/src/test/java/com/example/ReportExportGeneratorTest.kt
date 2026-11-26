@@ -115,6 +115,44 @@ class ReportExportGeneratorTest {
   }
 
   @Test
+  fun `csv export neutralizes formulas preceded by whitespace or control characters`() {
+    val snapshot = calcEngine.calculateSnapshot(
+      window = ReportDateWindow(
+        periodType = ReportPeriodType.MONTHLY,
+        startDateMillis = 1_750_000_000_000L,
+        endDateMillis = 1_752_500_000_000L,
+        label = "July 2025",
+      ),
+      accounts = listOf(
+        FinancialAccount(
+          id = "csv_guard_account", userId = "csv_guard_uid", name = "Primary",
+          type = AccountType.BANK, currencyCode = "INR",
+          initialBalanceMinor = 100_000L, currentBalanceMinor = 100_000L,
+        ),
+      ),
+      transactions = listOf(
+        FinancialTransaction(
+          id = "csv_guard_txn", userId = "csv_guard_uid", accountId = "csv_guard_account",
+          type = TransactionType.EXPENSE, amountMinor = 1_000L, currencyCode = "INR",
+          category = "Food", merchantOrPayee = " \\t=HYPERLINK(\\\"https://example.invalid\\\")",
+          transactionDate = 1_751_200_000_000L, status = TransactionStatus.COMPLETED,
+        ),
+      ),
+      budgets = emptyList(),
+      loans = emptyList(),
+      loanPayments = emptyList(),
+      holdings = emptyList(),
+      investmentTransactions = emptyList(),
+      investmentPriceHistory = emptyList(),
+      shoppingLists = emptyList(),
+      shoppingItems = emptyList(),
+      nowMillis = 1_752_000_000_000L,
+    )
+    val csvText = String(exportGenerator.generateExport(snapshot, ReportExportFormat.CSV).bytes, StandardCharsets.UTF_8)
+    assertTrue(csvText.contains("' \\t=HYPERLINK"))
+  }
+
+  @Test
   fun `docx export creates valid OOXML zip package with document xml and no UIDs`() {
     val snapshot = buildSampleSnapshot()
     val docxExport = exportGenerator.generateExport(snapshot, ReportExportFormat.DOCX)
