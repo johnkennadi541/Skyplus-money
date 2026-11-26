@@ -91,6 +91,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     withContext(dispatchers.io) {
       runCatching {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
+        requirePositiveDetectedAmount(parsed.amountMinor)
         val settings = getDetectionSettings(userId).first()
         if (!settings.isNotificationDetectionEnabled) {
           throw IllegalStateException("Smart notification detection is disabled in settings")
@@ -395,6 +396,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
             "Detected transfers must be recorded through the paired transfer workflow."
           }
           val finalAmount = correctedAmountMinor ?: event.detectedAmountMinor
+          requirePositiveDetectedAmount(finalAmount)
           val safeMerchant = sanitizeMerchant(merchant ?: event.detectedMerchant)
 
           val targetAccount =
@@ -467,6 +469,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     }
 
   private suspend fun saveDetectedTransactionInCurrentTx(transaction: FinancialTransaction): Boolean {
+    requirePositiveDetectedAmount(transaction.amountMinor)
     require(transaction.type != TransactionType.TRANSFER) {
       "Detected transfers must be recorded through the paired transfer workflow."
     }

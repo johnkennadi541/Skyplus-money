@@ -159,6 +159,7 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
         require(transaction.userId == authenticatedUserId) {
           "Transaction ownership cannot be assigned across users"
         }
+        require(transaction.amountMinor > 0L) { "Transaction amount must be greater than zero" }
         require(transaction.type != TransactionType.TRANSFER) {
           "Transfers must be recorded through the paired transfer workflow."
         }
@@ -205,12 +206,18 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
         ) {
           "Transaction ownership cannot be transferred or modified across users"
         }
+        require(updatedTransaction.amountMinor > 0L) {
+          "Transaction amount must be greater than zero"
+        }
         database.withTransaction {
           val existing =
             transactionDao.getTransactionById(authenticatedUserId, updatedTransaction.id)
               ?: throw SecurityException("Transaction does not belong to authenticated user")
           require(existing.userId == authenticatedUserId) {
             "Transaction ownership verification failed"
+          }
+          require(existing.amountMinor > 0L) {
+            "Persisted transaction amount is invalid; refusing to alter account balances."
           }
           require(
             existing.type != TransactionType.TRANSFER.name &&
@@ -220,11 +227,17 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
           }
           // The persisted transaction is authoritative; never trust the caller's stale
           // snapshot for the original account, type, status, or amount.
-          requireNotNull(accountDao.getAccountById(authenticatedUserId, existing.accountId)) {
-            "Original account not found for authenticated user"
+          val originalAccount =
+            accountDao.getAccountById(authenticatedUserId, existing.accountId)
+              ?: throw IllegalArgumentException("Original account not found for authenticated user")
+          val destinationAccount =
+            accountDao.getAccountById(authenticatedUserId, updatedTransaction.accountId)
+              ?: throw IllegalArgumentException("Destination account not found for authenticated user")
+          require(existing.currencyCode.equals(originalAccount.currencyCode, ignoreCase = true)) {
+            "Persisted transaction currency does not match its original account currency; refusing to alter balances."
           }
-          requireNotNull(accountDao.getAccountById(authenticatedUserId, updatedTransaction.accountId)) {
-            "Destination account not found for authenticated user"
+          require(updatedTransaction.currencyCode.equals(destinationAccount.currencyCode, ignoreCase = true)) {
+            "Currency mismatch: transaction currency ${updatedTransaction.currencyCode} does not match destination account currency ${destinationAccount.currencyCode}"
           }
 
           val now = System.currentTimeMillis()
