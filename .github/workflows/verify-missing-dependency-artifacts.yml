@@ -8,6 +8,7 @@ on:
     branches:
       - fix/security-dependency-update-automation
 
+# Re-run after adding the IntelliJ coroutines BOM artifact.
 permissions:
   contents: read
 
