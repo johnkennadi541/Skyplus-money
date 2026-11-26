@@ -1,0 +1,45 @@
+name: Verify missing dependency artifacts
+
+on:
+  push:
+    branches:
+      - security/verify-missing-dependency-artifacts
+
+permissions:
+  contents: read
+
+jobs:
+  verify-artifacts:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download from Maven Central and independent Google mirror
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p verified
+          cat > verified/artifacts.txt <<'EOF'
+          com/google/guava/guava-parent/33.3.1-jre/guava-parent-33.3.1-jre.pom
+          org/junit/junit-bom/5.10.2/junit-bom-5.10.2.module
+          org/junit/junit-bom/5.11.0-M2/junit-bom-5.11.0-M2.module
+          org/jetbrains/kotlin/kotlin-gradle-plugins-bom/2.2.10/kotlin-gradle-plugins-bom-2.2.10.module
+          org/jetbrains/kotlin/kotlin-gradle-plugins-bom/2.2.10/kotlin-gradle-plugins-bom-2.2.10.pom
+          EOF
+          while IFS= read -r path; do
+            [ -n "$path" ] || continue
+            name="${path##*/}"
+            curl --fail --silent --show-error --location "https://repo.maven.apache.org/maven2/$path" -o "verified/${name}.central"
+            curl --fail --silent --show-error --location "https://maven-central.storage-download.googleapis.com/maven2/$path" -o "verified/${name}.mirror"
+            cmp "verified/${name}.central" "verified/${name}.mirror"
+            sha256sum "verified/${name}.central" | tee -a verified/SHA256SUMS
+            mv "verified/${name}.central" "verified/$name"
+            rm "verified/${name}.mirror"
+          done < verified/artifacts.txt
+          sha256sum -c verified/SHA256SUMS
+          echo "All five artifacts match byte-for-byte across both HTTPS sources."
+      - name: Upload verified artifacts and checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: missing-dependency-artifacts-verified
+          path: verified/
+          if-no-files-found: error
+          retention-days: 7
