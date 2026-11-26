@@ -66,6 +66,12 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
         require(sourceTransaction.userId == authenticatedUserId) {
           "Transaction ownership cannot be assigned across users"
         }
+        require(sourceTransaction.accountId.isNotBlank()) { "Source account ID is required" }
+        require(destinationAccountId.isNotBlank()) { "Destination account ID is required" }
+        require(sourceTransaction.accountId != destinationAccountId) {
+          "Source and destination accounts must be different"
+        }
+        require(sourceTransaction.amountMinor > 0L) { "Transfer amount must be greater than zero" }
         database.withTransaction {
           val sourceAccount =
             accountDao.getAccountById(authenticatedUserId, sourceTransaction.accountId)
