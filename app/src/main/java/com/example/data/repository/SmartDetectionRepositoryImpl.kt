@@ -280,7 +280,8 @@ class SmartDetectionRepositoryImpl @Inject constructor(
               parsed.status == TransactionStatus.COMPLETED &&
               currencyMatchesAccount &&
               parsed.type != TransactionType.PENDING &&
-              parsed.type != TransactionType.FAILED
+              parsed.type != TransactionType.FAILED &&
+              parsed.type != TransactionType.TRANSFER
 
           val eventId = UUID.randomUUID().toString()
           var createdTxnId: String? = null
