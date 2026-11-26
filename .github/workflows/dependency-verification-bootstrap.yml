@@ -51,12 +51,20 @@ jobs:
           import sys
           import xml.etree.ElementTree as ET
           root = ET.parse(sys.argv[1]).getroot()
-          components = root.findall(".//components/component")
-          artifacts = root.findall(".//components/component/artifact")
+          # Match by local tag name so Gradle XML namespace/prefix changes do
+          # not make a valid metadata file look empty.
+          local_name = lambda tag: tag.rsplit("}", 1)[-1]
+          elements = list(root.iter())
+          components = [node for node in elements if local_name(node.tag) == "component"]
+          artifacts = [node for node in elements if local_name(node.tag) == "artifact"]
+          checksums = [node for node in elements if local_name(node.tag) in {"sha256", "sha512"}]
+          print(f"Root element: {root.tag}")
           print(f"Verified components: {len(components)}")
           print(f"Verified artifacts: {len(artifacts)}")
-          if not components or not artifacts:
-              raise SystemExit("Generated verification metadata is unexpectedly empty.")
+          print(f"Checksum entries: {len(checksums)}")
+          if not components or not artifacts or not checksums:
+              print("Top-level child elements:", [child.tag for child in root])
+              raise SystemExit("Generated verification metadata has no component/artifact checksums.")
           PY
 
       - name: Upload generated verification metadata
