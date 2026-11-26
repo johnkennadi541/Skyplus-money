@@ -28,6 +28,7 @@ jobs:
           org/jetbrains/kotlin/kotlin-gradle-plugins-bom/2.2.10/kotlin-gradle-plugins-bom-2.2.10.module
           org/jetbrains/kotlin/kotlin-gradle-plugins-bom/2.2.10/kotlin-gradle-plugins-bom-2.2.10.pom
           org/jetbrains/intellij/deps/kotlinx/kotlinx-coroutines-bom/1.8.0-intellij-14/kotlinx-coroutines-bom-1.8.0-intellij-14.pom
+          com/google/guava/guava-parent/33.6.0-jre/guava-parent-33.6.0-jre.pom
           EOF
           while IFS= read -r path; do
             [ -n "$path" ] || continue
