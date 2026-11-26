@@ -391,6 +391,16 @@ class Phase2DatabaseAndRepoTest {
     assertTrue(directAdjustment.isFailure)
     assertEquals(Long.MAX_VALUE, accountRepo.getAccountById(uid, maxAccount.id)!!.currentBalanceMinor)
 
+    val minAccount = FinancialAccount(
+      id = "overflow_min", userId = uid, name = "Min", type = AccountType.WALLET,
+      currencyCode = "INR", initialBalanceMinor = Long.MIN_VALUE,
+      currentBalanceMinor = Long.MIN_VALUE,
+    )
+    accountRepo.createAccount(uid, minAccount).getOrThrow()
+    val directUnderflow = accountRepo.adjustAccountBalance(uid, minAccount.id, -1L)
+    assertTrue(directUnderflow.isFailure)
+    assertEquals(Long.MIN_VALUE, accountRepo.getAccountById(uid, minAccount.id)!!.currentBalanceMinor)
+
     val overflowIncome = txnRepo.recordIncome(
       uid,
       FinancialTransaction(
