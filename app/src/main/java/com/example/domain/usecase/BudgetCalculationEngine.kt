@@ -83,9 +83,9 @@ class BudgetCalculationEngine @Inject constructor() {
       when {
         isStale -> BudgetAlertStatus.PERIOD_ENDED
         budget.amountMinor <= 0L -> BudgetAlertStatus.NORMAL
-        spentScaled >= allocated.multiply(HUNDRED) -> BudgetAlertStatus.EXCEEDED_100
-        spentScaled >= allocated.multiply(NINETY) -> BudgetAlertStatus.WARNING_90
-        spentScaled >= allocated.multiply(SEVENTY_FIVE) -> BudgetAlertStatus.APPROACHING_75
+        spentScaled > allocated.multiply(HUNDRED) -> BudgetAlertStatus.EXCEEDED_100
+        spentScaled >= allocated.multiply(BigDecimal.valueOf(budget.warningThresholdPercent.coerceIn(1, 100).toLong())) ->
+          BudgetAlertStatus.THRESHOLD_REACHED
         else -> BudgetAlertStatus.NORMAL
       }
 
@@ -105,8 +105,6 @@ class BudgetCalculationEngine @Inject constructor() {
 
   private companion object {
     val HUNDRED: BigDecimal = BigDecimal.valueOf(100)
-    val NINETY: BigDecimal = BigDecimal.valueOf(90)
-    val SEVENTY_FIVE: BigDecimal = BigDecimal.valueOf(75)
   }
 
   /**

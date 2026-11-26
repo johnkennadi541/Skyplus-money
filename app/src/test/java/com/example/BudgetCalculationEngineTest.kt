@@ -164,7 +164,7 @@ class BudgetCalculationEngineTest {
 
     val status = engine.calculateBudgetStatus(budget, transactions, nowMillis = withinRangeTime)
     assertEquals(75.0, status.percentageConsumed, 0.001)
-    assertEquals(BudgetAlertStatus.APPROACHING_75, status.alertStatus)
+    assertEquals(BudgetAlertStatus.THRESHOLD_REACHED, status.alertStatus)
   }
 
   @Test
@@ -174,7 +174,7 @@ class BudgetCalculationEngineTest {
 
     val status = engine.calculateBudgetStatus(budget, transactions, nowMillis = withinRangeTime)
     assertEquals(92.5, status.percentageConsumed, 0.001)
-    assertEquals(BudgetAlertStatus.WARNING_90, status.alertStatus)
+    assertEquals(BudgetAlertStatus.THRESHOLD_REACHED, status.alertStatus)
   }
 
   @Test

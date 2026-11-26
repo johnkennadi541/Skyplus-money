@@ -10,6 +10,7 @@ enum class BudgetPeriodType {
 
 enum class BudgetAlertStatus {
   NORMAL,
+  THRESHOLD_REACHED,
   APPROACHING_75,
   WARNING_90,
   EXCEEDED_100,
