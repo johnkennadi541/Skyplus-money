@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - security/verify-missing-dependency-artifacts
+  pull_request:
+    branches:
+      - fix/security-dependency-update-automation
 
 permissions:
   contents: read
