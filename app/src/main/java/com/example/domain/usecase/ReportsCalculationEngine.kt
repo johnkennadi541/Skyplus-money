@@ -302,7 +302,6 @@ class ReportsCalculationEngine @Inject constructor(
     var excludedNonCompleted = 0
 
     val expenseCatGross = linkedMapOf<String, Long>()
-    val expenseCatRefund = linkedMapOf<String, Long>()
     val expenseCatCount = linkedMapOf<String, Int>()
     val incomeCatTotal = linkedMapOf<String, Long>()
     val incomeCatCount = linkedMapOf<String, Int>()
@@ -351,8 +350,9 @@ class ReportsCalculationEngine @Inject constructor(
         TransactionType.REVERSAL -> {
           totalRefundsAndReversals = Math.addExact(totalRefundsAndReversals, txn.amountMinor)
           refundCount++
-          expenseCatRefund[cat] = Math.addExact(expenseCatRefund[cat] ?: 0L, txn.amountMinor)
-          expenseCatCount[cat] = (expenseCatCount[cat] ?: 0) + 1
+          // A refund has no persisted link to its original expense. Do not infer its
+          // category from the refund's user-selected category; keep it in the
+          // currency-wide and monthly refund totals instead.
           monthBucket.refundMinor = Math.addExact(monthBucket.refundMinor, txn.amountMinor)
         }
         TransactionType.TRANSFER,
@@ -372,31 +372,23 @@ class ReportsCalculationEngine @Inject constructor(
         ZERO_PCT
       }
 
-    val allExpenseCats = (expenseCatGross.keys + expenseCatRefund.keys).distinct()
-    val rawNetByExpenseCat =
-      allExpenseCats.associateWith { cat ->
-        val gross = expenseCatGross[cat] ?: 0L
-        val refund = expenseCatRefund[cat] ?: 0L
-        maxOf(0L, gross - refund)
-      }
-    val categoryNetSum = rawNetByExpenseCat.values.sum()
+    // Category rows represent gross completed expenses only. Since the transaction
+    // model has no original-expense reference for refunds, attributing a refund to
+    // its own category could silently offset an unrelated expense category.
+    val categoryGrossTotal = expenseCatGross.values.fold(0L) { total, amount -> Math.addExact(total, amount) }
     val expenseByCategory =
-      allExpenseCats
-        .map { cat ->
-          val gross = expenseCatGross[cat] ?: 0L
-          val refund = expenseCatRefund[cat] ?: 0L
-          val net = rawNetByExpenseCat[cat] ?: 0L
+      expenseCatGross
+        .map { (cat, gross) ->
           CategoryBreakdownRow(
             category = cat,
             currencyCode = currencyCode,
-            totalMinor = net,
+            totalMinor = gross,
             grossMinor = gross,
-            refundOffsetMinor = refund,
-            percentage = percentageOf(net, categoryNetSum),
+            refundOffsetMinor = 0L,
+            percentage = percentageOf(gross, categoryGrossTotal),
             transactionCount = expenseCatCount[cat] ?: 0,
           )
         }
-        .filter { it.grossMinor > 0L || it.refundOffsetMinor > 0L }
         .sortedByDescending { it.totalMinor }
 
     val incomeByCategory =
