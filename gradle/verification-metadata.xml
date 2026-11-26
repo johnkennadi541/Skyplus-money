@@ -5406,6 +5406,11 @@
             <sha256 value="55441db27e8869dfefe053059bdf478bdc7e95585642bf391f0023345fd56287" origin="Verified byte-for-byte from Maven Central and Google Maven Central mirror"/>
          </artifact>
       </component>
+      <component group="com.google.guava" name="guava-parent" version="33.6.0-jre">
+         <artifact name="guava-parent-33.6.0-jre.pom">
+            <sha256 value="374bd31f61b1cf612bee9ab2e4d70bbdf77dd85a49b431f809d4fbdc901f2dd4" origin="Verified byte-for-byte from Maven Central and Google Maven Central mirror"/>
+         </artifact>
+      </component>
       <component group="org.jetbrains.kotlin" name="kotlin-gradle-plugins-bom" version="2.2.10">
          <artifact name="kotlin-gradle-plugins-bom-2.2.10.module">
             <sha256 value="e4b7dd0b5570aa7ae6597d1f479bcea94e78e12735fa86f80afa95e7014efed6" origin="Verified byte-for-byte from Maven Central and Google Maven Central mirror"/>
