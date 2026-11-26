@@ -91,6 +91,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     withContext(dispatchers.io) {
       runCatching {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
+        requirePositiveDetectedAmount(parsed.amountMinor)
         val settings = getDetectionSettings(userId).first()
         if (!settings.isNotificationDetectionEnabled) {
           throw IllegalStateException("Smart notification detection is disabled in settings")
@@ -391,6 +392,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
           val finalType =
             if (parsedType == TransactionType.PENDING) TransactionType.EXPENSE else parsedType
           val finalAmount = correctedAmountMinor ?: event.detectedAmountMinor
+          requirePositiveDetectedAmount(finalAmount)
           val safeMerchant = sanitizeMerchant(merchant ?: event.detectedMerchant)
 
           val targetAccount =
@@ -463,6 +465,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     }
 
   private suspend fun saveDetectedTransactionInCurrentTx(transaction: FinancialTransaction): Boolean {
+    requirePositiveDetectedAmount(transaction.amountMinor)
     val account = accountDao.getAccountById(transaction.userId, transaction.accountId) ?: return false
     if (!account.currencyCode.equals(transaction.currencyCode, ignoreCase = true)) return false
 
