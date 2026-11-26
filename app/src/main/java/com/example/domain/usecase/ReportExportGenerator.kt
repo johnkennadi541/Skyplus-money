@@ -534,8 +534,17 @@ $paragraphsXml
 
   private fun sanitizeFormula(text: String): String {
     if (text.isEmpty()) return text
-    val first = text.first()
-    return if (first == '=' || first == '+' || first == '-' || first == '@') "'$text" else text
+    // Spreadsheet applications may ignore leading whitespace/control characters before formulas.
+    val firstMeaningful = text.firstOrNull {
+      !it.isWhitespace() && it.code >= 0x20 && it != '\uFEFF'
+    }
+    return if (firstMeaningful == '=' || firstMeaningful == '+' ||
+      firstMeaningful == '-' || firstMeaningful == '@'
+    ) {
+      "'$text"
+    } else {
+      text
+    }
   }
 
   private fun xmlEscape(text: String): String =
