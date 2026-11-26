@@ -136,8 +136,12 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
           transactionDao.insertTransaction(destEntity)
 
           // Atomic balance updates: debit source, credit destination
-          accountDao.adjustBalance(authenticatedUserId, sourceTransaction.accountId, -sourceTransaction.amountMinor, now)
-          accountDao.adjustBalance(authenticatedUserId, destinationAccountId, creditMinor, now)
+          check(accountDao.adjustBalance(authenticatedUserId, sourceTransaction.accountId, -sourceTransaction.amountMinor, now) == 1) {
+            "Source account balance adjustment rejected: overflow or account not found."
+          }
+          check(accountDao.adjustBalance(authenticatedUserId, destinationAccountId, creditMinor, now) == 1) {
+            "Destination account balance adjustment rejected: overflow or account not found."
+          }
 
           Pair(sourceEntity.toDomain(), destEntity.toDomain())
         }
@@ -237,7 +241,9 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
           val persistedOldStatus = TransactionStatus.valueOf(existing.status)
           val oldDelta = balanceDeltaFor(persistedOldType, persistedOldStatus, existing.amountMinor)
           if (oldDelta != 0L) {
-            accountDao.adjustBalance(authenticatedUserId, existing.accountId, -oldDelta, now)
+            check(accountDao.adjustBalance(authenticatedUserId, existing.accountId, -oldDelta, now) == 1) {
+              "Original account balance reversal rejected: overflow or account not found."
+            }
           }
 
           val effectiveStatus =
@@ -255,7 +261,9 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
             )
           val newDelta = balanceDeltaFor(normalizedUpdated.type, normalizedUpdated.status, normalizedUpdated.amountMinor)
           if (newDelta != 0L) {
-            accountDao.adjustBalance(authenticatedUserId, normalizedUpdated.accountId, newDelta, now)
+            check(accountDao.adjustBalance(authenticatedUserId, normalizedUpdated.accountId, newDelta, now) == 1) {
+              "Updated account balance adjustment rejected: overflow or account not found."
+            }
           }
 
           val rowsUpdated =
@@ -291,13 +299,17 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
                 } else {
                   entry.amountMinor
                 }
-              accountDao.adjustBalance(userId, entry.accountId, reverseDelta, now)
+              check(accountDao.adjustBalance(userId, entry.accountId, reverseDelta, now) == 1) {
+                "Transfer deletion balance reversal rejected: overflow or account not found."
+              }
               transactionDao.deleteTransaction(userId, entry.id)
             }
           } else {
             val delta = balanceDeltaFor(type, status, txn.amountMinor)
             if (delta != 0L) {
-              accountDao.adjustBalance(userId, txn.accountId, -delta, now)
+              check(accountDao.adjustBalance(userId, txn.accountId, -delta, now) == 1) {
+                "Transaction deletion balance reversal rejected: overflow or account not found."
+              }
             }
             transactionDao.deleteTransaction(userId, transactionId)
           }

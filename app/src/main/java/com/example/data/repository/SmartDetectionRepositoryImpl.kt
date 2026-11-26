@@ -492,7 +492,11 @@ class SmartDetectionRepositoryImpl @Inject constructor(
         TransactionType.TRANSFER, TransactionType.PENDING, TransactionType.FAILED -> 0L
       }
     if (delta != 0L) {
-      accountDao.adjustBalance(normalizedTxn.userId, normalizedTxn.accountId, delta, normalizedTxn.updatedAt)
+      check(
+        accountDao.adjustBalance(normalizedTxn.userId, normalizedTxn.accountId, delta, normalizedTxn.updatedAt) == 1
+      ) {
+        "Detected transaction balance adjustment rejected: overflow or account not found."
+      }
     }
     return true
   }

@@ -834,6 +834,71 @@ class Phase2DatabaseAndRepoTest {
   }
 
   @Test
+  fun `transaction balance overflow is rejected without changing ledger or balances`() = runTest {
+    val uid = "uid_balance_overflow"
+    accountRepo.createAccount(
+      uid,
+      FinancialAccount(
+        id = "acc_max",
+        userId = uid,
+        name = "Maximum Balance",
+        type = AccountType.BANK,
+        currencyCode = "INR",
+        initialBalanceMinor = Long.MAX_VALUE,
+        currentBalanceMinor = Long.MAX_VALUE,
+      ),
+    ).getOrThrow()
+    accountRepo.createAccount(
+      uid,
+      FinancialAccount(
+        id = "acc_min",
+        userId = uid,
+        name = "Minimum Balance",
+        type = AccountType.BANK,
+        currencyCode = "INR",
+        initialBalanceMinor = Long.MIN_VALUE,
+        currentBalanceMinor = Long.MIN_VALUE,
+      ),
+    ).getOrThrow()
+
+    val overflowIncome =
+      txnRepo.recordIncome(
+        uid,
+        FinancialTransaction(
+          userId = uid,
+          accountId = "acc_max",
+          type = TransactionType.INCOME,
+          amountMinor = 1L,
+          currencyCode = "INR",
+          category = "Other Income",
+        ),
+      )
+    assertTrue(overflowIncome.isFailure)
+    assertEquals(Long.MAX_VALUE, accountRepo.getAccountById(uid, "acc_max")!!.currentBalanceMinor)
+
+    val underflowExpense =
+      txnRepo.recordExpense(
+        uid,
+        FinancialTransaction(
+          userId = uid,
+          accountId = "acc_min",
+          type = TransactionType.EXPENSE,
+          amountMinor = 1L,
+          currencyCode = "INR",
+          category = "Other Expenses",
+        ),
+      )
+    assertTrue(underflowExpense.isFailure)
+    assertEquals(Long.MIN_VALUE, accountRepo.getAccountById(uid, "acc_min")!!.currentBalanceMinor)
+    assertTrue(txnRepo.getTransactions(uid).first().isEmpty())
+
+    assertTrue(accountRepo.adjustAccountBalance(uid, "acc_max", 1L).isFailure)
+    assertTrue(accountRepo.adjustAccountBalance(uid, "acc_min", -1L).isFailure)
+    assertEquals(Long.MAX_VALUE, accountRepo.getAccountById(uid, "acc_max")!!.currentBalanceMinor)
+    assertEquals(Long.MIN_VALUE, accountRepo.getAccountById(uid, "acc_min")!!.currentBalanceMinor)
+  }
+
+  @Test
   fun `room migration 1 to 2 preserves existing accounts and transactions non destructively`() {
     val dbFile = File(context.cacheDir, "migration_test_${System.nanoTime()}.db")
     if (dbFile.exists()) dbFile.delete()
