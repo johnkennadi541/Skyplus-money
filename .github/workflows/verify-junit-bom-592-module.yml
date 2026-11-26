@@ -1,0 +1,27 @@
+name: Verify JUnit BOM 5.9.2 module checksum
+on:
+  push:
+    branches:
+      - security/verify-junit-bom-592-module
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download from Maven Central endpoints and compare exact bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          url1="https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.9.2/junit-bom-5.9.2.module"
+          url2="https://repo1.maven.org/maven2/org/junit/junit-bom/5.9.2/junit-bom-5.9.2.module"
+          curl --fail --silent --show-error --location "$url1" -o junit-bom-5.9.2-a.module
+          curl --fail --silent --show-error --location "$url2" -o junit-bom-5.9.2-b.module
+          cmp junit-bom-5.9.2-a.module junit-bom-5.9.2-b.module
+          sha256sum junit-bom-5.9.2-a.module
+          sha256sum -c <(sha256sum junit-bom-5.9.2-a.module)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: junit-bom-5.9.2-module-verification
+          path: junit-bom-5.9.2-a.module
+          retention-days: 7
