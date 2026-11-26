@@ -37,9 +37,29 @@ constructor(
 
   override suspend fun signOut(): AuthResult<Unit> {
     withContext(NonCancellable) {
-      smartDetectionRepository?.clearAutoSavedNotice()
-      googleCredentialClient.clearCredentialState()
-      firebaseAuthGateway.signOut()
+      // Firebase is the authoritative session. Attempt it first so a credential-cleanup
+      // failure can never leave the Firebase user signed in.
+      var firebaseSignOutFailure: Exception? = null
+      try {
+        firebaseAuthGateway.signOut()
+      } catch (error: Exception) {
+        firebaseSignOutFailure = error
+      }
+
+      // These are best-effort local cleanups. They must not prevent the Firebase sign-out
+      // attempt, and a failed cleanup must not turn a completed Firebase sign-out into failure.
+      try {
+        googleCredentialClient.clearCredentialState()
+      } catch (_: Exception) {
+        // Credential Manager cleanup can be retried by the platform on the next sign-in.
+      }
+      try {
+        smartDetectionRepository?.clearAutoSavedNotice()
+      } catch (_: Exception) {
+        // Clearing an in-memory notice is best-effort; session ownership is still enforced.
+      }
+
+      firebaseSignOutFailure?.let { throw it }
     }
     return AuthResult.Success(Unit)
   }
