@@ -191,7 +191,8 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(
           oldTransaction.userId == authenticatedUserId &&
-            updatedTransaction.userId == authenticatedUserId
+            updatedTransaction.userId == authenticatedUserId &&
+            oldTransaction.id == updatedTransaction.id
         ) {
           "Transaction ownership cannot be transferred or modified across users"
         }
@@ -203,12 +204,11 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
             "Transaction ownership verification failed"
           }
           require(existing.type != TransactionType.TRANSFER.name &&
-            oldTransaction.type != TransactionType.TRANSFER &&
             updatedTransaction.type != TransactionType.TRANSFER
           ) {
             "Transfer transactions cannot be edited. Delete and recreate the transfer to preserve both linked entries and account balances."
           }
-          requireNotNull(accountDao.getAccountById(authenticatedUserId, oldTransaction.accountId)) {
+          requireNotNull(accountDao.getAccountById(authenticatedUserId, existing.accountId)) {
             "Original account not found for authenticated user"
           }
           requireNotNull(accountDao.getAccountById(authenticatedUserId, updatedTransaction.accountId)) {
@@ -217,9 +217,13 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
 
           val now = System.currentTimeMillis()
 
-          val oldDelta = balanceDeltaFor(oldTransaction.type, oldTransaction.status, oldTransaction.amountMinor)
+          // The persisted row is authoritative. Never use the caller-supplied oldTransaction
+          // snapshot to reverse balances: a stale or forged snapshot could affect another account.
+          val persistedOldType = TransactionType.valueOf(existing.type)
+          val persistedOldStatus = TransactionStatus.valueOf(existing.status)
+          val oldDelta = balanceDeltaFor(persistedOldType, persistedOldStatus, existing.amountMinor)
           if (oldDelta != 0L) {
-            accountDao.adjustBalance(authenticatedUserId, oldTransaction.accountId, -oldDelta, now)
+            accountDao.adjustBalance(authenticatedUserId, existing.accountId, -oldDelta, now)
           }
 
           val effectiveStatus =
