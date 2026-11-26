@@ -423,9 +423,9 @@ class Phase2DatabaseAndRepoTest {
     assertTrue(negativeTransfer.isFailure)
     assertEquals(100_000L, accountRepo.getAccountById(uid, primary.id)!!.currentBalanceMinor)
     assertEquals(100_000L, accountRepo.getAccountById(uid, secondary.id)!!.currentBalanceMinor)
-    assertEquals(null, txnRepo.getTransactionById(uid, "negative_expense"))
-    assertEquals(null, txnRepo.getTransactionById(uid, "zero_income"))
-    assertEquals(null, txnRepo.getTransactionById(uid, "negative_transfer"))
+    assertTrue(txnRepo.getTransactionById(uid, "negative_expense") == null)
+    assertTrue(txnRepo.getTransactionById(uid, "zero_income") == null)
+    assertTrue(txnRepo.getTransactionById(uid, "negative_transfer") == null)
 
     val validExpense = txnRepo.recordExpense(
       uid,
