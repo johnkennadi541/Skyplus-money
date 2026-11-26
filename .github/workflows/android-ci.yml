@@ -8,6 +8,12 @@ on:
     # another feature branch (the UI redesign runs on feature/ui-redesign).
     branches: [ main, develop, 'feature/**', 'fix/**', 'test/**' ]
   workflow_dispatch:
+    inputs:
+      build_debug_apk:
+        description: "Build and upload a signed debug APK (requires explicit approval)"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -223,11 +229,12 @@ jobs:
         if: always()
         run: rm -f "$RUNNER_TEMP/skyplus-test-only.jks"
 
-  # Signed debug APK. Only on main, and only through the protected environment, so
-  # the signing secrets are never reachable from a pull request.
+  # Signed debug APK is opt-in only. Pushes and pull requests must never build
+  # or upload an APK; a maintainer must manually dispatch this workflow on main
+  # and explicitly set build_debug_apk=true.
   debug-apk:
     needs: build-and-test
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && inputs.build_debug_apk == true
     runs-on: ubuntu-latest
     environment: debug-signing
     permissions:
