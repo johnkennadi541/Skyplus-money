@@ -1,5 +1,6 @@
 package com.example.data.local.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -23,6 +24,7 @@ data class SavingsGoalEntity(
   val note: String?,
   val createdAt: Long,
   val updatedAt: Long,
+  @ColumnInfo(defaultValue = "0") val isArchived: Boolean = false,
 ) {
   fun toDomain(): SavingsGoal =
     SavingsGoal(
@@ -35,6 +37,7 @@ data class SavingsGoalEntity(
       note = note,
       createdAt = createdAt,
       updatedAt = updatedAt,
+      isArchived = isArchived,
     )
 
   companion object {
@@ -49,6 +52,7 @@ data class SavingsGoalEntity(
         note = goal.note,
         createdAt = goal.createdAt,
         updatedAt = goal.updatedAt,
+        isArchived = goal.isArchived,
       )
   }
 }
@@ -62,10 +66,9 @@ data class SavingsGoalEntity(
  * fail-closed SQLCipher path turns into an unusable app. Making the rebuild always succeed would
  * mean deleting orphans, which is silent data loss.
  *
- * Integrity is instead guaranteed by [com.example.data.repository.SavingsGoalRepositoryImpl], which
- * deletes a goal's contributions inside the same transaction as the goal itself, and that path is
- * covered by tests. The foreign key would only add protection against direct DAO writes that bypass
- * the repository, which do not exist today.
+ * Goal deletion is deliberately unavailable: goals are archived and contribution rows are retained.
+ * Repository writes are UID-scoped and transactional; voiding marks a contribution without removing
+ * its original amount, date or note.
  */
 @Entity(
   tableName = "savings_contributions",
@@ -84,6 +87,8 @@ data class SavingsContributionEntity(
   val contributedAt: Long,
   val note: String?,
   val createdAt: Long,
+  @ColumnInfo(defaultValue = "0") val isVoided: Boolean = false,
+  @ColumnInfo(defaultValue = "NULL") val voidedAt: Long? = null,
 ) {
   fun toDomain(): SavingsContribution =
     SavingsContribution(
@@ -95,6 +100,8 @@ data class SavingsContributionEntity(
       contributedAt = contributedAt,
       note = note,
       createdAt = createdAt,
+      isVoided = isVoided,
+      voidedAt = voidedAt,
     )
 
   companion object {
@@ -108,6 +115,8 @@ data class SavingsContributionEntity(
         contributedAt = contribution.contributedAt,
         note = contribution.note,
         createdAt = contribution.createdAt,
+        isVoided = contribution.isVoided,
+        voidedAt = contribution.voidedAt,
       )
   }
 }

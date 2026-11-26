@@ -18,7 +18,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -27,7 +26,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Savings goal persistence: ownership, currency integrity, derived totals and safe deletion.
+ * Savings goal persistence: ownership, currency integrity, derived totals and retained history (archive/void), with user isolation.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -216,46 +215,64 @@ class SavingsGoalDatabaseAndRepoTest {
   }
 
   @Test
-  fun `another user cannot update or delete a goal`() = runTest {
+  fun `another user cannot update or archive a goal`() = runTest {
     repository.createGoal(userA, goal()).getOrThrow()
 
     assertTrue(repository.updateGoal(userB, goal(userId = userB)).isFailure)
-    assertTrue(repository.deleteGoal(userB, "goal_1").isFailure)
+    assertTrue(repository.setGoalArchived(userB, "goal_1", archived = true).isFailure)
     assertNotNull(repository.getGoal(userA, "goal_1"))
   }
 
   @Test
-  fun `deleting a goal removes its contributions and nothing else`() = runTest {
+  fun `archiving and restoring a goal preserves all contributions and saved totals`() = runTest {
     repository.createGoal(userA, goal()).getOrThrow()
     repository.addContribution(userA, contribution(10_000L, id = "c_1")).getOrThrow()
     repository.addContribution(userA, contribution(5_000L, id = "c_2")).getOrThrow()
 
-    repository.deleteGoal(userA, "goal_1").getOrThrow()
+    repository.setGoalArchived(userA, "goal_1", archived = true).getOrThrow()
 
-    assertNull(repository.getGoal(userA, "goal_1"))
-    assertTrue(repository.observeContributions(userA).first().isEmpty())
+    val archived = repository.getGoal(userA, "goal_1")!!
+    val retained = repository.observeContributions(userA).first()
+    assertTrue(archived.isArchived)
+    assertEquals(2, retained.size)
+    assertEquals(15_000L, engine.savedMinor(archived, retained))
+
+    assertTrue(repository.addContribution(userA, contribution(1_000L, id = "c_3")).isFailure)
+
+    repository.setGoalArchived(userA, "goal_1", archived = false).getOrThrow()
+    val restored = repository.getGoal(userA, "goal_1")!!
+    assertTrue(!restored.isArchived)
+    assertEquals(2, repository.observeContributions(userA).first().size)
+    assertEquals(15_000L, engine.savedMinor(restored, repository.observeContributions(userA).first()))
   }
 
   @Test
-  fun `a single contribution can be deleted and the total follows`() = runTest {
+  fun `voiding a contribution retains its original row and excludes it from saved totals`() = runTest {
     repository.createGoal(userA, goal()).getOrThrow()
     repository.addContribution(userA, contribution(10_000L, id = "c_1")).getOrThrow()
     repository.addContribution(userA, contribution(5_000L, id = "c_2")).getOrThrow()
 
-    repository.deleteContribution(userA, "c_1").getOrThrow()
+    repository.voidContribution(userA, "c_1").getOrThrow()
 
-    val remaining = repository.observeContributions(userA).first()
-    assertEquals(1, remaining.size)
-    assertEquals(5_000L, engine.savedMinor(repository.getGoal(userA, "goal_1")!!, remaining))
+    val history = repository.observeContributions(userA).first()
+    val voided = history.single { it.id == "c_1" }
+    assertEquals(2, history.size)
+    assertTrue(voided.isVoided)
+    assertTrue(voided.voidedAt != null)
+    assertEquals(10_000L, voided.amountMinor)
+    assertEquals(1, engine.summarise(repository.getGoal(userA, "goal_1")!!, history).contributionCount)
+    assertEquals(5_000L, engine.savedMinor(repository.getGoal(userA, "goal_1")!!, history))
+    assertTrue(repository.voidContribution(userA, "c_1").isFailure)
   }
 
   @Test
-  fun `another user cannot delete a contribution`() = runTest {
+  fun `another user cannot void a contribution`() = runTest {
     repository.createGoal(userA, goal()).getOrThrow()
     repository.addContribution(userA, contribution(10_000L, id = "c_1")).getOrThrow()
 
-    assertTrue(repository.deleteContribution(userB, "c_1").isFailure)
+    assertTrue(repository.voidContribution(userB, "c_1").isFailure)
     assertEquals(1, repository.observeContributions(userA).first().size)
+    assertTrue(!repository.observeContributions(userA).first().single().isVoided)
   }
 
   @Test
