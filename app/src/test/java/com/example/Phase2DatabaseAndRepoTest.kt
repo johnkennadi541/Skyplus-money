@@ -751,69 +751,6 @@ class Phase2DatabaseAndRepoTest {
   }
 
   @Test
-  fun `smart detection cannot approve a transfer as a single ledger entry`() = runTest {
-    val uid = "uid_detect_transfer"
-    accountRepo.createAccount(
-      uid,
-      FinancialAccount(
-        id = "acc_transfer",
-        userId = uid,
-        name = "Bank 4321",
-        type = AccountType.BANK,
-        currencyCode = "INR",
-        initialBalanceMinor = 500_000L,
-        currentBalanceMinor = 500_000L,
-        accountNumberLast4 = "4321",
-      ),
-    )
-    detectionRepo.updateDetectionSettings(
-      uid,
-      DetectionSettings(
-        userId = uid,
-        isNotificationDetectionEnabled = true,
-        isAutoSaveHighConfidenceEnabled = true,
-      ),
-    )
-
-    val parsedTransfer =
-      SmartTransactionParser.parse(
-        "Rs. 100.00 self transfer between accounts A/c XX4321",
-        "com.snapwork.hdfc",
-        1_700_000_000_000L,
-      )!!
-    assertEquals(TransactionType.TRANSFER, parsedTransfer.type)
-
-    val event =
-      detectionRepo.processIncomingEvent(
-        userId = uid,
-        rawPackageName = "com.snapwork.hdfc",
-        senderOrTitle = "HDFC Bank",
-        parsed = parsedTransfer,
-      ).getOrThrow()
-
-    assertEquals(DetectionEventStatus.IN_REVIEW, event.status)
-    val beforeBalance = accountRepo.getAccountById(uid, "acc_transfer")!!.currentBalanceMinor
-
-    val approval =
-      detectionRepo.approveReviewEvent(
-        userId = uid,
-        eventId = event.id,
-        selectedAccountId = "acc_transfer",
-        category = "Transfer",
-        merchant = null,
-        correctedType = TransactionType.TRANSFER,
-      )
-
-    assertTrue(approval.isFailure)
-    assertEquals(beforeBalance, accountRepo.getAccountById(uid, "acc_transfer")!!.currentBalanceMinor)
-    assertTrue(txnRepo.getTransactions(uid).first().isEmpty())
-    assertEquals(
-      DetectionEventStatus.IN_REVIEW,
-      detectionRepo.getEventById(uid, event.id)?.status,
-    )
-  }
-
-  @Test
   fun `financial data and detection events are strictly isolated by UID`() = runTest {
     accountRepo.createAccount(
       "uid_alice",

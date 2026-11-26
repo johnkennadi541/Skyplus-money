@@ -77,14 +77,25 @@ interface FinancialAccountDao {
   suspend fun deleteAccount(userId: String, accountId: String): Int
 
   @Query(
-    "UPDATE financial_accounts SET currentBalanceMinor = currentBalanceMinor + :deltaMinor, updatedAt = :updatedAt WHERE userId = :userId AND id = :accountId"
+    """
+    UPDATE financial_accounts
+    SET currentBalanceMinor = currentBalanceMinor + :deltaMinor,
+        updatedAt = :updatedAt
+    WHERE userId = :userId
+      AND id = :accountId
+      AND (
+        (:deltaMinor > 0 AND currentBalanceMinor <= 9223372036854775807 - :deltaMinor)
+        OR (:deltaMinor < 0 AND currentBalanceMinor >= (-9223372036854775807 - 1) - :deltaMinor)
+        OR :deltaMinor = 0
+      )
+    """
   )
   suspend fun adjustBalance(
     userId: String,
     accountId: String,
     deltaMinor: Long,
     updatedAt: Long = System.currentTimeMillis(),
-  )
+  ): Int
 
   @Query(
     "UPDATE financial_accounts SET currentBalanceMinor = :newBalanceMinor, updatedAt = :updatedAt WHERE userId = :userId AND id = :accountId"
