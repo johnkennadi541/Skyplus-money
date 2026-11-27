@@ -409,30 +409,30 @@ fun TransactionsContent(
             modifier = Modifier.widthIn(max = 760.dp),
           )
         }
-        if (archivedTransactions.isNotEmpty()) {
-          item {
-            Text(
-              text = "Archived Transactions",
-              style = MaterialTheme.typography.titleMedium,
-              modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp).padding(top = OceanSpacing.md),
-            )
-          }
-          items(archivedTransactions, key = { "archived-${it.id}" }) { txn ->
-            Row(
-              modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
-              horizontalArrangement = Arrangement.SpaceBetween,
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              Column(modifier = Modifier.weight(1f)) {
-                Text(txn.merchantOrPayee ?: txn.category, style = MaterialTheme.typography.bodyMedium)
-                Text(
-                  FormatMoneyUseCase().format(txn.money),
-                  style = MaterialTheme.typography.bodySmall,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-              }
-              TextButton(onClick = { onRestoreTransaction(txn) }) { Text("Restore") }
+      }
+      if (archivedTransactions.isNotEmpty()) {
+        item {
+          Text(
+            text = "Archived Transactions",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp).padding(top = OceanSpacing.md),
+          )
+        }
+        items(archivedTransactions, key = { "archived-${it.id}" }) { txn ->
+          Row(
+            modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Column(modifier = Modifier.weight(1f)) {
+              Text(txn.merchantOrPayee ?: txn.category, style = MaterialTheme.typography.bodyMedium)
+              Text(
+                FormatMoneyUseCase().format(txn.money),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
             }
+            TextButton(onClick = { onRestoreTransaction(txn) }) { Text("Restore") }
           }
         }
       }
