@@ -315,7 +315,7 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
 
             require(
               outgoing.id != incoming.id &&
-                outgoing.id == txn.id || incoming.id == txn.id
+                (outgoing.id == txn.id || incoming.id == txn.id)
             ) { "Selected transaction is not part of a valid paired transfer." }
             require(
               outgoing.type == TransactionType.TRANSFER.name &&
