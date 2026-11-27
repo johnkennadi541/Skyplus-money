@@ -11,6 +11,14 @@ interface ShoppingRepository {
 
   suspend fun getListById(userId: String, listId: String): ShoppingList?
 
+  fun observeArchivedLists(userId: String): Flow<List<ShoppingList>>
+
+  fun observeArchivedItems(userId: String): Flow<List<ShoppingListItem>>
+
+  suspend fun restoreList(authenticatedUserId: String, listId: String): Result<Unit>
+
+  suspend fun restoreItem(authenticatedUserId: String, itemId: String): Result<Unit>
+
   fun getItemsForUser(userId: String): Flow<List<ShoppingListItem>>
 
   fun getItemsForList(userId: String, listId: String): Flow<List<ShoppingListItem>>
