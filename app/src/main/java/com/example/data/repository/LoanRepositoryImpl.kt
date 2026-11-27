@@ -31,6 +31,9 @@ class LoanRepositoryImpl @Inject constructor(
   private val dispatchers: DispatcherProvider,
 ) : LoanRepository {
 
+  override fun getArchivedLoans(userId: String): Flow<List<Loan>> =
+    loanDao.getArchivedLoans(userId).map { rows -> rows.map { it.toDomain() } }.flowOn(dispatchers.io)
+
   override fun getLoans(userId: String): Flow<List<Loan>> =
     loanDao.getAllLoans(userId)
       .map { list -> list.map { it.toDomain() } }
@@ -318,27 +321,35 @@ class LoanRepositoryImpl @Inject constructor(
       }
     }
 
-  override suspend fun deleteLoan(
+  override suspend fun archiveLoan(authenticatedUserId: String, loanId: String): Result<Unit> =
+    setLoanArchived(authenticatedUserId, loanId, archived = true)
+
+  override suspend fun restoreLoan(authenticatedUserId: String, loanId: String): Result<Unit> =
+    setLoanArchived(authenticatedUserId, loanId, archived = false)
+
+  override suspend fun deleteLoan(authenticatedUserId: String, loanId: String): Result<Unit> =
+    archiveLoan(authenticatedUserId, loanId)
+
+  private suspend fun setLoanArchived(
     authenticatedUserId: String,
     loanId: String,
-  ): Result<Unit> =
-    withContext(dispatchers.io) {
-      runCatching {
-        require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
-        require(loanId.isNotBlank()) { "Loan ID is required" }
-
-        database.withTransaction {
-          val existing =
-            loanDao.getLoanById(authenticatedUserId, loanId)
-              ?: throw SecurityException("Loan does not belong to authenticated user")
-          require(existing.userId == authenticatedUserId) { "Loan ownership verification failed" }
-
-          loanDao.deletePaymentsForLoan(authenticatedUserId, loanId)
-          val rowsDeleted = loanDao.deleteLoan(authenticatedUserId, loanId)
-          check(rowsDeleted == 1) { "Loan deletion rejected for authenticated user" }
+    archived: Boolean,
+  ): Result<Unit> = withContext(dispatchers.io) {
+    runCatching {
+      require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
+      require(loanId.isNotBlank()) { "Loan ID is required" }
+      database.withTransaction {
+        val existing = loanDao.getLoanById(authenticatedUserId, loanId)
+          ?: throw SecurityException("Loan does not belong to authenticated user")
+        require(existing.userId == authenticatedUserId) { "Loan ownership verification failed" }
+        check(existing.isArchived != archived) {
+          if (archived) "Loan is already archived" else "Loan is not archived"
         }
+        val rows = loanDao.setLoanArchived(authenticatedUserId, loanId, archived, System.currentTimeMillis())
+        check(rows == 1) { "Loan archive state update rejected for authenticated user" }
       }
     }
+  }
 
   private fun dayBoundsMillis(timestampMillis: Long): Pair<Long, Long> {
     val cal = Calendar.getInstance()
