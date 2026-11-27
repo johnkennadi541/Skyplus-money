@@ -91,6 +91,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     withContext(dispatchers.io) {
       runCatching {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
+        requirePositiveDetectedAmount(parsed.amountMinor)
         val settings = getDetectionSettings(userId).first()
         if (!settings.isNotificationDetectionEnabled) {
           throw IllegalStateException("Smart notification detection is disabled in settings")
@@ -280,7 +281,8 @@ class SmartDetectionRepositoryImpl @Inject constructor(
               parsed.status == TransactionStatus.COMPLETED &&
               currencyMatchesAccount &&
               parsed.type != TransactionType.PENDING &&
-              parsed.type != TransactionType.FAILED
+              parsed.type != TransactionType.FAILED &&
+              parsed.type != TransactionType.TRANSFER
 
           val eventId = UUID.randomUUID().toString()
           var createdTxnId: String? = null
@@ -384,13 +386,18 @@ class SmartDetectionRepositoryImpl @Inject constructor(
             throw IllegalStateException("Event is not in review")
           }
 
-          val parsedType =
-            correctedType
-              ?: runCatching { TransactionType.valueOf(event.detectedType) }
-                .getOrDefault(TransactionType.EXPENSE)
-          val finalType =
-            if (parsedType == TransactionType.PENDING) TransactionType.EXPENSE else parsedType
+          // Never convert corrupt or unresolved detection data into an expense by guessing.
+          // The user must explicitly classify pending events before they can affect the ledger.
+          val parsedType = correctedType ?: TransactionType.valueOf(event.detectedType)
+          require(parsedType != TransactionType.PENDING && parsedType != TransactionType.FAILED) {
+            "Detection event must be explicitly classified as income, expense, refund, or reversal before approval."
+          }
+          val finalType = parsedType
+          require(finalType != TransactionType.TRANSFER) {
+            "Detected transfers must be recorded through the paired transfer workflow."
+          }
           val finalAmount = correctedAmountMinor ?: event.detectedAmountMinor
+          requirePositiveDetectedAmount(finalAmount)
           val safeMerchant = sanitizeMerchant(merchant ?: event.detectedMerchant)
 
           val targetAccount =
@@ -463,6 +470,10 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     }
 
   private suspend fun saveDetectedTransactionInCurrentTx(transaction: FinancialTransaction): Boolean {
+    requirePositiveDetectedAmount(transaction.amountMinor)
+    require(transaction.type != TransactionType.TRANSFER) {
+      "Detected transfers must be recorded through the paired transfer workflow."
+    }
     val account = accountDao.getAccountById(transaction.userId, transaction.accountId) ?: return false
     if (!account.currencyCode.equals(transaction.currencyCode, ignoreCase = true)) return false
 
@@ -562,7 +573,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     context.detectionDataStore.data
       .map { prefs ->
         val notifEnabled = prefs[booleanPreferencesKey("notif_detection_$userId")] ?: true
-        val autoSave = prefs[booleanPreferencesKey("autosave_high_conf_$userId")] ?: true
+        val autoSave = prefs[booleanPreferencesKey("autosave_high_conf_$userId")] ?: false
         val packages =
           prefs[stringSetPreferencesKey("permitted_pkgs_$userId")] ?: DetectionSettings.DEFAULT_PERMITTED_PACKAGES
 

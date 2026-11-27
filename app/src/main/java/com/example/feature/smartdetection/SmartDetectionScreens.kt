@@ -1030,6 +1030,7 @@ fun DetectionHistoryScreen(
 ) {
   BackHandler(onBack = onNavigateBack)
   val events by viewModel.detectionEvents.collectAsStateWithLifecycle()
+  var showClearConfirmation by remember { mutableStateOf(false) }
 
   Scaffold(
     topBar = {
@@ -1042,7 +1043,7 @@ fun DetectionHistoryScreen(
         },
         actions = {
           if (events.isNotEmpty()) {
-            IconButton(onClick = { viewModel.clearHistory() }, modifier = Modifier.testTag("clear_detection_history_btn")) {
+            IconButton(onClick = { showClearConfirmation = true }, modifier = Modifier.testTag("clear_detection_history_btn")) {
               Icon(Icons.Rounded.Delete, contentDescription = "Clear History", tint = OceanTheme.colors.negative)
             }
           }
@@ -1099,5 +1100,31 @@ fun DetectionHistoryScreen(
         }
       }
     }
+  }
+
+  if (showClearConfirmation) {
+    AlertDialog(
+      onDismissRequest = { showClearConfirmation = false },
+      title = { Text("Clear detection history?") },
+      text = {
+        Text("This removes detection event history only. Saved financial transactions and account balances will not be deleted or changed.")
+      },
+      confirmButton = {
+        TextButton(
+          onClick = {
+            showClearConfirmation = false
+            viewModel.clearHistory()
+          },
+          modifier = Modifier.testTag("confirm_clear_detection_history_btn"),
+        ) {
+          Text("Clear history")
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { showClearConfirmation = false }) {
+          Text("Cancel")
+        }
+      },
+    )
   }
 }

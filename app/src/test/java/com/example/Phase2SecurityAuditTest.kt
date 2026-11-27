@@ -12,6 +12,7 @@ import com.example.data.local.db.entity.TransactionDetectionEventEntity
 import com.example.data.repository.FinancialTransactionRepositoryImpl
 import com.example.data.repository.SmartDetectionRepositoryImpl
 import com.example.domain.model.DetectionConfidence
+import com.example.domain.model.DetectionEventStatus
 import com.example.domain.model.DetectionSettings
 import com.example.domain.model.ParsedFinancialMessage
 import com.example.domain.model.TransactionStatus
@@ -19,12 +20,14 @@ import com.example.domain.model.TransactionType
 import com.example.service.SkyplusNotificationListenerService
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -110,6 +113,22 @@ class Phase2SecurityAuditTest {
   }
 
   @Test
+  fun `auto-save defaults off until user explicitly opts in`() = runTest {
+    val uid = "uid_auto_save_default_off"
+    val defaults = detectionRepo.getDetectionSettings(uid).first()
+
+    assertFalse("New users must not auto-save detected transactions by default", defaults.isAutoSaveHighConfidenceEnabled)
+    assertFalse("Domain defaults must keep auto-save disabled", DetectionSettings(userId = uid).isAutoSaveHighConfidenceEnabled)
+
+    val optedIn = defaults.copy(isAutoSaveHighConfidenceEnabled = true)
+    detectionRepo.updateDetectionSettings(uid, optedIn).getOrThrow()
+    assertTrue(
+      "An explicit user opt-in must be preserved",
+      detectionRepo.getDetectionSettings(uid).first().isAutoSaveHighConfidenceEnabled,
+    )
+  }
+
+  @Test
   fun `detection settings lock SMS detection disabled per Play policy`() = runTest {
     val requested =
       DetectionSettings(
@@ -189,6 +208,89 @@ class Phase2SecurityAuditTest {
     assertFalse(fieldNames.contains("rawText"))
     assertFalse(fieldNames.contains("rawBody"))
     assertFalse(fieldNames.contains("smsBody"))
+  }
+
+  @Test
+  fun `review approval rejects unknown persisted transaction type without ledger write`() = runTest {
+    val uid = "uid_invalid_review_type"
+    val eventId = "event_invalid_review_type"
+    database.transactionDetectionEventDao().insertEvent(
+      TransactionDetectionEventEntity(
+        id = eventId,
+        userId = uid,
+        rawPackageName = "com.phonepe.app",
+        senderOrTitle = "PhonePe",
+        detectedAmountMinor = 5000L,
+        detectedCurrency = "INR",
+        detectedType = "UNRECOGNIZED_TYPE",
+        detectedMerchant = "Merchant",
+        detectedAccountLast4 = null,
+        referenceId = null,
+        confidence = 0.6f,
+        confidenceLevel = DetectionConfidence.MEDIUM.name,
+        confidenceReasonsJoined = "test",
+        dedupFingerprint = "invalid-review-type-fingerprint",
+        status = DetectionEventStatus.IN_REVIEW.name,
+        mappedAccountId = null,
+        createdTransactionId = null,
+        receivedAt = 1000L,
+      ),
+    )
+
+    val result = detectionRepo.approveReviewEvent(
+      userId = uid,
+      eventId = eventId,
+      selectedAccountId = "not_reached",
+      category = "Expenses",
+      merchant = null,
+      correctedType = null,
+      correctedAmountMinor = null,
+    )
+
+    assertTrue(result.isFailure)
+    assertNotNull(database.transactionDetectionEventDao().getEventById(uid, eventId))
+    assertNull(database.financialTransactionDao().getTransactionById(uid, "no_transaction_created"))
+  }
+
+  @Test
+  fun `review approval requires explicit classification for pending events`() = runTest {
+    val uid = "uid_pending_review_requires_choice"
+    val eventId = "event_pending_requires_choice"
+    database.transactionDetectionEventDao().insertEvent(
+      TransactionDetectionEventEntity(
+        id = eventId,
+        userId = uid,
+        rawPackageName = "com.phonepe.app",
+        senderOrTitle = "PhonePe",
+        detectedAmountMinor = 5000L,
+        detectedCurrency = "INR",
+        detectedType = TransactionType.PENDING.name,
+        detectedMerchant = "Merchant",
+        detectedAccountLast4 = null,
+        referenceId = null,
+        confidence = 0.4f,
+        confidenceLevel = DetectionConfidence.LOW.name,
+        confidenceReasonsJoined = "ambiguous",
+        dedupFingerprint = "pending-review-requires-choice",
+        status = DetectionEventStatus.IN_REVIEW.name,
+        mappedAccountId = null,
+        createdTransactionId = null,
+        receivedAt = 1000L,
+      ),
+    )
+
+    val result = detectionRepo.approveReviewEvent(
+      userId = uid,
+      eventId = eventId,
+      selectedAccountId = "not_reached",
+      category = "Expenses",
+      merchant = null,
+      correctedType = null,
+      correctedAmountMinor = null,
+    )
+
+    assertTrue(result.isFailure)
+    assertNotNull(database.transactionDetectionEventDao().getEventById(uid, eventId))
   }
 
   @Test

@@ -97,7 +97,7 @@ interface FinancialTransactionDao {
   }
 
   @Query("DELETE FROM financial_transactions WHERE userId = :userId AND id = :transactionId")
-  suspend fun deleteTransaction(userId: String, transactionId: String)
+  suspend fun deleteTransaction(userId: String, transactionId: String): Int
 
   @Query(
     """
@@ -126,6 +126,16 @@ interface FinancialTransactionDao {
     "SELECT * FROM financial_transactions WHERE userId = :userId AND linkedTransferId = :linkedTransferId"
   )
   suspend fun findByLinkedTransferId(userId: String, linkedTransferId: String): List<FinancialTransactionEntity>
+
+  @Query(
+    """
+    SELECT COUNT(*) FROM financial_transactions
+    WHERE userId = :userId
+      AND accountId = :accountId
+      AND (type = 'TRANSFER' OR linkedTransferId IS NOT NULL OR transferDestinationAccountId IS NOT NULL)
+    """
+  )
+  suspend fun countTransferEntriesForAccount(userId: String, accountId: String): Int
 
   @Query("SELECT COUNT(*) FROM financial_transactions WHERE userId = :userId AND accountId = :accountId")
   suspend fun countForAccount(userId: String, accountId: String): Int

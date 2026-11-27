@@ -53,7 +53,7 @@ data class AccountMappingRule(
 data class DetectionSettings(
   val userId: String,
   val isNotificationDetectionEnabled: Boolean = true,
-  val isAutoSaveHighConfidenceEnabled: Boolean = true,
+  val isAutoSaveHighConfidenceEnabled: Boolean = false,
   val isSmsDetectionEnabled: Boolean = false,
   val isSmsPolicyRestricted: Boolean = true,
   val permittedPackages: Set<String> = DEFAULT_PERMITTED_PACKAGES,

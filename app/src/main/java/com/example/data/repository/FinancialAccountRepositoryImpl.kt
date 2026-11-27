@@ -89,6 +89,9 @@ class FinancialAccountRepositoryImpl @Inject constructor(
             FinancialAccountEntity.fromDomain(
               account.copy(
                 userId = existing.userId,
+                // Metadata edits must not overwrite ledger-derived balances from a stale UI snapshot.
+                initialBalanceMinor = existing.initialBalanceMinor,
+                currentBalanceMinor = existing.currentBalanceMinor,
                 createdAt = existing.createdAt,
                 updatedAt = System.currentTimeMillis(),
               )
@@ -139,6 +142,10 @@ class FinancialAccountRepositoryImpl @Inject constructor(
               ?: throw SecurityException("Account does not belong to authenticated user")
           require(existing.userId == userId) { "Account ownership verification failed" }
           val txnCount = transactionDao.countForAccount(userId, accountId)
+          val transferEntryCount = transactionDao.countTransferEntriesForAccount(userId, accountId)
+          require(transferEntryCount == 0) {
+            "This account contains transfer ledger entries. Deactivate it to preserve both sides of every transfer."
+          }
           if (txnCount > 0 && !deleteLinkedTransactions) {
             throw IllegalStateException(
               "Account has $txnCount recorded transactions. Deactivate the account to preserve history or confirm full removal."
