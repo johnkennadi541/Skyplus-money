@@ -7,6 +7,7 @@ import androidx.room.Query
 import com.example.data.local.db.entity.ShoppingItemEntity
 import com.example.data.local.db.entity.ShoppingListEntity
 import com.example.data.local.db.entity.ShoppingStorePriceEntity
+import com.example.data.local.db.entity.ShoppingPurchaseHistoryEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -145,6 +146,15 @@ interface ShoppingDao {
 
   @Query("UPDATE shopping_items SET isArchived = 0, updatedAt = :updatedAt WHERE userId = :userId AND id = :itemId AND isArchived = 1")
   suspend fun restoreItem(userId: String, itemId: String, updatedAt: Long): Int
+
+  @Insert(onConflict = OnConflictStrategy.ABORT)
+  suspend fun insertPurchaseHistory(record: ShoppingPurchaseHistoryEntity)
+
+  @Query("SELECT * FROM shopping_purchase_history WHERE userId = :userId AND itemId = :itemId ORDER BY purchasedAt DESC, recordedAt DESC")
+  fun getPurchaseHistoryForItem(userId: String, itemId: String): Flow<List<ShoppingPurchaseHistoryEntity>>
+
+  @Query("SELECT * FROM shopping_purchase_history WHERE userId = :userId AND listId = :listId ORDER BY purchasedAt DESC, recordedAt DESC")
+  fun getPurchaseHistoryForList(userId: String, listId: String): Flow<List<ShoppingPurchaseHistoryEntity>>
 
   @Query("SELECT * FROM shopping_store_prices WHERE userId = :userId ORDER BY recordedAt DESC")
   fun getAllStorePricesForUser(userId: String): Flow<List<ShoppingStorePriceEntity>>
