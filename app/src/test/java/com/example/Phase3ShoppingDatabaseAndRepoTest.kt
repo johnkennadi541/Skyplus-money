@@ -210,6 +210,36 @@ class Phase3ShoppingDatabaseAndRepoTest {
   }
 
   @Test
+  fun `archiving a parent list hides its items but retains and restores their history`() = runTest {
+    val list = repo.createList("user_1", "Archived Parent", "INR", 900_00L, 80).getOrThrow()
+    val item = repo.addItem(
+      "user_1", list.id, "Rice", "Groceries", "2", "kg", "80.00", "Market", null
+    ).getOrThrow()
+    repo.markItemPurchased(
+      "user_1", item.id, "75.00", purchasedAt = 1234L, storeNameOverride = "Market"
+    ).getOrThrow()
+    val pricesBefore = repo.getStorePricesForList("user_1", list.id).first()
+    assertEquals(1, pricesBefore.size)
+
+    repo.deleteList("user_1", list.id).getOrThrow()
+
+    // Parent archive hides child rows from active-list queries without archiving or deleting them.
+    assertTrue(repo.getItemsForList("user_1", list.id).first().isEmpty())
+    assertTrue(repo.getItemsForUser("user_1").first().isEmpty())
+    assertEquals(pricesBefore, repo.getStorePricesForList("user_1", list.id).first())
+    assertTrue(repo.restoreItem("user_1", item.id).isFailure)
+
+    // Restoring the parent reveals the unchanged purchase details and associated price history.
+    repo.restoreList("user_1", list.id).getOrThrow()
+    val restored = repo.getItemsForList("user_1", list.id).first().single()
+    assertEquals(item.id, restored.id)
+    assertTrue(restored.isPurchased)
+    assertEquals(1234L, restored.purchasedAt)
+    assertEquals(150_00L, restored.actualTotalMinor)
+    assertEquals(pricesBefore, repo.getStorePricesForList("user_1", list.id).first())
+  }
+
+  @Test
   fun `non destructive migration 5 to 6 creates shopping tables and preserves existing v5 data`() = runTest {
     val dbFile = File.createTempFile("skyplus_mig56_", ".db", context.cacheDir)
     dbFile.delete()
