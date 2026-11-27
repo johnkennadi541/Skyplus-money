@@ -12,11 +12,14 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface InvestmentDao {
 
-  @Query("SELECT * FROM investment_holdings WHERE userId = :userId ORDER BY updatedAt DESC, createdAt DESC")
+  @Query("SELECT * FROM investment_holdings WHERE userId = :userId AND isArchived = 0 ORDER BY updatedAt DESC, createdAt DESC")
   fun getAllHoldings(userId: String): Flow<List<InvestmentHoldingEntity>>
 
   @Query("SELECT * FROM investment_holdings WHERE userId = :userId ORDER BY updatedAt DESC, createdAt DESC")
   suspend fun getAllHoldingsSync(userId: String): List<InvestmentHoldingEntity>
+
+  @Query("SELECT * FROM investment_holdings WHERE userId = :userId AND isArchived = 1 ORDER BY updatedAt DESC, createdAt DESC")
+  fun getArchivedHoldings(userId: String): Flow<List<InvestmentHoldingEntity>>
 
   @Query("SELECT * FROM investment_holdings WHERE userId = :userId AND id = :holdingId LIMIT 1")
   fun getHoldingByIdFlow(userId: String, holdingId: String): Flow<InvestmentHoldingEntity?>
@@ -109,8 +112,8 @@ interface InvestmentDao {
     )
   }
 
-  @Query("DELETE FROM investment_holdings WHERE userId = :userId AND id = :holdingId")
-  suspend fun deleteHolding(userId: String, holdingId: String): Int
+  @Query("UPDATE investment_holdings SET isArchived = :archived, updatedAt = :updatedAt WHERE userId = :userId AND id = :holdingId")
+  suspend fun setHoldingArchived(userId: String, holdingId: String, archived: Boolean, updatedAt: Long): Int
 
   @Query(
     """
