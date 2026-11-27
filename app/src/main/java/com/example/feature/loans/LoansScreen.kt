@@ -78,6 +78,7 @@ fun LoansScreen(
   modifier: Modifier = Modifier,
 ) {
   val loans by viewModel.loans.collectAsStateWithLifecycle()
+  val archivedLoans by viewModel.archivedLoans.collectAsStateWithLifecycle()
   val summaries by viewModel.summariesByCurrency.collectAsStateWithLifecycle()
   val accounts by viewModel.accounts.collectAsStateWithLifecycle()
   val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
@@ -87,6 +88,8 @@ fun LoansScreen(
 
   LoansContent(
     loans = loans,
+    archivedLoans = archivedLoans,
+    onRestoreLoan = viewModel::restoreLoan,
     summaries = summaries,
     accounts = accounts,
     userMessage = userMessage,
@@ -122,6 +125,8 @@ fun LoansScreen(
 @Composable
 fun LoansContent(
   loans: List<Loan>,
+  archivedLoans: List<Loan> = emptyList(),
+  onRestoreLoan: (String) -> Unit = {},
   summaries: Map<String, LoanCurrencySummary>,
   accounts: List<FinancialAccount>,
   userMessage: String? = null,
@@ -152,6 +157,7 @@ fun LoansContent(
   BackHandler(onBack = onNavigateBack)
 
   var showCreateDialog by remember { mutableStateOf(false) }
+  var showArchivedLoans by remember { mutableStateOf(false) }
   var activeDraft by remember { mutableStateOf<EmiPrefillDraft?>(null) }
 
   LaunchedEffect(emiPrefillDraft) {
@@ -403,6 +409,36 @@ fun LoansContent(
         }
       }
 
+      item {
+        OutlinedButton(
+          onClick = { showArchivedLoans = !showArchivedLoans },
+          modifier = Modifier.fillMaxWidth().testTag("toggle_archived_loans"),
+        ) {
+          Text(if (showArchivedLoans) "Hide archived loans" else "Archived loans (\${archivedLoans.size})")
+        }
+      }
+      if (showArchivedLoans) {
+        if (archivedLoans.isEmpty()) {
+          item {
+            OceanCard(modifier = Modifier.fillMaxWidth().testTag("archived_loans_empty")) {
+              Text("No archived loans", modifier = Modifier.padding(OceanSpacing.md))
+            }
+          }
+        } else {
+          items(archivedLoans, key = { "archived_\${it.id}" }) { loan ->
+            OceanCard(modifier = Modifier.fillMaxWidth().testTag("archived_loan_\${loan.id}")) {
+              Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                  Text(loan.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                  Text("Archived · \${loan.currencyCode}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                  Text("EMI payment history retained", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                OutlinedButton(onClick = { onRestoreLoan(loan.id) }, modifier = Modifier.testTag("restore_loan_\${loan.id}")) { Text("Restore") }
+              }
+            }
+          }
+        }
+      }
       // Loan Cards or Empty State
       if (filteredLoans.isEmpty()) {
         item {
