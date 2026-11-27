@@ -44,5 +44,5 @@ interface SavingsGoalRepository {
   ): Result<SavingsContribution>
 
   /** Financial contribution history is immutable; this legacy removal action is refused. */
-  suspend fun deleteContribution(userId: String, contributionId: String)
+  suspend fun deleteContribution(userId: String, contributionId: String): Result<Unit>
 }
