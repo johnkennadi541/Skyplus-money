@@ -94,6 +94,7 @@ constructor(
           val existing =
             savingsGoalDao.getGoalById(authenticatedUserId, goal.id)
               ?: throw SecurityException("Goal does not belong to authenticated user")
+          check(!existing.isArchived) { "Archived goals must be restored before editing" }
 
           // A currency change would silently re-denominate every contribution, so it is refused
           // as soon as one exists.
@@ -162,6 +163,7 @@ constructor(
           val goal =
             savingsGoalDao.getGoalById(authenticatedUserId, contribution.goalId)
               ?: throw SavingsGoalConflictException("Goal does not exist for this user")
+          check(!goal.isArchived) { "Archived goals cannot accept contributions until restored" }
 
           SavingsGoalValidation.requireValidContribution(
             contribution = contribution,
