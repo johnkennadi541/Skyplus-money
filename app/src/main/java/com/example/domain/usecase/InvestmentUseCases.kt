@@ -53,8 +53,10 @@ class ObservePortfolioUseCase @Inject constructor(
       repository.getAllPriceHistory(userId),
     ) { holdings, priceHistory ->
       val now = System.currentTimeMillis()
+      val activeHoldingIds = holdings.mapTo(mutableSetOf()) { it.id }
+      val activePriceHistory = priceHistory.filter { it.holdingId in activeHoldingIds }
       val performances = holdings.map { calculationEngine.evaluateHoldingPerformance(it, now) }
-      val summaries = calculationEngine.calculateCurrencySummaries(holdings, priceHistory, now)
+      val summaries = calculationEngine.calculateCurrencySummaries(holdings, activePriceHistory, now)
       InvestmentPortfolioSnapshot(
         holdings = holdings,
         performances = performances,
