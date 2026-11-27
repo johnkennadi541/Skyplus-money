@@ -34,6 +34,8 @@ data class Budget(
    * the current month with the same limit. Unused amount is never carried forward.
    */
   val isRecurring: Boolean = true,
+  /** Archived budgets remain stored with their period and transaction history. */
+  val isArchived: Boolean = false,
   /** When the window was last moved forward by renewal; 0 means it never has been. */
   val lastRenewedAt: Long = 0L,
   val createdAt: Long = System.currentTimeMillis(),
