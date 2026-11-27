@@ -131,6 +131,7 @@ class ShoppingRepositoryImpl @Inject constructor(
           require(existing.userId == authenticatedUserId) {
             "Shopping list ownership verification failed"
           }
+          check(!existing.isArchived) { "Restore the archived shopping list before editing it" }
 
           if (!existing.currencyCode.equals(normalizedCurrency, ignoreCase = true)) {
             val itemCount = shoppingDao.countItemsForList(authenticatedUserId, list.id)
@@ -163,18 +164,53 @@ class ShoppingRepositoryImpl @Inject constructor(
       runCatching {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(listId.isNotBlank()) { "List ID is required" }
-
         database.withTransaction {
-          val existing =
-            shoppingDao.getListById(authenticatedUserId, listId)
-              ?: throw SecurityException("Shopping list does not belong to authenticated user")
-          require(existing.userId == authenticatedUserId) {
-            "Shopping list ownership verification failed"
+          val existing = shoppingDao.getListById(authenticatedUserId, listId)
+            ?: throw SecurityException("Shopping list does not belong to authenticated user")
+          require(existing.userId == authenticatedUserId) { "Shopping list ownership verification failed" }
+          check(shoppingDao.archiveList(authenticatedUserId, listId, System.currentTimeMillis()) == 1) {
+            "Shopping list archive rejected for authenticated user"
           }
-          shoppingDao.deleteStorePricesForList(authenticatedUserId, listId)
-          shoppingDao.deleteItemsForList(authenticatedUserId, listId)
-          val rows = shoppingDao.deleteList(authenticatedUserId, listId)
-          check(rows == 1) { "Shopping list deletion rejected for authenticated user" }
+        }
+      }
+    }
+
+  override fun observeArchivedLists(userId: String): Flow<List<ShoppingList>> =
+    shoppingDao.observeArchivedLists(userId).map { rows -> rows.map { it.toDomain() } }
+      .flowOn(dispatchers.io)
+
+  override fun observeArchivedItems(userId: String): Flow<List<ShoppingListItem>> =
+    shoppingDao.observeArchivedItems(userId).map { rows -> rows.map { it.toDomain() } }
+      .flowOn(dispatchers.io)
+
+  override suspend fun restoreList(authenticatedUserId: String, listId: String): Result<Unit> =
+    withContext(dispatchers.io) {
+      runCatching {
+        require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
+        database.withTransaction {
+          val existing = shoppingDao.getListById(authenticatedUserId, listId)
+            ?: throw SecurityException("Shopping list does not belong to authenticated user")
+          require(existing.userId == authenticatedUserId) { "Shopping list ownership verification failed" }
+          check(shoppingDao.restoreList(authenticatedUserId, listId, System.currentTimeMillis()) == 1) {
+            "Shopping list restore rejected for authenticated user"
+          }
+        }
+      }
+    }
+
+  override suspend fun restoreItem(authenticatedUserId: String, itemId: String): Result<Unit> =
+    withContext(dispatchers.io) {
+      runCatching {
+        require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
+        database.withTransaction {
+          val item = shoppingDao.getItemById(authenticatedUserId, itemId)
+            ?: throw SecurityException("Shopping item does not belong to authenticated user")
+          val parent = shoppingDao.getListById(authenticatedUserId, item.listId)
+            ?: throw SecurityException("Parent shopping list does not belong to authenticated user")
+          check(!parent.isArchived) { "Restore the archived shopping list before restoring its item" }
+          check(shoppingDao.restoreItem(authenticatedUserId, itemId, System.currentTimeMillis()) == 1) {
+            "Shopping item restore rejected for authenticated user"
+          }
         }
       }
     }
@@ -203,6 +239,7 @@ class ShoppingRepositoryImpl @Inject constructor(
           val parentList =
             shoppingDao.getListById(authenticatedUserId, listId)?.toDomain()
               ?: throw SecurityException("Shopping list does not belong to authenticated user")
+          check(!parentList.isArchived) { "Restore the archived shopping list before adding items" }
 
           val qty = calculationEngine.parsePositiveQuantity(quantityDecimal, "Quantity")
           val unitPriceMinor =
@@ -267,6 +304,7 @@ class ShoppingRepositoryImpl @Inject constructor(
           val existing =
             shoppingDao.getItemById(authenticatedUserId, itemId)?.toDomain()
               ?: throw SecurityException("Shopping item does not belong to authenticated user")
+          check(!existing.isArchived) { "Restore the archived shopping item before editing it" }
           val parentList =
             shoppingDao.getListById(authenticatedUserId, existing.listId)?.toDomain()
               ?: throw SecurityException("Parent shopping list does not belong to authenticated user")
@@ -422,9 +460,8 @@ class ShoppingRepositoryImpl @Inject constructor(
           require(existing.userId == authenticatedUserId) {
             "Shopping item ownership verification failed"
           }
-          shoppingDao.deleteStorePricesForItem(authenticatedUserId, itemId)
-          val rows = shoppingDao.deleteItem(authenticatedUserId, itemId)
-          check(rows == 1) { "Shopping item deletion rejected for authenticated user" }
+          val rows = shoppingDao.archiveItem(authenticatedUserId, itemId, System.currentTimeMillis())
+          check(rows == 1) { "Shopping item archive rejected for authenticated user" }
         }
       }
     }
@@ -494,8 +531,7 @@ class ShoppingRepositoryImpl @Inject constructor(
           require(existing.userId == authenticatedUserId) {
             "Store price ownership verification failed"
           }
-          val rows = shoppingDao.deleteStorePrice(authenticatedUserId, priceId)
-          check(rows == 1) { "Store price deletion rejected for authenticated user" }
+          throw IllegalStateException("Store-price history is retained and cannot be permanently deleted")
         }
       }
     }
