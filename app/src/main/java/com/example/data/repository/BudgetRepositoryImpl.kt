@@ -136,17 +136,41 @@ class BudgetRepositoryImpl @Inject constructor(
     }
 
   override suspend fun deleteBudget(userId: String, budgetId: String): Result<Unit> =
+    archiveBudget(userId, budgetId)
+
+  private suspend fun archiveBudget(userId: String, budgetId: String): Result<Unit> =
     withContext(dispatchers.io) {
       runCatching {
         require(userId.isNotBlank()) { "Authenticated user ID is required" }
         require(budgetId.isNotBlank()) { "Budget ID is required" }
         database.withTransaction {
-          val existing =
-            budgetDao.getBudgetById(userId, budgetId)
-              ?: throw SecurityException("Budget does not belong to authenticated user")
+          val existing = budgetDao.getBudgetById(userId, budgetId)
+            ?: throw SecurityException("Budget does not belong to authenticated user")
           require(existing.userId == userId) { "Budget ownership verification failed" }
-          val rowsDeleted = budgetDao.deleteBudget(userId, budgetId)
-          check(rowsDeleted == 1) { "Budget deletion rejected for authenticated user" }
+          check(budgetDao.archiveBudget(userId, budgetId, System.currentTimeMillis()) == 1) {
+            "Budget archive rejected for authenticated user"
+          }
+        }
+      }
+    }
+
+  override fun observeArchivedBudgets(userId: String): Flow<List<Budget>> =
+    budgetDao.observeArchivedBudgets(userId)
+      .map { rows -> rows.map { it.toDomain() } }
+      .flowOn(dispatchers.io)
+
+  override suspend fun restoreBudget(authenticatedUserId: String, budgetId: String): Result<Unit> =
+    withContext(dispatchers.io) {
+      runCatching {
+        require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
+        require(budgetId.isNotBlank()) { "Budget ID is required" }
+        database.withTransaction {
+          val existing = budgetDao.getBudgetById(authenticatedUserId, budgetId)
+            ?: throw SecurityException("Budget does not belong to authenticated user")
+          require(existing.userId == authenticatedUserId) { "Budget ownership verification failed" }
+          check(budgetDao.restoreBudget(authenticatedUserId, budgetId, System.currentTimeMillis()) == 1) {
+            "Budget restore rejected for authenticated user"
+          }
         }
       }
     }
