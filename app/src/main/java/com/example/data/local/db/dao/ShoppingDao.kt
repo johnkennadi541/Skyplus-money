@@ -67,7 +67,7 @@ interface ShoppingDao {
   @Query("SELECT * FROM shopping_items WHERE userId = :userId AND isArchived = 0 AND EXISTS (SELECT 1 FROM shopping_lists WHERE shopping_lists.id = shopping_items.listId AND shopping_lists.userId = :userId AND shopping_lists.isArchived = 0) ORDER BY isPurchased ASC, updatedAt DESC, createdAt DESC")
   fun getAllItemsForUser(userId: String): Flow<List<ShoppingItemEntity>>
 
-  @Query("SELECT * FROM shopping_items WHERE userId = :userId AND listId = :listId AND isArchived = 0 ORDER BY isPurchased ASC, updatedAt DESC, createdAt DESC")
+  @Query("SELECT * FROM shopping_items WHERE userId = :userId AND listId = :listId AND isArchived = 0 AND EXISTS (SELECT 1 FROM shopping_lists WHERE shopping_lists.id = shopping_items.listId AND shopping_lists.userId = :userId AND shopping_lists.isArchived = 0) ORDER BY isPurchased ASC, updatedAt DESC, createdAt DESC")
   fun getItemsForList(userId: String, listId: String): Flow<List<ShoppingItemEntity>>
 
   @Query("SELECT * FROM shopping_items WHERE userId = :userId AND isArchived = 1 ORDER BY updatedAt DESC")
