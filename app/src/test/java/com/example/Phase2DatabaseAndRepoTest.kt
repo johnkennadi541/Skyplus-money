@@ -233,6 +233,13 @@ class Phase2DatabaseAndRepoTest {
     // Delete income reverses +50.000 cleanly
     txnRepo.deleteTransaction(uid, inc.id).getOrThrow()
     assertEquals(80_000L, accountRepo.getAccountById(uid, "acc_kwd")!!.currentBalanceMinor)
+    assertTrue(txnRepo.getTransactions(uid).first().none { it.id == inc.id })
+    val archivedIncome = txnRepo.getArchivedTransactions(uid).first().single { it.id == inc.id }
+    assertTrue(archivedIncome.isArchived)
+    txnRepo.restoreTransaction(uid, inc.id).getOrThrow()
+    assertEquals(130_000L, accountRepo.getAccountById(uid, "acc_kwd")!!.currentBalanceMinor)
+    assertTrue(txnRepo.getTransactions(uid).first().any { it.id == inc.id })
+    assertTrue(txnRepo.getArchivedTransactions(uid).first().none { it.id == inc.id })
   }
 
   @Test
@@ -299,6 +306,14 @@ class Phase2DatabaseAndRepoTest {
     assertEquals(500_000L, accountRepo.getAccountById(uid, "src_inr")!!.currentBalanceMinor)
     assertEquals(100_000L, accountRepo.getAccountById(uid, "dst_inr")!!.currentBalanceMinor)
     assertEquals(0, txnRepo.getTransactions(uid).first().size)
+    assertEquals(2, txnRepo.getArchivedTransactions(uid).first().size)
+
+    // Restoring either leg restores the entire paired transfer atomically.
+    txnRepo.restoreTransaction(uid, outLeg.id).getOrThrow()
+    assertEquals(300_000L, accountRepo.getAccountById(uid, "src_inr")!!.currentBalanceMinor)
+    assertEquals(300_000L, accountRepo.getAccountById(uid, "dst_inr")!!.currentBalanceMinor)
+    assertEquals(2, txnRepo.getTransactions(uid).first().size)
+    assertEquals(0, txnRepo.getArchivedTransactions(uid).first().size)
 
     // Cross-currency without converted destination amount must fail
     val missingConv =
