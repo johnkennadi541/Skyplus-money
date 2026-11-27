@@ -125,8 +125,6 @@ fun LoansScreen(
 @Composable
 fun LoansContent(
   loans: List<Loan>,
-  archivedLoans: List<Loan> = emptyList(),
-  onRestoreLoan: (String) -> Unit = {},
   summaries: Map<String, LoanCurrencySummary>,
   accounts: List<FinancialAccount>,
   userMessage: String? = null,
@@ -153,6 +151,8 @@ fun LoansContent(
     () -> Unit,
   ) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
   modifier: Modifier = Modifier,
+  archivedLoans: List<Loan> = emptyList(),
+  onRestoreLoan: (String) -> Unit = {},
 ) {
   BackHandler(onBack = onNavigateBack)
 
