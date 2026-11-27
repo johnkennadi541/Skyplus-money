@@ -165,11 +165,19 @@ class Phase3InvestmentDatabaseAndRepoTest {
     assertEquals(24075_00L, afterPartialSell.totalInvestedMinor)
     assertEquals(975_00L, afterPartialSell.realizedPnlMinor)
 
-    // Delete holding cascades transactions and history
+    // Legacy delete action now archives the holding; all investment history remains intact.
     repo.deleteHolding("uid_inv_1", created.id).getOrThrow()
-    assertNull(repo.getHoldingById("uid_inv_1", created.id))
-    assertTrue(repo.getTransactionsForHolding("uid_inv_1", created.id).first().isEmpty())
-    assertTrue(repo.getPriceHistoryForHolding("uid_inv_1", created.id).first().isEmpty())
+    val archived = repo.getHoldingById("uid_inv_1", created.id)
+    assertNotNull(archived)
+    assertTrue(archived!!.isArchived)
+    assertTrue(repo.getHoldings("uid_inv_1").first().none { it.id == created.id })
+    assertTrue(repo.getArchivedHoldings("uid_inv_1").first().any { it.id == created.id })
+    assertEquals(3, repo.getTransactionsForHolding("uid_inv_1", created.id).first().size)
+    assertTrue(repo.getPriceHistoryForHolding("uid_inv_1", created.id).first().isNotEmpty())
+
+    repo.restoreHolding("uid_inv_1", created.id).getOrThrow()
+    assertFalse(repo.getHoldingById("uid_inv_1", created.id)!!.isArchived)
+    assertTrue(repo.getHoldings("uid_inv_1").first().any { it.id == created.id })
   }
 
   @Test
@@ -525,6 +533,8 @@ class Phase3InvestmentDatabaseAndRepoTest {
           DatabaseMigrations.MIGRATION_6_7,
           DatabaseMigrations.MIGRATION_7_8,
           DatabaseMigrations.MIGRATION_8_9,
+          DatabaseMigrations.MIGRATION_9_10,
+          DatabaseMigrations.MIGRATION_10_11,
         )
         .build()
 

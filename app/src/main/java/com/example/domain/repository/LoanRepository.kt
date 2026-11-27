@@ -39,6 +39,13 @@ interface LoanRepository {
     notes: String? = null,
   ): Result<LoanPayment>
 
+  fun getArchivedLoans(userId: String): Flow<List<Loan>>
+
+  suspend fun archiveLoan(authenticatedUserId: String, loanId: String): Result<Unit>
+
+  suspend fun restoreLoan(authenticatedUserId: String, loanId: String): Result<Unit>
+
+  /** Legacy compatibility: archive instead of permanently deleting payment history. */
   suspend fun deleteLoan(
     authenticatedUserId: String,
     loanId: String,

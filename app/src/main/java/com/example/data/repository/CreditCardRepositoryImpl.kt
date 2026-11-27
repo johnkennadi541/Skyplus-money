@@ -143,8 +143,8 @@ constructor(
             creditCardDao.getCardById(userId, cardId)
               ?: throw SecurityException("Card does not belong to authenticated user")
           require(existing.userId == userId) { "Card ownership verification failed" }
-          val rows = creditCardDao.deleteCard(userId, cardId)
-          check(rows == 1) { "Card deletion rejected for authenticated user" }
+          val rows = creditCardDao.deactivateCard(userId, cardId, System.currentTimeMillis())
+          check(rows == 1) { "Card deactivation rejected for authenticated user" }
         }
       }
     }

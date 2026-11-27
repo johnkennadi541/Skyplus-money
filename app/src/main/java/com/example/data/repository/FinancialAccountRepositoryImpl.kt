@@ -139,22 +139,14 @@ class FinancialAccountRepositoryImpl @Inject constructor(
               ?: throw SecurityException("Account does not belong to authenticated user")
           require(existing.userId == userId) { "Account ownership verification failed" }
           val txnCount = transactionDao.countForAccount(userId, accountId)
-          if (txnCount > 0 && !deleteLinkedTransactions) {
-            throw IllegalStateException(
-              "Account has $txnCount recorded transactions. Deactivate the account to preserve history or confirm full removal."
-            )
+          require(txnCount == 0) {
+            "Account has $txnCount recorded ledger transactions. Permanent account deletion is disabled; deactivate the account to preserve its complete history."
           }
-          if (txnCount > 0 && deleteLinkedTransactions) {
-            transactionDao.deleteByAccount(userId, accountId)
-          }
-          mappingRuleDao.deleteRulesForAccount(userId, accountId)
-          // Remove the card record in the same transaction so an orphan card can never survive
-          // its account. The card row carries no ledger data of its own.
-          database.creditCardDao().getCardByAccountId(userId, accountId)?.let { linkedCard ->
-            database.creditCardDao().deleteCard(userId, linkedCard.id)
-          }
-          val deletedRows = accountDao.deleteAccount(userId, accountId)
-          check(deletedRows == 1) { "Account deletion rejected for authenticated user" }
+          // Account deletion is deliberately fail-closed. Even an explicit legacy
+          // deleteLinkedTransactions=true flag must never erase a user's financial ledger.
+          throw IllegalStateException(
+            "Permanent account deletion is disabled to protect financial history. Deactivate the account instead."
+          )
         }
       }
     }

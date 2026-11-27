@@ -185,10 +185,10 @@ fun CardsContent(
 
   cardToDelete?.let { summary ->
     SkyplusConfirmDialog(
-      title = "Remove card?",
+      title = "Deactivate card?",
       message =
-        "This removes the card record only. The account and its transactions stay exactly as they are.",
-      confirmLabel = "Remove",
+        "This deactivates the card while preserving its record and all linked account transactions. You can reactivate it later.",
+      confirmLabel = "Deactivate",
       destructive = true,
       onConfirm = {
         onDeleteCard(summary.card.id) { cardToDelete = null }

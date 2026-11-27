@@ -11,8 +11,14 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface SavingsGoalDao {
 
-  @Query("SELECT * FROM savings_goals WHERE userId = :userId ORDER BY createdAt DESC")
+  @Query("SELECT * FROM savings_goals WHERE userId = :userId AND isArchived = 0 ORDER BY createdAt DESC")
   fun observeGoals(userId: String): Flow<List<SavingsGoalEntity>>
+
+  @Query("SELECT * FROM savings_goals WHERE userId = :userId AND isArchived = 1 ORDER BY createdAt DESC")
+  fun observeArchivedGoals(userId: String): Flow<List<SavingsGoalEntity>>
+
+  @Query("UPDATE savings_goals SET isArchived = :archived, updatedAt = :updatedAt WHERE userId = :userId AND id = :goalId")
+  suspend fun setGoalArchived(userId: String, goalId: String, archived: Boolean, updatedAt: Long): Int
 
   @Query("SELECT * FROM savings_goals WHERE userId = :userId AND id = :goalId LIMIT 1")
   suspend fun getGoalById(userId: String, goalId: String): SavingsGoalEntity?
@@ -66,15 +72,7 @@ interface SavingsGoalDao {
     updatedAt: Long,
   ): Int
 
-  @Query("DELETE FROM savings_goals WHERE userId = :userId AND id = :id")
-  suspend fun deleteGoal(userId: String, id: String): Int
-
   @Insert(onConflict = OnConflictStrategy.ABORT)
   suspend fun insertContribution(contribution: SavingsContributionEntity)
 
-  @Query("DELETE FROM savings_contributions WHERE userId = :userId AND id = :id")
-  suspend fun deleteContribution(userId: String, id: String): Int
-
-  @Query("DELETE FROM savings_contributions WHERE userId = :userId AND goalId = :goalId")
-  suspend fun deleteContributionsForGoal(userId: String, goalId: String): Int
 }

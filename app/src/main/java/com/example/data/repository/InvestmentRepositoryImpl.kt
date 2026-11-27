@@ -52,6 +52,11 @@ class InvestmentRepositoryImpl @Inject constructor(
       .map { list -> list.map { it.toDomain() } }
       .flowOn(dispatchers.io)
 
+  override fun getArchivedHoldings(userId: String): Flow<List<InvestmentHolding>> =
+    investmentDao.getArchivedHoldings(userId)
+      .map { list -> list.map { it.toDomain() } }
+      .flowOn(dispatchers.io)
+
   override fun getHoldingByIdFlow(userId: String, holdingId: String): Flow<InvestmentHolding?> =
     investmentDao.getHoldingByIdFlow(userId, holdingId)
       .map { it?.toDomain() }
@@ -776,15 +781,30 @@ class InvestmentRepositoryImpl @Inject constructor(
       }
     }
 
+  override suspend fun archiveHolding(
+    authenticatedUserId: String,
+    holdingId: String,
+  ): Result<Unit> = setHoldingArchived(authenticatedUserId, holdingId, archived = true)
+
+  override suspend fun restoreHolding(
+    authenticatedUserId: String,
+    holdingId: String,
+  ): Result<Unit> = setHoldingArchived(authenticatedUserId, holdingId, archived = false)
+
   override suspend fun deleteHolding(
     authenticatedUserId: String,
     holdingId: String,
+  ): Result<Unit> = archiveHolding(authenticatedUserId, holdingId)
+
+  private suspend fun setHoldingArchived(
+    authenticatedUserId: String,
+    holdingId: String,
+    archived: Boolean,
   ): Result<Unit> =
     withContext(dispatchers.io) {
       runCatching {
         require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
         require(holdingId.isNotBlank()) { "Holding ID is required" }
-
         database.withTransaction {
           val existing =
             investmentDao.getHoldingById(authenticatedUserId, holdingId)
@@ -792,11 +812,17 @@ class InvestmentRepositoryImpl @Inject constructor(
           require(existing.userId == authenticatedUserId) {
             "Investment ownership verification failed"
           }
-
-          investmentDao.deletePriceHistoryForHolding(authenticatedUserId, holdingId)
-          investmentDao.deleteTransactionsForHolding(authenticatedUserId, holdingId)
-          val rowsDeleted = investmentDao.deleteHolding(authenticatedUserId, holdingId)
-          check(rowsDeleted == 1) { "Investment deletion rejected for authenticated user" }
+          check(existing.isArchived != archived) {
+            if (archived) "Investment holding is already archived" else "Investment holding is not archived"
+          }
+          val rowsUpdated =
+            investmentDao.setHoldingArchived(
+              userId = authenticatedUserId,
+              holdingId = holdingId,
+              archived = archived,
+              updatedAt = System.currentTimeMillis(),
+            )
+          check(rowsUpdated == 1) { "Investment archive state update rejected for authenticated user" }
         }
       }
     }

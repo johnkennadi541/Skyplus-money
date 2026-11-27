@@ -1,5 +1,6 @@
 package com.example.data.local.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -23,6 +24,7 @@ data class SavingsGoalEntity(
   val note: String?,
   val createdAt: Long,
   val updatedAt: Long,
+  @ColumnInfo(defaultValue = "0") val isArchived: Boolean = false,
 ) {
   fun toDomain(): SavingsGoal =
     SavingsGoal(
@@ -35,6 +37,7 @@ data class SavingsGoalEntity(
       note = note,
       createdAt = createdAt,
       updatedAt = updatedAt,
+      isArchived = isArchived,
     )
 
   companion object {
@@ -49,6 +52,7 @@ data class SavingsGoalEntity(
         note = goal.note,
         createdAt = goal.createdAt,
         updatedAt = goal.updatedAt,
+        isArchived = goal.isArchived,
       )
   }
 }

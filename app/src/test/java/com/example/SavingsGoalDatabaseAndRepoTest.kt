@@ -225,28 +225,32 @@ class SavingsGoalDatabaseAndRepoTest {
   }
 
   @Test
-  fun `deleting a goal removes its contributions and nothing else`() = runTest {
+  fun `legacy goal removal archives goal and preserves all contributions`() = runTest {
     repository.createGoal(userA, goal()).getOrThrow()
     repository.addContribution(userA, contribution(10_000L, id = "c_1")).getOrThrow()
     repository.addContribution(userA, contribution(5_000L, id = "c_2")).getOrThrow()
 
     repository.deleteGoal(userA, "goal_1").getOrThrow()
 
-    assertNull(repository.getGoal(userA, "goal_1"))
-    assertTrue(repository.observeContributions(userA).first().isEmpty())
+    assertTrue(repository.getGoal(userA, "goal_1")!!.isArchived)
+    assertTrue(repository.observeGoals(userA).first().none { it.id == "goal_1" })
+    assertTrue(repository.observeArchivedGoals(userA).first().any { it.id == "goal_1" })
+    assertEquals(2, repository.observeContributions(userA).first().size)
+    repository.restoreGoal(userA, "goal_1").getOrThrow()
+    assertTrue(repository.observeGoals(userA).first().any { it.id == "goal_1" })
   }
 
   @Test
-  fun `a single contribution can be deleted and the total follows`() = runTest {
+  fun `contribution deletion is refused and financial history remains unchanged`() = runTest {
     repository.createGoal(userA, goal()).getOrThrow()
     repository.addContribution(userA, contribution(10_000L, id = "c_1")).getOrThrow()
     repository.addContribution(userA, contribution(5_000L, id = "c_2")).getOrThrow()
 
-    repository.deleteContribution(userA, "c_1").getOrThrow()
+    assertTrue(repository.deleteContribution(userA, "c_1").isFailure)
 
     val remaining = repository.observeContributions(userA).first()
-    assertEquals(1, remaining.size)
-    assertEquals(5_000L, engine.savedMinor(repository.getGoal(userA, "goal_1")!!, remaining))
+    assertEquals(2, remaining.size)
+    assertEquals(15_000L, engine.savedMinor(repository.getGoal(userA, "goal_1")!!, remaining))
   }
 
   @Test

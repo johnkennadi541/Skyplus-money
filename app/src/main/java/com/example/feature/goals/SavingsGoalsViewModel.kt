@@ -203,7 +203,7 @@ constructor(
     viewModelScope.launch {
       deleteSavingsGoalUseCase(uid, goalId)
         .onSuccess {
-          succeed("Goal and its contributions were removed")
+          succeed("Goal archived. All contribution history is preserved.")
           onSuccess()
         }
         .onFailure { fail(it.message ?: "Could not remove the goal") }

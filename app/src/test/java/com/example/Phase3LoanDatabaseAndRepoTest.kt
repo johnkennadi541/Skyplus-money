@@ -205,15 +205,19 @@ class Phase3LoanDatabaseAndRepoTest {
   }
 
   @Test
-  fun `deleteLoan removes loan and payment history atomically`() = runTest {
+  fun `legacy loan removal archives loan and preserves payment history`() = runTest {
     val loan = buildLoan(userId = userA)
     loanRepo.createLoan(userA, loan)
     loanRepo.recordPayment(userA, loan.id, 1_701_000_000_000L, 888_49L)
 
     assertEquals(1, loanRepo.getPaymentsForLoan(userA, loan.id).first().size)
     assertTrue(loanRepo.deleteLoan(userA, loan.id).isSuccess)
-    assertNull(loanRepo.getLoanById(userA, loan.id))
-    assertTrue(loanRepo.getPaymentsForLoan(userA, loan.id).first().isEmpty())
+    assertTrue(loanRepo.getLoanById(userA, loan.id)!!.isArchived)
+    assertTrue(loanRepo.getLoans(userA).first().none { it.id == loan.id })
+    assertTrue(loanRepo.getArchivedLoans(userA).first().any { it.id == loan.id })
+    assertEquals(1, loanRepo.getPaymentsForLoan(userA, loan.id).first().size)
+    loanRepo.restoreLoan(userA, loan.id).getOrThrow()
+    assertTrue(loanRepo.getLoans(userA).first().any { it.id == loan.id })
   }
 
   @Test
@@ -374,6 +378,8 @@ class Phase3LoanDatabaseAndRepoTest {
           DatabaseMigrations.MIGRATION_6_7,
           DatabaseMigrations.MIGRATION_7_8,
           DatabaseMigrations.MIGRATION_8_9,
+          DatabaseMigrations.MIGRATION_9_10,
+          DatabaseMigrations.MIGRATION_10_11,
         )
         .build()
 

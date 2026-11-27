@@ -13,6 +13,8 @@ interface InvestmentRepository {
 
   fun getHoldings(userId: String): Flow<List<InvestmentHolding>>
 
+  fun getArchivedHoldings(userId: String): Flow<List<InvestmentHolding>>
+
   fun getHoldingByIdFlow(userId: String, holdingId: String): Flow<InvestmentHolding?>
 
   suspend fun getHoldingById(userId: String, holdingId: String): InvestmentHolding?
@@ -102,6 +104,11 @@ interface InvestmentRepository {
     forceBypassCooldown: Boolean = false,
   ): Result<MarketSyncSummary>
 
+  suspend fun archiveHolding(authenticatedUserId: String, holdingId: String): Result<Unit>
+
+  suspend fun restoreHolding(authenticatedUserId: String, holdingId: String): Result<Unit>
+
+  /** Legacy compatibility: archives the holding and never deletes its history. */
   suspend fun deleteHolding(
     authenticatedUserId: String,
     holdingId: String,

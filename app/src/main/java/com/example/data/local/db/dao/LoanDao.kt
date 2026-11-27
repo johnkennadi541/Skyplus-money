@@ -11,8 +11,14 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface LoanDao {
 
-  @Query("SELECT * FROM loans WHERE userId = :userId ORDER BY createdAt DESC")
+  @Query("SELECT * FROM loans WHERE userId = :userId AND isArchived = 0 ORDER BY createdAt DESC")
   fun getAllLoans(userId: String): Flow<List<LoanEntity>>
+
+  @Query("SELECT * FROM loans WHERE userId = :userId AND isArchived = 1 ORDER BY createdAt DESC")
+  fun getArchivedLoans(userId: String): Flow<List<LoanEntity>>
+
+  @Query("UPDATE loans SET isArchived = :archived, updatedAt = :updatedAt WHERE userId = :userId AND id = :loanId")
+  suspend fun setLoanArchived(userId: String, loanId: String, archived: Boolean, updatedAt: Long): Int
 
   @Query("SELECT * FROM loans WHERE userId = :userId AND id = :loanId LIMIT 1")
   suspend fun getLoanById(userId: String, loanId: String): LoanEntity?
@@ -92,9 +98,6 @@ interface LoanDao {
       updatedAt = loan.updatedAt,
     )
   }
-
-  @Query("DELETE FROM loans WHERE userId = :userId AND id = :loanId")
-  suspend fun deleteLoan(userId: String, loanId: String): Int
 
   @Query(
     """

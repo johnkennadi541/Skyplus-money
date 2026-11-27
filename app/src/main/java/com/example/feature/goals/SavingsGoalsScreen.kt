@@ -221,10 +221,10 @@ fun SavingsGoalsContent(
 
   deleting?.let { summary ->
     SkyplusConfirmDialog(
-      title = "Delete goal?",
-      message = "This removes the goal and every contribution recorded against it. Your accounts and transactions are not affected.",
-      confirmLabel = "Delete",
-      destructive = true,
+      title = "Archive goal?",
+      message = "This hides the goal from your active list. Every saved contribution remains unchanged, and you can restore the goal later.",
+      confirmLabel = "Archive",
+      destructive = false,
       onConfirm = {
         onDeleteGoal(summary.goal.id) { deleting = null }
         deleting = null

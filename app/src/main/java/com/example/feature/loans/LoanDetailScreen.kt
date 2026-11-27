@@ -606,9 +606,9 @@ fun LoanDetailContent(
   if (showDeleteDialog && loan != null) {
     AlertDialog(
       onDismissRequest = { showDeleteDialog = false },
-      title = { Text("Delete Loan") },
+      title = { Text("Archive Loan") },
       text = {
-        Text("Are you sure you want to delete '${loan.name}' and all its recorded EMI payment history? This cannot be undone.")
+        Text("Archive '${loan.name}'? The loan will leave the active list, but its EMI payments and complete loan history will be preserved. You can restore it later.")
       },
       confirmButton = {
         Button(
@@ -617,7 +617,7 @@ fun LoanDetailContent(
             onDeleteLoan(loan.id)
           },
           colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-          modifier = Modifier.testTag("confirm_delete_loan_button"),
+          modifier = Modifier.testTag("confirm_archive_loan_button"),
         ) {
           Text("Delete")
         }
