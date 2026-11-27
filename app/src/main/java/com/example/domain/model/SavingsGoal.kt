@@ -20,6 +20,7 @@ data class SavingsGoal(
   val note: String? = null,
   val createdAt: Long = System.currentTimeMillis(),
   val updatedAt: Long = System.currentTimeMillis(),
+  val isArchived: Boolean = false,
 ) {
   val target: Money
     get() = Money.fromMinorUnits(targetMinor, currencyCode)
