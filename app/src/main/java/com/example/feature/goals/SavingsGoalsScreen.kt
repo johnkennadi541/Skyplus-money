@@ -89,8 +89,6 @@ fun SavingsGoalsScreen(
 @Composable
 fun SavingsGoalsContent(
   goals: List<SavingsGoalSummary>,
-  archivedGoals: List<SavingsGoal> = emptyList(),
-  onRestoreGoal: (String) -> Unit = {},
   isLoading: Boolean = false,
   message: String?,
   isErrorMessage: Boolean,
@@ -102,6 +100,8 @@ fun SavingsGoalsContent(
   hasLoadError: Boolean = false,
   onRetryLoadGoals: () -> Unit = {},
   modifier: Modifier = Modifier,
+  archivedGoals: List<SavingsGoal> = emptyList(),
+  onRestoreGoal: (String) -> Unit = {},
 ) {
   var showCreateDialog by remember { mutableStateOf(false) }
   var showArchivedGoals by remember { mutableStateOf(false) }
