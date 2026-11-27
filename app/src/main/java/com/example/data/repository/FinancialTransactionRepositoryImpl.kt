@@ -27,6 +27,11 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
   private val dispatchers: DispatcherProvider,
 ) : FinancialTransactionRepository {
 
+  override fun getArchivedTransactions(userId: String): Flow<List<FinancialTransaction>> =
+    transactionDao.getArchivedTransactions(userId)
+      .map { rows -> rows.map { it.toDomain() } }
+      .flowOn(dispatchers.io)
+
   override fun getTransactions(userId: String): Flow<List<FinancialTransaction>> =
     transactionDao.getAllTransactions(userId)
       .map { list -> list.map { it.toDomain() } }
@@ -254,28 +259,39 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
             transactionDao.getTransactionById(userId, transactionId)
               ?: throw SecurityException("Transaction does not belong to authenticated user")
           require(txn.userId == userId) { "Transaction ownership verification failed" }
+          check(!txn.isArchived) { "Transaction is already archived" }
           val now = System.currentTimeMillis()
-          val type = runCatching { TransactionType.valueOf(txn.type) }.getOrDefault(TransactionType.EXPENSE)
-          val status = runCatching { TransactionStatus.valueOf(txn.status) }.getOrDefault(TransactionStatus.COMPLETED)
+          val type = runCatching { TransactionType.valueOf(txn.type) }
+            .getOrElse { throw IllegalStateException("Unknown transaction type; refusing to alter balance") }
+          val status = runCatching { TransactionStatus.valueOf(txn.status) }
+            .getOrElse { throw IllegalStateException("Unknown transaction status; refusing to alter balance") }
 
           if (status == TransactionStatus.COMPLETED && type == TransactionType.TRANSFER && !txn.linkedTransferId.isNullOrBlank()) {
             val linkedEntries = transactionDao.findByLinkedTransferId(userId, txn.linkedTransferId)
+            check(linkedEntries.isNotEmpty() && linkedEntries.all { !it.isArchived }) {
+              "Linked transfer is incomplete or already archived; refusing partial reversal"
+            }
             for (entry in linkedEntries) {
-              val reverseDelta =
-                if (entry.category == TransactionCategories.TRANSFER_IN_CATEGORY) {
-                  -entry.amountMinor
-                } else {
-                  entry.amountMinor
-                }
-              accountDao.adjustBalance(userId, entry.accountId, reverseDelta, now)
-              transactionDao.deleteTransaction(userId, entry.id)
+              val entryType = runCatching { TransactionType.valueOf(entry.type) }
+                .getOrElse { throw IllegalStateException("Unknown linked transaction type") }
+              val entryStatus = runCatching { TransactionStatus.valueOf(entry.status) }
+                .getOrElse { throw IllegalStateException("Unknown linked transaction status") }
+              val reverseDelta = -balanceDeltaFor(entryType, entryStatus, entry.amountMinor)
+              if (reverseDelta != 0L) {
+                accountDao.adjustBalance(userId, entry.accountId, reverseDelta, now)
+              }
+              check(transactionDao.archiveTransaction(userId, entry.id, now) == 1) {
+                "Linked transaction archive failed"
+              }
             }
           } else {
             val delta = balanceDeltaFor(type, status, txn.amountMinor)
             if (delta != 0L) {
               accountDao.adjustBalance(userId, txn.accountId, -delta, now)
             }
-            transactionDao.deleteTransaction(userId, transactionId)
+            check(transactionDao.archiveTransaction(userId, transactionId, now) == 1) {
+              "Transaction archive failed"
+            }
           }
         }
       }
