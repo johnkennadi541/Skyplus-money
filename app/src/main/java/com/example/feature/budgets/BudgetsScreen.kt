@@ -497,9 +497,9 @@ fun BudgetsContent(
   budgetToDelete?.let { budget ->
     AlertDialog(
       onDismissRequest = { budgetToDelete = null },
-      title = { Text("Delete Budget") },
+      title = { Text("Archive Budget") },
       text = {
-        Text("Are you sure you want to delete '${budget.name}'? Recorded financial transactions will remain safe in your ledger.")
+        Text("'${budget.name}' will move to Archived Budgets. Its budget periods and linked financial transactions will be preserved.")
       },
       confirmButton = {
         Button(
@@ -511,7 +511,7 @@ fun BudgetsContent(
           colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
           modifier = Modifier.testTag("confirm_delete_budget_button"),
         ) {
-          Text("Delete")
+          Text("Archive")
         }
       },
       dismissButton = {
