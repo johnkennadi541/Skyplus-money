@@ -276,7 +276,14 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
                 .getOrElse { throw IllegalStateException("Unknown linked transaction type") }
               val entryStatus = runCatching { TransactionStatus.valueOf(entry.status) }
                 .getOrElse { throw IllegalStateException("Unknown linked transaction status") }
-              val reverseDelta = -balanceDeltaFor(entryType, entryStatus, entry.amountMinor)
+              val reverseDelta =
+                if (entry.category == TransactionCategories.TRANSFER_IN_CATEGORY) {
+                  -entry.amountMinor
+                } else if (entry.category == TransactionCategories.TRANSFER_OUT_CATEGORY) {
+                  entry.amountMinor
+                } else {
+                  -balanceDeltaFor(entryType, entryStatus, entry.amountMinor)
+                }
               if (reverseDelta != 0L) {
                 accountDao.adjustBalance(userId, entry.accountId, reverseDelta, now)
               }
@@ -292,6 +299,23 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
             check(transactionDao.archiveTransaction(userId, transactionId, now) == 1) {
               "Transaction archive failed"
             }
+          }
+        }
+      }
+    }
+
+  override suspend fun restoreTransaction(userId: String, transactionId: String): Result<Unit> =
+    withContext(dispatchers.io) {
+      runCatching {
+        require(userId.isNotBlank()) { "Authenticated user ID is required" }
+        require(transactionId.isNotBlank()) { "Transaction ID is required" }
+        database.withTransaction {
+          val existing = transactionDao.getTransactionById(userId, transactionId)
+            ?: throw SecurityException("Transaction does not belong to authenticated user")
+          require(existing.userId == userId) { "Transaction ownership verification failed" }
+          check(existing.isArchived) { "Transaction is not archived" }
+          check(transactionDao.restoreTransaction(userId, transactionId, System.currentTimeMillis()) == 1) {
+            "Transaction restore rejected"
           }
         }
       }
