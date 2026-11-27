@@ -314,12 +314,50 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
             ?: throw SecurityException("Transaction does not belong to authenticated user")
           require(existing.userId == userId) { "Transaction ownership verification failed" }
           check(existing.isArchived) { "Transaction is not archived" }
-          check(transactionDao.restoreTransaction(userId, transactionId, System.currentTimeMillis()) == 1) {
-            "Transaction restore rejected"
+          val now = System.currentTimeMillis()
+          val type = runCatching { TransactionType.valueOf(existing.type) }
+            .getOrElse { throw IllegalStateException("Unknown transaction type; refusing to alter balance") }
+          val status = runCatching { TransactionStatus.valueOf(existing.status) }
+            .getOrElse { throw IllegalStateException("Unknown transaction status; refusing to alter balance") }
+
+          if (status == TransactionStatus.COMPLETED && type == TransactionType.TRANSFER && !existing.linkedTransferId.isNullOrBlank()) {
+            val linkedEntries = transactionDao.findByLinkedTransferId(userId, existing.linkedTransferId)
+            check(linkedEntries.isNotEmpty() && linkedEntries.all { it.isArchived }) {
+              "Linked transfer is incomplete or not fully archived; refusing partial restore"
+            }
+            for (entry in linkedEntries) {
+              val originalDelta =
+                if (entry.category == TransactionCategories.TRANSFER_IN_CATEGORY) {
+                  entry.amountMinor
+                } else if (entry.category == TransactionCategories.TRANSFER_OUT_CATEGORY) {
+                  -entry.amountMinor
+                } else {
+                  val entryType = runCatching { TransactionType.valueOf(entry.type) }
+                    .getOrElse { throw IllegalStateException("Unknown linked transaction type") }
+                  val entryStatus = runCatching { TransactionStatus.valueOf(entry.status) }
+                    .getOrElse { throw IllegalStateException("Unknown linked transaction status") }
+                  balanceDeltaFor(entryType, entryStatus, entry.amountMinor)
+                }
+              if (originalDelta != 0L) {
+                accountDao.adjustBalance(userId, entry.accountId, originalDelta, now)
+              }
+              check(transactionDao.restoreTransaction(userId, entry.id, now) == 1) {
+                "Linked transaction restore failed"
+              }
+            }
+          } else {
+            val delta = balanceDeltaFor(type, status, existing.amountMinor)
+            if (delta != 0L) {
+              accountDao.adjustBalance(userId, existing.accountId, delta, now)
+            }
+            check(transactionDao.restoreTransaction(userId, transactionId, now) == 1) {
+              "Transaction restore rejected"
+            }
           }
         }
       }
     }
+
 
   private fun balanceDeltaFor(
     type: TransactionType,
