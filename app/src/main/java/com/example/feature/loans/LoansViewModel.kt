@@ -392,7 +392,7 @@ class LoansViewModel @Inject constructor(
       result.fold(
         onSuccess = {
           _isErrorMessage.value = false
-          _userMessage.value = "Loan deleted"
+          _userMessage.value = "Loan archived. EMI payment history is preserved."
           launch(dispatchers.main) { onSuccess() }
         },
         onFailure = { error ->
