@@ -3,6 +3,7 @@ package com.example.domain.repository
 import com.example.domain.model.ShoppingList
 import com.example.domain.model.ShoppingListItem
 import com.example.domain.model.ShoppingStorePriceRecord
+import com.example.domain.model.ShoppingPurchaseHistory
 import kotlinx.coroutines.flow.Flow
 
 interface ShoppingRepository {
@@ -22,6 +23,10 @@ interface ShoppingRepository {
   fun getItemsForUser(userId: String): Flow<List<ShoppingListItem>>
 
   fun getItemsForList(userId: String, listId: String): Flow<List<ShoppingListItem>>
+
+  fun getPurchaseHistoryForItem(userId: String, itemId: String): Flow<List<ShoppingPurchaseHistory>>
+
+  fun getPurchaseHistoryForList(userId: String, listId: String): Flow<List<ShoppingPurchaseHistory>>
 
   fun getStorePricesForUser(userId: String): Flow<List<ShoppingStorePriceRecord>>
 
