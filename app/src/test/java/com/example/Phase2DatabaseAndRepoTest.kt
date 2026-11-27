@@ -9,6 +9,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.example.core.common.DispatcherProvider
 import com.example.data.local.db.AppDatabase
 import com.example.data.local.db.DatabaseMigrations
+import com.example.data.local.db.entity.FinancialTransactionEntity
 import com.example.data.repository.FinancialAccountRepositoryImpl
 import com.example.data.repository.FinancialTransactionRepositoryImpl
 import com.example.data.repository.SmartDetectionRepositoryImpl
@@ -813,6 +814,108 @@ class Phase2DatabaseAndRepoTest {
     assertEquals(
       DetectionEventStatus.IN_REVIEW,
       detectionRepo.getEventById(uid, event.id)?.status,
+    )
+  }
+
+  @Test
+  fun `deleting account with transfer entries is rejected without changing ledger`() = runTest {
+    val uid = "uid_account_transfer_delete_guard"
+    val source = FinancialAccount(
+      id = "transfer_delete_source", userId = uid, name = "Source",
+      type = AccountType.BANK, currencyCode = "INR",
+      initialBalanceMinor = 100_000L, currentBalanceMinor = 100_000L,
+    )
+    val destination = FinancialAccount(
+      id = "transfer_delete_destination", userId = uid, name = "Destination",
+      type = AccountType.WALLET, currencyCode = "INR",
+      initialBalanceMinor = 50_000L, currentBalanceMinor = 50_000L,
+    )
+    accountRepo.createAccount(uid, source).getOrThrow()
+    accountRepo.createAccount(uid, destination).getOrThrow()
+    txnRepo.recordTransfer(
+      authenticatedUserId = uid,
+      sourceTransaction = FinancialTransaction(
+        id = "transfer_delete_out", userId = uid, accountId = source.id,
+        type = TransactionType.TRANSFER, amountMinor = 10_000L,
+        currencyCode = "INR", category = TransactionCategories.TRANSFER_OUT_CATEGORY,
+      ),
+      destinationAccountId = destination.id,
+    ).getOrThrow()
+
+    val result = accountRepo.deleteAccount(uid, source.id, deleteLinkedTransactions = true)
+
+    assertTrue(result.isFailure)
+    assertNotNull(accountRepo.getAccountById(uid, source.id))
+    assertEquals(90_000L, accountRepo.getAccountById(uid, source.id)!!.currentBalanceMinor)
+    assertEquals(60_000L, accountRepo.getAccountById(uid, destination.id)!!.currentBalanceMinor)
+    assertEquals(2, txnRepo.getTransactions(uid).first().size)
+  }
+
+  @Test
+  fun `deleting incomplete transfer fails closed and preserves remaining ledger row`() = runTest {
+    val uid = "uid_incomplete_transfer_delete_guard"
+    val source = FinancialAccount(
+      id = "incomplete_source", userId = uid, name = "Source",
+      type = AccountType.BANK, currencyCode = "INR",
+      initialBalanceMinor = 100_000L, currentBalanceMinor = 100_000L,
+    )
+    val destination = FinancialAccount(
+      id = "incomplete_destination", userId = uid, name = "Destination",
+      type = AccountType.WALLET, currencyCode = "INR",
+      initialBalanceMinor = 50_000L, currentBalanceMinor = 50_000L,
+    )
+    accountRepo.createAccount(uid, source).getOrThrow()
+    accountRepo.createAccount(uid, destination).getOrThrow()
+    val pair = txnRepo.recordTransfer(
+      authenticatedUserId = uid,
+      sourceTransaction = FinancialTransaction(
+        id = "incomplete_transfer_out", userId = uid, accountId = source.id,
+        type = TransactionType.TRANSFER, amountMinor = 10_000L,
+        currencyCode = "INR", category = TransactionCategories.TRANSFER_OUT_CATEGORY,
+      ),
+      destinationAccountId = destination.id,
+    ).getOrThrow()
+
+    assertEquals(1, database.financialTransactionDao().deleteTransaction(uid, pair.second.id))
+    val sourceBalanceBeforeDelete = accountRepo.getAccountById(uid, source.id)!!.currentBalanceMinor
+    val destinationBalanceBeforeDelete = accountRepo.getAccountById(uid, destination.id)!!.currentBalanceMinor
+
+    val result = txnRepo.deleteTransaction(uid, pair.first.id)
+
+    assertTrue(result.isFailure)
+    assertEquals(sourceBalanceBeforeDelete, accountRepo.getAccountById(uid, source.id)!!.currentBalanceMinor)
+    assertEquals(destinationBalanceBeforeDelete, accountRepo.getAccountById(uid, destination.id)!!.currentBalanceMinor)
+    assertNotNull(database.financialTransactionDao().getTransactionById(uid, pair.first.id))
+  }
+
+  @Test
+  fun `deleting transaction with unknown persisted type fails closed`() = runTest {
+    val uid = "uid_unknown_transaction_type_guard"
+    val account = FinancialAccount(
+      id = "unknown_type_account", userId = uid, name = "Primary",
+      type = AccountType.BANK, currencyCode = "INR",
+      initialBalanceMinor = 100_000L, currentBalanceMinor = 100_000L,
+    )
+    accountRepo.createAccount(uid, account).getOrThrow()
+    val transaction = txnRepo.recordExpense(
+      uid,
+      FinancialTransaction(
+        id = "unknown_type_transaction", userId = uid, accountId = account.id,
+        type = TransactionType.EXPENSE, amountMinor = 10_000L,
+        currencyCode = "INR", category = "Food",
+      ),
+    ).getOrThrow()
+    val entity = FinancialTransactionEntity.fromDomain(transaction).copy(type = "UNRECOGNIZED_TYPE")
+    assertEquals(1, database.financialTransactionDao().updateTransaction(entity, uid))
+    val balanceBeforeDelete = accountRepo.getAccountById(uid, account.id)!!.currentBalanceMinor
+
+    val result = txnRepo.deleteTransaction(uid, transaction.id)
+
+    assertTrue(result.isFailure)
+    assertEquals(balanceBeforeDelete, accountRepo.getAccountById(uid, account.id)!!.currentBalanceMinor)
+    assertEquals(
+      "UNRECOGNIZED_TYPE",
+      database.financialTransactionDao().getTransactionById(uid, transaction.id)?.type,
     )
   }
 
