@@ -11,6 +11,8 @@ import com.example.data.local.db.AppDatabase
 import com.example.data.local.db.DatabaseMigrations
 import com.example.data.repository.BudgetRepositoryImpl
 import com.example.domain.model.Budget
+import com.example.domain.model.BudgetAlertStatus
+import com.example.domain.model.BudgetPeriod
 import com.example.domain.model.BudgetPeriodType
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -155,6 +157,33 @@ class Phase3BudgetDatabaseAndRepoTest {
   fun `delete archives budget and restore returns it without losing period history`() = runTest {
     val budget = buildBudget(userA, name = "Retained Food Budget")
     budgetRepo.createBudget(userA, budget).getOrThrow()
+    val closedPeriod = BudgetPeriod(
+      id = "period_${budget.id}",
+      userId = userA,
+      budgetId = budget.id,
+      category = budget.category,
+      currencyCode = budget.currencyCode,
+      periodType = budget.periodType,
+      periodStart = budget.startDate,
+      periodEnd = budget.endDate,
+      allocatedMinor = budget.amountMinor,
+      spentMinor = 42_00L,
+      remainingMinor = budget.amountMinor - 42_00L,
+      alertStatus = BudgetAlertStatus.NORMAL,
+      closedAt = 2_100_000L,
+    )
+    budgetRepo.applyRenewal(
+      authenticatedUserId = userA,
+      budgetId = budget.id,
+      expectedStart = budget.startDate,
+      expectedEnd = budget.endDate,
+      closedPeriods = listOf(closedPeriod),
+      nextStart = 2_100_001L,
+      nextEnd = 3_100_001L,
+      renewedAt = 2_100_000L,
+    ).getOrThrow()
+    val periodsBeforeArchive = budgetRepo.observeBudgetPeriods(userA).first()
+    assertEquals(listOf(closedPeriod), periodsBeforeArchive)
 
     budgetRepo.deleteBudget(userA, budget.id).getOrThrow()
 
@@ -164,11 +193,13 @@ class Phase3BudgetDatabaseAndRepoTest {
     assertEquals(budget.id, archived.single().id)
     assertTrue(archived.single().isArchived)
     assertTrue(budgetRepo.updateBudget(userA, archived.single().copy(name = "Should not edit")).isFailure)
+    assertEquals("Archiving must not alter closed budget periods", periodsBeforeArchive, budgetRepo.observeBudgetPeriods(userA).first())
 
     budgetRepo.restoreBudget(userA, budget.id).getOrThrow()
     val restored = budgetRepo.getBudgets(userA).first().single()
     assertEquals(budget.id, restored.id)
     assertFalse(restored.isArchived)
+    assertEquals("Restoring must retain the exact closed period snapshot", periodsBeforeArchive, budgetRepo.observeBudgetPeriods(userA).first())
   }
 
   @Test
