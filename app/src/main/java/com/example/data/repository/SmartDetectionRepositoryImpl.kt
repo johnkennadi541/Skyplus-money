@@ -386,12 +386,13 @@ class SmartDetectionRepositoryImpl @Inject constructor(
             throw IllegalStateException("Event is not in review")
           }
 
-          val parsedType =
-            correctedType
-              ?: runCatching { TransactionType.valueOf(event.detectedType) }
-                .getOrDefault(TransactionType.EXPENSE)
-          val finalType =
-            if (parsedType == TransactionType.PENDING) TransactionType.EXPENSE else parsedType
+          // Never convert corrupt or unresolved detection data into an expense by guessing.
+          // The user must explicitly classify pending events before they can affect the ledger.
+          val parsedType = correctedType ?: TransactionType.valueOf(event.detectedType)
+          require(parsedType != TransactionType.PENDING && parsedType != TransactionType.FAILED) {
+            "Detection event must be explicitly classified as income, expense, refund, or reversal before approval."
+          }
+          val finalType = parsedType
           require(finalType != TransactionType.TRANSFER) {
             "Detected transfers must be recorded through the paired transfer workflow."
           }
