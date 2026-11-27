@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -61,6 +62,7 @@ fun SavingsGoalsScreen(
   modifier: Modifier = Modifier,
 ) {
   val goals by viewModel.goals.collectAsStateWithLifecycle()
+  val archivedGoals by viewModel.archivedGoals.collectAsStateWithLifecycle()
   val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
   val hasLoadError by viewModel.hasLoadError.collectAsStateWithLifecycle()
   val message by viewModel.userMessage.collectAsStateWithLifecycle()
@@ -68,6 +70,8 @@ fun SavingsGoalsScreen(
 
   SavingsGoalsContent(
     goals = goals,
+    archivedGoals = archivedGoals,
+    onRestoreGoal = viewModel::restoreGoal,
     isLoading = isLoading,
     hasLoadError = hasLoadError,
     onRetryLoadGoals = viewModel::retryGoalsLoad,
@@ -85,6 +89,8 @@ fun SavingsGoalsScreen(
 @Composable
 fun SavingsGoalsContent(
   goals: List<SavingsGoalSummary>,
+  archivedGoals: List<SavingsGoal> = emptyList(),
+  onRestoreGoal: (String) -> Unit = {},
   isLoading: Boolean = false,
   message: String?,
   isErrorMessage: Boolean,
@@ -98,6 +104,7 @@ fun SavingsGoalsContent(
   modifier: Modifier = Modifier,
 ) {
   var showCreateDialog by remember { mutableStateOf(false) }
+  var showArchivedGoals by remember { mutableStateOf(false) }
   var editing by remember { mutableStateOf<SavingsGoalSummary?>(null) }
   var contributingTo by remember { mutableStateOf<SavingsGoalSummary?>(null) }
   var deleting by remember { mutableStateOf<SavingsGoalSummary?>(null) }
@@ -136,6 +143,36 @@ fun SavingsGoalsContent(
         }
       }
 
+      item {
+        OutlinedButton(
+          onClick = { showArchivedGoals = !showArchivedGoals },
+          modifier = Modifier.fillMaxWidth().testTag("toggle_archived_goals"),
+        ) {
+          Text(if (showArchivedGoals) "Hide archived goals" else "Archived goals (${archivedGoals.size})")
+        }
+      }
+      if (showArchivedGoals) {
+        if (archivedGoals.isEmpty()) {
+          item {
+            OceanCard(modifier = Modifier.fillMaxWidth().testTag("archived_goals_empty")) {
+              Text("No archived savings goals", modifier = Modifier.padding(OceanSpacing.md))
+            }
+          }
+        } else {
+          items(archivedGoals, key = { "archived_${it.id}" }) { goal ->
+            OceanCard(modifier = Modifier.fillMaxWidth().testTag("archived_goal_${goal.id}")) {
+              Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                  Text(goal.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                  Text("${goal.currencyCode} · Target ${goal.targetMinor}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                  Text("Contribution history retained", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                OutlinedButton(onClick = { onRestoreGoal(goal.id) }, modifier = Modifier.testTag("restore_goal_${goal.id}")) { Text("Restore") }
+              }
+            }
+          }
+        }
+      }
       if (message != null && !hasLoadError) {
         item {
           SkyplusInlineMessage(
