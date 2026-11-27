@@ -102,6 +102,9 @@ interface FinancialTransactionDao {
   @Query("UPDATE financial_transactions SET isArchived = 1, updatedAt = :updatedAt WHERE userId = :userId AND id = :transactionId AND isArchived = 0")
   suspend fun archiveTransaction(userId: String, transactionId: String, updatedAt: Long): Int
 
+  @Query("UPDATE financial_transactions SET isArchived = 0, updatedAt = :updatedAt WHERE userId = :userId AND id = :transactionId AND isArchived = 1")
+  suspend fun restoreTransaction(userId: String, transactionId: String, updatedAt: Long): Int
+
   @Query(
     """
     SELECT * FROM financial_transactions 
