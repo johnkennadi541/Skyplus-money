@@ -324,6 +324,29 @@ fun ShoppingListContent(
               Spacer(modifier = Modifier.width(6.dp))
               Text("Create First Shopping List")
             }
+            archivedLists.forEach { archived ->
+              Row(
+                modifier = Modifier.fillMaxWidth().testTag("archived_shopping_list_${archived.id}"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+              ) {
+                Text(archived.name, modifier = Modifier.weight(1f))
+                TextButton(onClick = { onRestoreList(archived.id) {} }) { Text("Restore") }
+              }
+            }
+            archivedItems.forEach { archived ->
+              val parentIsArchived = archivedLists.any { it.id == archived.listId }
+              Row(
+                modifier = Modifier.fillMaxWidth().testTag("archived_shopping_item_${archived.id}"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+              ) {
+                Text(archived.name, modifier = Modifier.weight(1f))
+                TextButton(enabled = !parentIsArchived, onClick = { onRestoreItem(archived.id) {} }) {
+                  Text(if (parentIsArchived) "Restore list first" else "Restore")
+                }
+              }
+            }
           }
         }
       }
