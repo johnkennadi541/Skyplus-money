@@ -94,11 +94,14 @@ fun BudgetsScreen(
   val isErrorMessage by viewModel.isErrorMessage.collectAsStateWithLifecycle()
   val selectedCurrency by viewModel.selectedCurrency.collectAsStateWithLifecycle()
   val budgetPeriods by viewModel.budgetPeriods.collectAsStateWithLifecycle()
+  val archivedBudgets by viewModel.archivedBudgets.collectAsStateWithLifecycle()
 
   BudgetsContent(
     budgets = budgets,
     summaries = summaries,
     periods = budgetPeriods,
+    archivedBudgets = archivedBudgets,
+    onRestoreBudget = { id, onSuccess -> viewModel.restoreBudget(id, onSuccess) },
     accounts = accounts,
     userMessage = userMessage,
     isErrorMessage = isErrorMessage,
@@ -123,6 +126,8 @@ fun BudgetsContent(
   budgets: List<BudgetStatus>,
   summaries: Map<String, BudgetSummary>,
   periods: List<com.example.domain.model.BudgetPeriod> = emptyList(),
+  archivedBudgets: List<Budget> = emptyList(),
+  onRestoreBudget: (String, () -> Unit) -> Unit = { _, _ -> },
   accounts: List<FinancialAccount>,
   userMessage: String? = null,
   isErrorMessage: Boolean = false,
@@ -378,6 +383,31 @@ fun BudgetsContent(
             onEdit = { budgetToEdit = status.budget },
             onDelete = { budgetToDelete = status.budget },
           )
+        }
+      }
+
+      if (archivedBudgets.isNotEmpty()) {
+        item {
+          OceanSectionHeader(
+            title = "Archived Budgets",
+            subtitle = "Restore a budget to continue using it",
+            modifier = Modifier.testTag("archived_budgets_section"),
+          )
+        }
+        items(archivedBudgets, key = { "archived_${it.id}" }) { budget ->
+          OceanCard(modifier = Modifier.testTag("archived_budget_${budget.id}")) {
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+              Column(modifier = Modifier.weight(1f)) {
+                Text(budget.name, style = MaterialTheme.typography.titleMedium)
+                Text("${budget.category} • ${budget.currencyCode}", style = MaterialTheme.typography.bodySmall)
+              }
+              TextButton(onClick = { onRestoreBudget(budget.id) {} }) { Text("Restore") }
+            }
+          }
         }
       }
 
