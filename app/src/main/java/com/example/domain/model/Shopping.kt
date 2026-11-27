@@ -46,6 +46,7 @@ data class ShoppingList(
   val warningThresholdPercent: Int = 80,
   val createdAt: Long = System.currentTimeMillis(),
   val updatedAt: Long = System.currentTimeMillis(),
+  val isArchived: Boolean = false,
 )
 
 data class ShoppingListItem(
@@ -66,6 +67,7 @@ data class ShoppingListItem(
   val purchasedAt: Long? = null,
   val createdAt: Long = System.currentTimeMillis(),
   val updatedAt: Long = System.currentTimeMillis(),
+  val isArchived: Boolean = false,
 )
 
 data class ShoppingStorePriceRecord(
