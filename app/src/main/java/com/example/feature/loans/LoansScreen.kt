@@ -414,7 +414,7 @@ fun LoansContent(
           onClick = { showArchivedLoans = !showArchivedLoans },
           modifier = Modifier.fillMaxWidth().testTag("toggle_archived_loans"),
         ) {
-          Text(if (showArchivedLoans) "Hide archived loans" else "Archived loans (\${archivedLoans.size})")
+          Text(if (showArchivedLoans) "Hide archived loans" else "Archived loans (${archivedLoans.size})")
         }
       }
       if (showArchivedLoans) {
@@ -425,15 +425,15 @@ fun LoansContent(
             }
           }
         } else {
-          items(archivedLoans, key = { "archived_\${it.id}" }) { loan ->
-            OceanCard(modifier = Modifier.fillMaxWidth().testTag("archived_loan_\${loan.id}")) {
+          items(archivedLoans, key = { "archived_${it.id}" }) { loan ->
+            OceanCard(modifier = Modifier.fillMaxWidth().testTag("archived_loan_${loan.id}")) {
               Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                   Text(loan.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                  Text("Archived · \${loan.currencyCode}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                  Text("Archived · ${loan.currencyCode}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                   Text("EMI payment history retained", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                OutlinedButton(onClick = { onRestoreLoan(loan.id) }, modifier = Modifier.testTag("restore_loan_\${loan.id}")) { Text("Restore") }
+                OutlinedButton(onClick = { onRestoreLoan(loan.id) }, modifier = Modifier.testTag("restore_loan_${loan.id}")) { Text("Restore") }
               }
             }
           }
