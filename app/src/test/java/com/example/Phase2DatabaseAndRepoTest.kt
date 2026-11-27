@@ -137,16 +137,20 @@ class Phase2DatabaseAndRepoTest {
 
     assertEquals(75000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
 
-    // Safe delete blocked without force flag
+    // Both the normal and legacy force-delete paths must preserve financial history.
     val safeDeleteResult = accountRepo.deleteAccount(uid, "acc_1", deleteLinkedTransactions = false)
+    val legacyForceDeleteResult = accountRepo.deleteAccount(uid, "acc_1", deleteLinkedTransactions = true)
     assertTrue(safeDeleteResult.isFailure)
+    assertTrue(legacyForceDeleteResult.isFailure)
     assertNotNull(accountRepo.getAccountById(uid, "acc_1"))
+    assertEquals(1, txnRepo.getTransactions(uid).first().size)
+    assertEquals(75000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
 
-    // Confirmed delete removes linked transactions and account
-    val forceDeleteResult = accountRepo.deleteAccount(uid, "acc_1", deleteLinkedTransactions = true)
-    assertTrue(forceDeleteResult.isSuccess)
-    assertEquals(0, accountRepo.getAccounts(uid).first().size)
-    assertEquals(0, txnRepo.getTransactions(uid).first().size)
+    // Deactivation hides the account from active workflows without deleting its ledger.
+    accountRepo.setAccountActive(uid, "acc_1", false).getOrThrow()
+    assertFalse(accountRepo.getAccountById(uid, "acc_1")!!.isActive)
+    assertEquals(1, txnRepo.getTransactions(uid).first().size)
+    assertEquals(75000L, accountRepo.getAccountById(uid, "acc_1")!!.currentBalanceMinor)
   }
 
   @Test
@@ -586,6 +590,7 @@ class Phase2DatabaseAndRepoTest {
           DatabaseMigrations.MIGRATION_6_7,
           DatabaseMigrations.MIGRATION_7_8,
           DatabaseMigrations.MIGRATION_8_9,
+          DatabaseMigrations.MIGRATION_9_10,
         )
         .build()
 

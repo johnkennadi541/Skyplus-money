@@ -486,4 +486,19 @@ object DatabaseMigrations {
         )
       }
     }
+
+  /**
+   * Stage 4 — investment retention.
+   *
+   * Additive-only migration. Existing investment holdings become active by default;
+   * no holding, transaction, or price-history row is deleted or rewritten.
+   */
+  val MIGRATION_9_10: Migration =
+    object : Migration(9, 10) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+          "ALTER TABLE investment_holdings ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0"
+        )
+      }
+    }
 }

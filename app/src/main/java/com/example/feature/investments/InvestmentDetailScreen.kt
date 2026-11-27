@@ -181,7 +181,7 @@ fun InvestmentDetailContent(
             onClick = { showDeleteConfirm = true },
             modifier = Modifier.minimumInteractiveComponentSize().testTag("delete_holding_button"),
           ) {
-            Icon(Icons.Rounded.Delete, contentDescription = "Delete investment", tint = extended.negative)
+            Icon(Icons.Rounded.Delete, contentDescription = "Archive investment", tint = extended.negative)
           }
         }
       }
@@ -192,7 +192,7 @@ fun InvestmentDetailContent(
     if (holding == null || performance == null) {
       OceanCard(modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp)) {
         Text(
-          text = "Holding not found or removed.",
+          text = "Holding not found or archived.",
           style = MaterialTheme.typography.bodyMedium,
         )
       }
@@ -466,10 +466,10 @@ fun InvestmentDetailContent(
     if (showDeleteConfirm) {
       AlertDialog(
         onDismissRequest = { showDeleteConfirm = false },
-        title = { Text("Delete Investment?") },
+        title = { Text("Archive Investment?") },
         text = {
           Text(
-            "Are you sure you want to delete '${holding.name}' along with its transaction and price update history? This action cannot be undone."
+            "Archive '${holding.name}'? It will be hidden from the active portfolio, but all investment transactions and price history will be preserved."
           )
         },
         confirmButton = {
@@ -479,9 +479,9 @@ fun InvestmentDetailContent(
               onDeleteHolding()
             },
             colors = ButtonDefaults.buttonColors(containerColor = extended.negative),
-            modifier = Modifier.minimumInteractiveComponentSize().testTag("confirm_delete_holding_button"),
+            modifier = Modifier.minimumInteractiveComponentSize().testTag("confirm_archive_holding_button"),
           ) {
-            Text("Delete")
+            Text("Archive")
           }
         },
         dismissButton = {

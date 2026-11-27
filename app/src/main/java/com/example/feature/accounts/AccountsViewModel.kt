@@ -173,9 +173,10 @@ class AccountsViewModel @Inject constructor(
         _userMessage.value = "Delete failed: Account ownership verification failed"
         return@launch
       }
-      deleteAccountUseCase(uid, account.id, deleteLinkedTransactions)
-        .onSuccess { _userMessage.value = "Account deleted" }
-        .onFailure { error -> _userMessage.value = error.message ?: "Delete failed" }
+      // Preserve all ledger rows: the former delete action now deactivates the account.
+      setAccountActiveUseCase(uid, account.id, false)
+        .onSuccess { _userMessage.value = "Account deactivated. Your transaction history is preserved." }
+        .onFailure { error -> _userMessage.value = error.message ?: "Account deactivation failed" }
     }
   }
 

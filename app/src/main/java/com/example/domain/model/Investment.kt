@@ -59,6 +59,7 @@ data class InvestmentHolding(
   val notes: String? = null,
   val createdAt: Long = System.currentTimeMillis(),
   val updatedAt: Long = System.currentTimeMillis(),
+  val isArchived: Boolean = false,
 )
 
 data class InvestmentTransaction(

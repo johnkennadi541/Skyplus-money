@@ -1,5 +1,6 @@
 package com.example.data.local.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -39,6 +40,7 @@ data class InvestmentHoldingEntity(
   val notes: String? = null,
   val createdAt: Long,
   val updatedAt: Long,
+  @ColumnInfo(defaultValue = "0") val isArchived: Boolean = false,
 ) {
   fun toDomain(): InvestmentHolding =
     InvestmentHolding(
@@ -66,6 +68,7 @@ data class InvestmentHoldingEntity(
       lastPriceProviderLabel = lastPriceProviderLabel,
       autoPriceUpdateEnabled = autoPriceUpdateEnabled,
       notes = notes,
+      isArchived = isArchived,
       createdAt = createdAt,
       updatedAt = updatedAt,
     )
@@ -94,6 +97,7 @@ data class InvestmentHoldingEntity(
         lastPriceProviderLabel = holding.lastPriceProviderLabel,
         autoPriceUpdateEnabled = holding.autoPriceUpdateEnabled,
         notes = holding.notes,
+        isArchived = holding.isArchived,
         createdAt = holding.createdAt,
         updatedAt = holding.updatedAt,
       )

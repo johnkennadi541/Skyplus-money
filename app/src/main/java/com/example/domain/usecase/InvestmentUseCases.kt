@@ -29,6 +29,20 @@ data class InvestmentHoldingDetailState(
   val priceHistory: List<InvestmentPriceHistory> = emptyList(),
 )
 
+class ObserveArchivedInvestmentsUseCase @Inject constructor(
+  private val repository: InvestmentRepository,
+) {
+  operator fun invoke(userId: String): Flow<List<InvestmentHolding>> =
+    repository.getArchivedHoldings(userId)
+}
+
+class RestoreInvestmentUseCase @Inject constructor(
+  private val repository: InvestmentRepository,
+) {
+  suspend operator fun invoke(authenticatedUserId: String, holdingId: String): Result<Unit> =
+    repository.restoreHolding(authenticatedUserId, holdingId)
+}
+
 class ObservePortfolioUseCase @Inject constructor(
   private val repository: InvestmentRepository,
   private val calculationEngine: InvestmentCalculationEngine,
@@ -39,8 +53,10 @@ class ObservePortfolioUseCase @Inject constructor(
       repository.getAllPriceHistory(userId),
     ) { holdings, priceHistory ->
       val now = System.currentTimeMillis()
+      val activeHoldingIds = holdings.mapTo(mutableSetOf()) { it.id }
+      val activePriceHistory = priceHistory.filter { it.holdingId in activeHoldingIds }
       val performances = holdings.map { calculationEngine.evaluateHoldingPerformance(it, now) }
-      val summaries = calculationEngine.calculateCurrencySummaries(holdings, priceHistory, now)
+      val summaries = calculationEngine.calculateCurrencySummaries(holdings, activePriceHistory, now)
       InvestmentPortfolioSnapshot(
         holdings = holdings,
         performances = performances,
