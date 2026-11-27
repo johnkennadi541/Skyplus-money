@@ -427,7 +427,7 @@ class InvestmentsViewModel @Inject constructor(
       result.fold(
         onSuccess = {
           _isErrorMessage.value = false
-          _userMessage.value = "Investment holding deleted"
+          _userMessage.value = "Investment holding archived. Transaction and price history are preserved."
           launch(dispatchers.main) { onSuccess() }
         },
         onFailure = { error ->
