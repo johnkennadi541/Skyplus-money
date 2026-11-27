@@ -13,8 +13,6 @@ import com.example.domain.repository.AuthRepository
 import com.example.domain.usecase.DeleteTransactionUseCase
 import com.example.domain.usecase.GetAccountsUseCase
 import com.example.domain.usecase.GetTransactionsUseCase
-import com.example.domain.usecase.GetArchivedTransactionsUseCase
-import com.example.domain.usecase.RestoreTransactionUseCase
 import com.example.domain.usecase.RecordExpenseUseCase
 import com.example.domain.usecase.RecordGeneralTransactionUseCase
 import com.example.domain.usecase.RecordIncomeUseCase
@@ -60,8 +58,6 @@ data class TransactionsFilterState(
 class TransactionsViewModel @Inject constructor(
   private val authRepository: AuthRepository,
   private val getTransactionsUseCase: GetTransactionsUseCase,
-  private val getArchivedTransactionsUseCase: GetArchivedTransactionsUseCase,
-  private val restoreTransactionUseCase: RestoreTransactionUseCase,
   private val getAccountsUseCase: GetAccountsUseCase,
   private val recordExpenseUseCase: RecordExpenseUseCase,
   private val recordIncomeUseCase: RecordIncomeUseCase,
@@ -119,7 +115,7 @@ class TransactionsViewModel @Inject constructor(
     authRepository.observeAuthSession()
       .flatMapLatest { session ->
         val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
-        if (uid != null) getArchivedTransactionsUseCase(uid) else flowOf(emptyList())
+        if (uid != null) getTransactionsUseCase.archived(uid) else flowOf(emptyList())
       }
       .stateIn(
         scope = viewModelScope,
@@ -452,7 +448,7 @@ class TransactionsViewModel @Inject constructor(
         _userMessage.value = "Restore failed: Transaction ownership verification failed"
         return@launch
       }
-      restoreTransactionUseCase(uid, transaction.id)
+      getTransactionsUseCase.restore(uid, transaction.id)
         .onSuccess { _userMessage.value = "Transaction restored" }
         .onFailure { error -> _userMessage.value = "Restore failed: ${error.message}" }
     }
