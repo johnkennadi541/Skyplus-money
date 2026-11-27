@@ -104,6 +104,7 @@ class BudgetRepositoryImpl @Inject constructor(
             budgetDao.getBudgetById(authenticatedUserId, budget.id)
               ?: throw SecurityException("Budget does not belong to authenticated user")
           require(existing.userId == authenticatedUserId) { "Budget ownership verification failed" }
+          check(!existing.isArchived) { "Restore the archived budget before editing it" }
 
           val conflicting =
             budgetDao.findConflictingBudget(
@@ -207,6 +208,7 @@ class BudgetRepositoryImpl @Inject constructor(
             budgetDao.getBudgetById(authenticatedUserId, budgetId)
               ?: throw SecurityException("Budget does not belong to authenticated user")
           require(existing.userId == authenticatedUserId) { "Budget ownership verification failed" }
+          check(!existing.isArchived) { "Restore the archived budget before renewing it" }
 
           // Compare-and-set FIRST. Only the renewal that still sees the expected window wins;
           // anyone else returns without archiving anything.
