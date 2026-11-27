@@ -573,7 +573,7 @@ class SmartDetectionRepositoryImpl @Inject constructor(
     context.detectionDataStore.data
       .map { prefs ->
         val notifEnabled = prefs[booleanPreferencesKey("notif_detection_$userId")] ?: true
-        val autoSave = prefs[booleanPreferencesKey("autosave_high_conf_$userId")] ?: true
+        val autoSave = prefs[booleanPreferencesKey("autosave_high_conf_$userId")] ?: false
         val packages =
           prefs[stringSetPreferencesKey("permitted_pkgs_$userId")] ?: DetectionSettings.DEFAULT_PERMITTED_PACKAGES
 
