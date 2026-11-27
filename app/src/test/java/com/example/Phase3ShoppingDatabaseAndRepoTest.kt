@@ -279,6 +279,8 @@ class Phase3ShoppingDatabaseAndRepoTest {
     ).getOrThrow()
     val pricesBefore = repo.getStorePricesForList("user_1", list.id).first()
     assertEquals(1, pricesBefore.size)
+    val purchaseHistoryBefore = repo.getPurchaseHistoryForList("user_1", list.id).first()
+    assertEquals(1, purchaseHistoryBefore.size)
 
     repo.deleteList("user_1", list.id).getOrThrow()
 
@@ -286,6 +288,7 @@ class Phase3ShoppingDatabaseAndRepoTest {
     assertTrue(repo.getItemsForList("user_1", list.id).first().isEmpty())
     assertTrue(repo.getItemsForUser("user_1").first().isEmpty())
     assertEquals(pricesBefore, repo.getStorePricesForList("user_1", list.id).first())
+    assertEquals(purchaseHistoryBefore, repo.getPurchaseHistoryForList("user_1", list.id).first())
     assertTrue(repo.restoreItem("user_1", item.id).isFailure)
 
     // Restoring the parent reveals the unchanged purchase details and associated price history.
@@ -296,6 +299,7 @@ class Phase3ShoppingDatabaseAndRepoTest {
     assertEquals(1234L, restored.purchasedAt)
     assertEquals(150_00L, restored.actualTotalMinor)
     assertEquals(pricesBefore, repo.getStorePricesForList("user_1", list.id).first())
+    assertEquals(purchaseHistoryBefore, repo.getPurchaseHistoryForList("user_1", list.id).first())
   }
 
   @Test
