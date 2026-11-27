@@ -126,6 +126,14 @@ class SavingsGoalsViewModelTest {
     var goalObservationAttempts: Int = 0
       private set
 
+    override fun observeArchivedGoals(userId: String): Flow<List<SavingsGoal>> = flowOf(emptyList())
+
+    override suspend fun archiveGoal(authenticatedUserId: String, goalId: String): Result<Unit> =
+      Result.failure(UnsupportedOperationException("Not used in this test"))
+
+    override suspend fun restoreGoal(authenticatedUserId: String, goalId: String): Result<Unit> =
+      Result.failure(UnsupportedOperationException("Not used in this test"))
+
     override fun observeGoals(userId: String): Flow<List<SavingsGoal>> = flow {
       goalObservationAttempts += 1
       if (goalObservationAttempts == 1) {
