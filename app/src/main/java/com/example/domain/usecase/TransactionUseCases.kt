@@ -14,20 +14,13 @@ class GetTransactionsUseCase @Inject constructor(
 
   fun forAccount(userId: String, accountId: String): Flow<List<FinancialTransaction>> =
     repository.getTransactionsByAccount(userId, accountId)
-}
 
-class GetArchivedTransactionsUseCase @Inject constructor(
-  private val repository: FinancialTransactionRepository,
-) {
-  operator fun invoke(userId: String): Flow<List<FinancialTransaction>> =
+  fun archived(userId: String): Flow<List<FinancialTransaction>> =
     repository.getArchivedTransactions(userId)
-}
 
-class RestoreTransactionUseCase @Inject constructor(
-  private val repository: FinancialTransactionRepository,
-) {
-  suspend operator fun invoke(userId: String, transactionId: String): Result<Unit> =
+  suspend fun restore(userId: String, transactionId: String): Result<Unit> =
     repository.restoreTransaction(userId, transactionId)
+
 }
 
 class RecordIncomeUseCase @Inject constructor(
