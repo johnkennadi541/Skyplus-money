@@ -19,6 +19,8 @@ import com.example.domain.usecase.InvestmentHoldingDetailState
 import com.example.domain.usecase.InvestmentPortfolioSnapshot
 import com.example.domain.usecase.ObserveHoldingDetailUseCase
 import com.example.domain.usecase.ObservePortfolioUseCase
+import com.example.domain.usecase.ObserveArchivedInvestmentsUseCase
+import com.example.domain.usecase.RestoreInvestmentUseCase
 import com.example.domain.usecase.RecordInvestmentBuyUseCase
 import com.example.domain.usecase.RecordInvestmentSellUseCase
 import com.example.domain.usecase.SetHoldingAutoPriceUseCase
@@ -47,6 +49,8 @@ class InvestmentsViewModel @Inject constructor(
   private val authRepository: AuthRepository,
   private val accountRepository: FinancialAccountRepository,
   private val observePortfolioUseCase: ObservePortfolioUseCase,
+  private val observeArchivedInvestmentsUseCase: ObserveArchivedInvestmentsUseCase,
+  private val restoreInvestmentUseCase: RestoreInvestmentUseCase,
   private val observeHoldingDetailUseCase: ObserveHoldingDetailUseCase,
   private val createInvestmentUseCase: CreateInvestmentUseCase,
   private val updateInvestmentMetadataUseCase: UpdateInvestmentMetadataUseCase,
@@ -121,6 +125,20 @@ class InvestmentsViewModel @Inject constructor(
   val holdings: StateFlow<List<InvestmentHolding>> =
     portfolioSnapshot
       .map { it.holdings }
+      .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList(),
+      )
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  val archivedHoldings: StateFlow<List<InvestmentHolding>> =
+    authRepository
+      .observeAuthSession()
+      .flatMapLatest { session ->
+        val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+        if (uid != null) observeArchivedInvestmentsUseCase(uid) else flowOf(emptyList())
+      }
       .stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -412,6 +430,26 @@ class InvestmentsViewModel @Inject constructor(
         onFailure = { error ->
           _isErrorMessage.value = true
           _userMessage.value = error.message ?: "Failed to update market price"
+        },
+      )
+    }
+  }
+
+  fun restoreInvestment(
+    holdingId: String,
+    onSuccess: () -> Unit = {},
+  ) {
+    viewModelScope.launch(dispatchers.io) {
+      val uid = requireAuthenticatedUid() ?: return@launch
+      restoreInvestmentUseCase(uid, holdingId).fold(
+        onSuccess = {
+          _isErrorMessage.value = false
+          _userMessage.value = "Investment restored to active portfolio. Its history is unchanged."
+          launch(dispatchers.main) { onSuccess() }
+        },
+        onFailure = { error ->
+          _isErrorMessage.value = true
+          _userMessage.value = error.message ?: "Failed to restore investment"
         },
       )
     }
