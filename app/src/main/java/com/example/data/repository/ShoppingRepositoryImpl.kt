@@ -308,6 +308,7 @@ class ShoppingRepositoryImpl @Inject constructor(
           val parentList =
             shoppingDao.getListById(authenticatedUserId, existing.listId)?.toDomain()
               ?: throw SecurityException("Parent shopping list does not belong to authenticated user")
+          check(!parentList.isArchived) { "Restore the archived shopping list before editing items" }
 
           val qty = calculationEngine.parsePositiveQuantity(quantityDecimal, "Quantity")
           val estUnitMinor =
@@ -358,6 +359,8 @@ class ShoppingRepositoryImpl @Inject constructor(
           val parentList =
             shoppingDao.getListById(authenticatedUserId, existing.listId)?.toDomain()
               ?: throw SecurityException("Parent shopping list does not belong to authenticated user")
+          check(!existing.isArchived) { "Restore the archived shopping item before recording a purchase" }
+          check(!parentList.isArchived) { "Restore the archived shopping list before recording a purchase" }
 
           val actualUnitMinor =
             calculationEngine.parseNonNegativeMoneyMinor(
@@ -430,6 +433,10 @@ class ShoppingRepositoryImpl @Inject constructor(
           val existing =
             shoppingDao.getItemById(authenticatedUserId, itemId)?.toDomain()
               ?: throw SecurityException("Shopping item does not belong to authenticated user")
+          check(!existing.isArchived) { "Restore the archived shopping item before changing purchase status" }
+          val parentList = shoppingDao.getListById(authenticatedUserId, existing.listId)
+            ?: throw SecurityException("Parent shopping list does not belong to authenticated user")
+          check(!parentList.isArchived) { "Restore the archived shopping list before changing purchase status" }
           val updated =
             existing.copy(
               isPurchased = false,
@@ -489,6 +496,8 @@ class ShoppingRepositoryImpl @Inject constructor(
           val parentList =
             shoppingDao.getListById(authenticatedUserId, item.listId)?.toDomain()
               ?: throw SecurityException("Parent shopping list does not belong to authenticated user")
+          check(!item.isArchived) { "Restore the archived shopping item before recording store prices" }
+          check(!parentList.isArchived) { "Restore the archived shopping list before recording store prices" }
 
           val unitPriceMinor =
             calculationEngine.parsePositiveMoneyMinor(
