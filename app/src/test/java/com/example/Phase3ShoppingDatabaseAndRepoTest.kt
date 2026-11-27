@@ -119,6 +119,14 @@ class Phase3ShoppingDatabaseAndRepoTest {
     assertEquals(5_000L, purchased.purchasedAt)
     assertEquals(50_00L, engine.calculateSavingsOrOverspendMinor(purchased))
 
+    val purchaseSnapshot = repo.getPurchaseHistoryForItem("user_1", rice.id).first().single()
+    assertEquals("Basmati Rice", purchaseSnapshot.itemName)
+    assertEquals("2.5", purchaseSnapshot.quantityDecimal)
+    assertEquals(100_00L, purchaseSnapshot.actualUnitPriceMinor)
+    assertEquals(250_00L, purchaseSnapshot.actualTotalMinor)
+    assertEquals("DailyMart", purchaseSnapshot.storeName)
+    assertEquals(5_000L, purchaseSnapshot.purchasedAt)
+
     val pricesAfterPurchase = repo.getStorePricesForList("user_1", groceryList.id).first()
     assertEquals(3, pricesAfterPurchase.size)
     assertEquals("DailyMart", pricesAfterPurchase.first().storeName)
@@ -136,6 +144,57 @@ class Phase3ShoppingDatabaseAndRepoTest {
     assertEquals(kitchenList.id, repo.observeArchivedLists("user_1").first().single().id)
     repo.restoreList("user_1", kitchenList.id).getOrThrow()
     assertEquals(2, repo.getLists("user_1").first().size)
+  }
+
+  @Test
+  fun `purchase history survives unpurchase and records repeat purchases without a store`() = runTest {
+    val list = repo.createList("user_1", "Purchase Ledger", "INR", null, 80).getOrThrow()
+    val item = repo.addItem(
+      "user_1", list.id, "Cooking Oil", "Groceries", "2", "litre", "150.00", null, null
+    ).getOrThrow()
+
+    repo.markItemPurchased(
+      authenticatedUserId = "user_1",
+      itemId = item.id,
+      actualUnitPriceDecimal = "140.00",
+      actualTotalOverrideDecimal = "275.00",
+      purchasedAt = 10_000L,
+      storeNameOverride = null,
+    ).getOrThrow()
+
+    val firstPurchase = repo.getPurchaseHistoryForItem("user_1", item.id).first().single()
+    assertEquals("Cooking Oil", firstPurchase.itemName)
+    assertEquals("2", firstPurchase.quantityDecimal)
+    assertEquals(140_00L, firstPurchase.actualUnitPriceMinor)
+    assertEquals(275_00L, firstPurchase.actualTotalMinor)
+    assertNull(firstPurchase.storeName)
+    assertEquals(10_000L, firstPurchase.purchasedAt)
+
+    repo.markItemUnpurchased("user_1", item.id).getOrThrow()
+    val pending = repo.getItemsForList("user_1", list.id).first().single()
+    assertFalse(pending.isPurchased)
+    assertNull(pending.actualTotalMinor)
+
+    // A second purchase is a separate immutable event, not an overwrite of the first.
+    repo.markItemPurchased(
+      authenticatedUserId = "user_1",
+      itemId = item.id,
+      actualUnitPriceDecimal = "135.00",
+      actualTotalOverrideDecimal = "260.00",
+      purchasedAt = 20_000L,
+      storeNameOverride = null,
+    ).getOrThrow()
+
+    val history = repo.getPurchaseHistoryForItem("user_1", item.id).first()
+    assertEquals(2, history.size)
+    assertEquals(20_000L, history[0].purchasedAt)
+    assertEquals(260_00L, history[0].actualTotalMinor)
+    assertEquals(10_000L, history[1].purchasedAt)
+    assertEquals(275_00L, history[1].actualTotalMinor)
+    assertTrue(repo.getPurchaseHistoryForItem("other_user", item.id).first().isEmpty())
+
+    repo.markItemUnpurchased("user_1", item.id).getOrThrow()
+    assertEquals(history, repo.getPurchaseHistoryForItem("user_1", item.id).first())
   }
 
   @Test
