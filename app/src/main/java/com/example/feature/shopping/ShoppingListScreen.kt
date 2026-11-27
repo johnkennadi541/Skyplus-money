@@ -134,7 +134,6 @@ fun ShoppingListScreen(
     onRecordStorePrice = { itemId, storeName, unitPrice, recordedAt, notes ->
       viewModel.recordStorePrice(itemId, storeName, unitPrice, recordedAt, notes)
     },
-    onDeleteStorePrice = { priceId -> viewModel.deleteStorePrice(priceId) },
     modifier = modifier,
   )
 }
@@ -161,7 +160,6 @@ fun ShoppingListContent(
   onMarkUnpurchased: (String) -> Unit = {},
   onDeleteItem: (String, () -> Unit) -> Unit = { _, _ -> },
   onRecordStorePrice: (String, String, String, Long, String?) -> Unit = { _, _, _, _, _ -> },
-  onDeleteStorePrice: (String) -> Unit = {},
   modifier: Modifier = Modifier,
   archivedLists: List<ShoppingList> = emptyList(),
   archivedItems: List<ShoppingListItem> = emptyList(),
@@ -630,7 +628,6 @@ fun ShoppingListContent(
         onRecordPrice = { store, unitPrice, recordedAt, notes ->
           onRecordStorePrice(id, store, unitPrice, recordedAt, notes)
         },
-        onDeletePrice = { priceId -> onDeleteStorePrice(priceId) },
       )
     }
   }
