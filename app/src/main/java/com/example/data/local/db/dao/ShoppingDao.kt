@@ -158,12 +158,4 @@ interface ShoppingDao {
   @Insert(onConflict = OnConflictStrategy.ABORT)
   suspend fun insertStorePrice(record: ShoppingStorePriceEntity)
 
-  @Query("DELETE FROM shopping_store_prices WHERE userId = :userId AND id = :priceId")
-  suspend fun deleteStorePrice(userId: String, priceId: String): Int
-
-  @Query("DELETE FROM shopping_store_prices WHERE userId = :userId AND itemId = :itemId")
-  suspend fun deleteStorePricesForItem(userId: String, itemId: String): Int
-
-  @Query("DELETE FROM shopping_store_prices WHERE userId = :userId AND listId = :listId")
-  suspend fun deleteStorePricesForList(userId: String, listId: String): Int
 }
