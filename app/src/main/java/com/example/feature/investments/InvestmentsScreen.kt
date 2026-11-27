@@ -74,6 +74,7 @@ fun InvestmentsScreen(
   modifier: Modifier = Modifier,
 ) {
   val performances by viewModel.performances.collectAsStateWithLifecycle()
+  val archivedHoldings by viewModel.archivedHoldings.collectAsStateWithLifecycle()
   val summaries by viewModel.summariesByCurrency.collectAsStateWithLifecycle()
   val accounts by viewModel.accounts.collectAsStateWithLifecycle()
   val syncSettings by viewModel.syncSettings.collectAsStateWithLifecycle()
@@ -85,6 +86,7 @@ fun InvestmentsScreen(
 
   InvestmentsContent(
     performances = performances,
+    archivedHoldings = archivedHoldings,
     summaries = summaries,
     accounts = accounts,
     syncSettings = syncSettings,
@@ -120,6 +122,7 @@ fun InvestmentsScreen(
         onSuccess = onSuccess,
       )
     },
+    onRestoreHolding = { holdingId -> viewModel.restoreInvestment(holdingId) },
     onUpdateManualPrice = { holdingId, newPrice, priceDate, onSuccess ->
       viewModel.updateManualMarketPrice(holdingId, newPrice, priceDate, onSuccess)
     },
@@ -130,6 +133,7 @@ fun InvestmentsScreen(
 @Composable
 fun InvestmentsContent(
   performances: List<InvestmentHoldingPerformance>,
+  archivedHoldings: List<InvestmentHolding> = emptyList(),
   summaries: Map<String, PortfolioCurrencySummary>,
   accounts: List<FinancialAccount>,
   syncSettings: MarketSyncSettings = MarketSyncSettings(),
@@ -147,6 +151,7 @@ fun InvestmentsContent(
   onDismissMessage: () -> Unit = {},
   onNavigateBack: () -> Unit = {},
   onOpenHoldingDetail: (String) -> Unit = {},
+  onRestoreHolding: (String) -> Unit = {},
   onCreateInvestment: (
     name: String,
     category: InvestmentCategory,
@@ -479,6 +484,46 @@ fun InvestmentsContent(
             onOpenDetail = { onOpenHoldingDetail(perf.holding.id) },
             onQuickUpdatePrice = { priceUpdateTarget = perf.holding },
           )
+        }
+      }
+
+      if (archivedHoldings.isNotEmpty()) {
+        item {
+          Text(
+            text = "Archived investments",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.fillMaxWidth().testTag("archived_investments_heading"),
+          )
+        }
+        items(archivedHoldings, key = { "archived_${it.id}" }) { holding ->
+          OceanCard(modifier = Modifier.fillMaxWidth().testTag("archived_investment_${holding.id}")) {
+            Row(
+              modifier = Modifier.fillMaxWidth().padding(OceanSpacing.sm),
+              horizontalArrangement = Arrangement.SpaceBetween,
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Column(modifier = Modifier.weight(1f)) {
+                Text(holding.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(
+                  text = "${holding.category.displayName} • ${holding.currencyCode}",
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                  text = "Transactions and price history preserved",
+                  style = MaterialTheme.typography.labelSmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+              }
+              OutlinedButton(
+                onClick = { onRestoreHolding(holding.id) },
+                modifier = Modifier.testTag("restore_investment_${holding.id}"),
+              ) {
+                Text("Restore")
+              }
+            }
+          }
         }
       }
     }
