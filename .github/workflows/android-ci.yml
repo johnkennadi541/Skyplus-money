@@ -55,14 +55,14 @@ jobs:
           echo "Test classes executed: $(find "$DIR" -name 'TEST-*.xml' | wc -l)"
           awk -F'"' '/<testsuite /{for(i=1;i<=NF;i++){if($i ~ /tests=$/){t+=$(i+1)} if($i ~ /failures=$/){f+=$(i+1)} if($i ~ /errors=$/){e+=$(i+1)} if($i ~ /skipped=$/){s+=$(i+1)}}} END{printf "tests=%d failures=%d errors=%d skipped=%d\n", t, f, e, s}' "$DIR"/TEST-*.xml
 
-      # Report the Room migration integration test independently of the aggregate suite total.
-      - name: Verify Room 8-to-9 migration integration test
+      # Report the investment archive migration regression test independently of the aggregate suite total.
+      - name: Verify investment archive 9-to-10 migration test
         if: always()
         run: |
           set -euo pipefail
-          REPORT=app/build/test-results/testDebugUnitTest/TEST-com.example.SavingsGoalRoomMigrationIntegrationTest.xml
+          REPORT=app/build/test-results/testDebugUnitTest/TEST-com.example.InvestmentArchiveMigration9To10Test.xml
           if [ ! -f "$REPORT" ]; then
-            echo "::error::Room migration integration test report is missing: $REPORT"
+            echo "::error::Investment archive migration test report is missing: $REPORT"
             exit 1
           fi
           python3 - "$REPORT" <<'PY'
@@ -76,16 +76,16 @@ jobs:
           failures = int(suite.attrib.get("failures", "0"))
           errors = int(suite.attrib.get("errors", "0"))
           skipped = int(suite.attrib.get("skipped", "0"))
-          name = suite.attrib.get("name", "SavingsGoalRoomMigrationIntegrationTest")
+          name = suite.attrib.get("name", "InvestmentArchiveMigration9To10Test")
           line = (
-              f"Room migration integration test ({name}): "
+              f"Investment archive migration test ({name}): "
               f"tests={tests} failures={failures} errors={errors} skipped={skipped}"
           )
           print(line)
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
-              summary.write(f"### Room migration integration test\n\n{line}\n")
+              summary.write(f"### Investment archive migration test\n\n{line}\n")
           if tests < 1 or failures or errors or skipped:
-              print("::error::Room migration integration test did not pass cleanly.")
+              print("::error::Investment archive migration test did not pass cleanly.")
               raise SystemExit(1)
           PY
 
