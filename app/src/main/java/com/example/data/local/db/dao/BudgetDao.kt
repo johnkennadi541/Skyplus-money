@@ -137,6 +137,7 @@ interface BudgetDao {
       AND userId = :userId
       AND startDate = :expectedStart
       AND endDate = :expectedEnd
+      AND isArchived = 0
     """
   )
   suspend fun applyRenewalScoped(
