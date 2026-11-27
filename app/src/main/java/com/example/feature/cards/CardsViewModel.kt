@@ -163,7 +163,7 @@ constructor(
     viewModelScope.launch {
       deleteCreditCardUseCase(uid, cardId)
         .onSuccess {
-          _userMessage.value = "Card removed. The account and its transactions are unchanged."
+          _userMessage.value = "Card deactivated. Its record and account transaction history are preserved."
           _isErrorMessage.value = false
           onSuccess()
         }
