@@ -276,15 +276,16 @@ class CreditCardDatabaseAndRepoTest {
   }
 
   @Test
-  fun `a card can be recreated after deletion`() = runTest {
+  fun `removing a card deactivates it and preserves its record`() = runTest {
     val account = createAccount(userA, "acc_card_r1")
     val first = cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
     cardRepository.deleteCard(userA, first.id).getOrThrow()
 
-    val second = cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
-
-    assertEquals(account.id, second.accountId)
+    val retained = cardRepository.getCard(userA, first.id)
+    assertNotNull(retained)
+    assertFalse(retained!!.isActive)
     assertEquals(1, cardRepository.observeCards(userA).first().size)
+    assertTrue(cardRepository.createCard(userA, card(userA, account.id)).isFailure)
   }
 
   @Test
@@ -395,14 +396,16 @@ class CreditCardDatabaseAndRepoTest {
   }
 
   @Test
-  fun `deleting an account removes its card record`() = runTest {
+  fun `account removal is refused and card metadata remains available for deactivation`() = runTest {
     val account = createAccount(userA, "acc_card_del")
-    cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
+    val linkedCard = cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
 
-    accountRepository.deleteAccount(userA, account.id, deleteLinkedTransactions = false).getOrThrow()
-
-    assertNull(accountRepository.getAccountById(userA, account.id))
-    assertTrue(cardRepository.observeCards(userA).first().isEmpty())
+    assertTrue(accountRepository.deleteAccount(userA, account.id, deleteLinkedTransactions = false).isFailure)
+    assertNotNull(accountRepository.getAccountById(userA, account.id))
+    assertNotNull(cardRepository.getCard(userA, linkedCard.id))
+    accountRepository.setAccountActive(userA, account.id, false).getOrThrow()
+    assertFalse(accountRepository.getAccountById(userA, account.id)!!.isActive)
+    assertNotNull(cardRepository.getCard(userA, linkedCard.id))
   }
 
   @Test
@@ -420,16 +423,17 @@ class CreditCardDatabaseAndRepoTest {
   }
 
   @Test
-  fun `a confirmed account deletion removes the card and its transactions together`() = runTest {
+  fun `legacy confirmed account deletion is refused and preserves card and ledger history`() = runTest {
     val account = createAccount(userA, "acc_card_full", balanceMinor = -10_000L)
-    cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
+    val linkedCard = cardRepository.createCard(userA, card(userA, account.id)).getOrThrow()
     insertTransaction(account.id, "txn_full")
 
-    accountRepository.deleteAccount(userA, account.id, deleteLinkedTransactions = true).getOrThrow()
+    assertTrue(accountRepository.deleteAccount(userA, account.id, deleteLinkedTransactions = true).isFailure)
 
-    assertNull(accountRepository.getAccountById(userA, account.id))
-    assertTrue(cardRepository.observeCards(userA).first().isEmpty())
-    assertNull(database.financialTransactionDao().getTransactionById(userA, "txn_full"))
+    assertNotNull(accountRepository.getAccountById(userA, account.id))
+    assertNotNull(cardRepository.getCard(userA, linkedCard.id))
+    assertNotNull(database.financialTransactionDao().getTransactionById(userA, "txn_full"))
+    assertEquals(1, cardRepository.observeCards(userA).first().size)
   }
 
   @Test
