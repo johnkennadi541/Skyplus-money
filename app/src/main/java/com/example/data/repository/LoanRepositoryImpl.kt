@@ -154,6 +154,7 @@ class LoanRepositoryImpl @Inject constructor(
             loanDao.getLoanById(authenticatedUserId, loan.id)
               ?: throw SecurityException("Loan does not belong to authenticated user")
           require(existing.userId == authenticatedUserId) { "Loan ownership verification failed" }
+          check(!existing.isArchived) { "Archived loans must be restored before editing" }
 
           val now = System.currentTimeMillis()
           val finalStatus =
@@ -241,6 +242,7 @@ class LoanRepositoryImpl @Inject constructor(
             loanDao.getLoanById(authenticatedUserId, loanId)
               ?: throw SecurityException("Loan does not belong to authenticated user")
           require(existingLoan.userId == authenticatedUserId) { "Loan ownership verification failed" }
+          check(!existingLoan.isArchived) { "Archived loans cannot accept new payments until restored" }
 
           if (existingLoan.status == LoanStatus.COMPLETED.name || existingLoan.outstandingPrincipalMinor <= 0L) {
             throw IllegalStateException("This loan is already fully paid and completed")
