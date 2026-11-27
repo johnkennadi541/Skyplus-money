@@ -517,6 +517,7 @@ object DatabaseMigrations {
         db.execSQL("ALTER TABLE budgets ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
         db.execSQL("ALTER TABLE shopping_lists ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
         db.execSQL("ALTER TABLE shopping_items ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE financial_transactions ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
 
         // Immutable purchase-event ledger. Deliberately no cascading foreign keys:
         // archived/deleted parent records must never erase a completed purchase snapshot.
