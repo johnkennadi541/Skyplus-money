@@ -16,6 +16,7 @@ import com.example.domain.model.PaymentBreakdown
 import com.example.domain.model.TenureUnit
 import com.example.domain.repository.AuthRepository
 import com.example.domain.repository.FinancialAccountRepository
+import com.example.domain.repository.LoanRepository
 import com.example.domain.usecase.CreateLoanUseCase
 import com.example.domain.usecase.DeleteLoanUseCase
 import com.example.domain.usecase.EmiCalculationEngine
@@ -46,6 +47,7 @@ import javax.inject.Inject
 class LoansViewModel @Inject constructor(
   private val authRepository: AuthRepository,
   private val accountRepository: FinancialAccountRepository,
+  private val loanRepository: LoanRepository,
   private val observeLoansWithSummariesUseCase: ObserveLoansWithSummariesUseCase,
   private val observeLoanDetailUseCase: ObserveLoanDetailUseCase,
   private val createLoanUseCase: CreateLoanUseCase,
@@ -111,6 +113,36 @@ class LoansViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList(),
       )
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  val archivedLoans: StateFlow<List<Loan>> =
+    authRepository.observeAuthSession()
+      .flatMapLatest { session ->
+        val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+        if (uid != null) loanRepository.getArchivedLoans(uid) else flowOf(emptyList())
+      }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+  fun restoreLoan(loanId: String) {
+    viewModelScope.launch(dispatchers.io) {
+      val uid = (authRepository.observeAuthSession().first() as? AuthSessionState.Authenticated)?.user?.uid
+      if (uid == null) {
+        _isErrorMessage.value = true
+        _userMessage.value = "Authentication session required"
+        return@launch
+      }
+      loanRepository.restoreLoan(uid, loanId).fold(
+        onSuccess = {
+          _isErrorMessage.value = false
+          _userMessage.value = "Loan restored. EMI payment history is preserved."
+        },
+        onFailure = { error ->
+          _isErrorMessage.value = true
+          _userMessage.value = error.message ?: "Could not restore loan"
+        },
+      )
+    }
+  }
 
   val summariesByCurrency: StateFlow<Map<String, LoanCurrencySummary>> =
     rawLoansData
