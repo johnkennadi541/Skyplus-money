@@ -15,7 +15,7 @@ interface InvestmentDao {
   @Query("SELECT * FROM investment_holdings WHERE userId = :userId AND isArchived = 0 ORDER BY updatedAt DESC, createdAt DESC")
   fun getAllHoldings(userId: String): Flow<List<InvestmentHoldingEntity>>
 
-  @Query("SELECT * FROM investment_holdings WHERE userId = :userId ORDER BY updatedAt DESC, createdAt DESC")
+  @Query("SELECT * FROM investment_holdings WHERE userId = :userId AND isArchived = 0 ORDER BY updatedAt DESC, createdAt DESC")
   suspend fun getAllHoldingsSync(userId: String): List<InvestmentHoldingEntity>
 
   @Query("SELECT * FROM investment_holdings WHERE userId = :userId AND isArchived = 1 ORDER BY updatedAt DESC, createdAt DESC")
