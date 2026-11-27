@@ -54,7 +54,7 @@ interface CreditCardDao {
     updatedAt: Long,
   ): Int
 
-  /** Removes only the card record; the ledger account and its transactions are untouched. */
-  @Query("DELETE FROM credit_cards WHERE userId = :userId AND id = :id")
-  suspend fun deleteCard(userId: String, id: String): Int
+  /** Deactivates the card record while retaining its metadata and payment history. */
+  @Query("UPDATE credit_cards SET isActive = 0, updatedAt = :updatedAt WHERE userId = :userId AND id = :id")
+  suspend fun deactivateCard(userId: String, id: String, updatedAt: Long): Int
 }
