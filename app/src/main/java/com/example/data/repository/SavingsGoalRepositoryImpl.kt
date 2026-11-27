@@ -27,6 +27,9 @@ constructor(
   private val dispatchers: DispatcherProvider,
 ) : SavingsGoalRepository {
 
+  override fun observeArchivedGoals(userId: String): Flow<List<SavingsGoal>> =
+    savingsGoalDao.observeArchivedGoals(userId).map { rows -> rows.map { it.toDomain() } }.flowOn(dispatchers.io)
+
   override fun observeGoals(userId: String): Flow<List<SavingsGoal>> =
     savingsGoalDao
       .observeGoals(userId)
@@ -117,25 +120,35 @@ constructor(
       }
     }
 
+  override suspend fun archiveGoal(authenticatedUserId: String, goalId: String): Result<Unit> =
+    setGoalArchived(authenticatedUserId, goalId, archived = true)
+
+  override suspend fun restoreGoal(authenticatedUserId: String, goalId: String): Result<Unit> =
+    setGoalArchived(authenticatedUserId, goalId, archived = false)
+
   override suspend fun deleteGoal(userId: String, goalId: String): Result<Unit> =
-    withContext(dispatchers.io) {
-      runCatchingPreservingCancellation {
-        require(userId.isNotBlank()) { "Authenticated user ID is required" }
-        require(goalId.isNotBlank()) { "Goal ID is required" }
+    archiveGoal(userId, goalId)
 
-        database.withTransaction {
-          val existing =
-            savingsGoalDao.getGoalById(userId, goalId)
-              ?: throw SecurityException("Goal does not belong to authenticated user")
-          require(existing.userId == userId) { "Goal ownership verification failed" }
-
-          // Contributions are meaningless without their goal, so both go in one transaction.
-          savingsGoalDao.deleteContributionsForGoal(userId, existing.id)
-          val rows = savingsGoalDao.deleteGoal(userId, existing.id)
-          check(rows == 1) { "Goal deletion rejected for authenticated user" }
+  private suspend fun setGoalArchived(
+    authenticatedUserId: String,
+    goalId: String,
+    archived: Boolean,
+  ): Result<Unit> = withContext(dispatchers.io) {
+    runCatchingPreservingCancellation {
+      require(authenticatedUserId.isNotBlank()) { "Authenticated user ID is required" }
+      require(goalId.isNotBlank()) { "Goal ID is required" }
+      database.withTransaction {
+        val existing = savingsGoalDao.getGoalById(authenticatedUserId, goalId)
+          ?: throw SecurityException("Goal does not belong to authenticated user")
+        require(existing.userId == authenticatedUserId) { "Goal ownership verification failed" }
+        check(existing.isArchived != archived) {
+          if (archived) "Goal is already archived" else "Goal is not archived"
         }
+        val rows = savingsGoalDao.setGoalArchived(authenticatedUserId, goalId, archived, System.currentTimeMillis())
+        check(rows == 1) { "Goal archive state update rejected for authenticated user" }
       }
     }
+  }
 
   override suspend fun addContribution(
     authenticatedUserId: String,
@@ -172,20 +185,7 @@ constructor(
   override suspend fun deleteContribution(
     userId: String,
     contributionId: String,
-  ): Result<Unit> =
-    withContext(dispatchers.io) {
-      runCatchingPreservingCancellation {
-        require(userId.isNotBlank()) { "Authenticated user ID is required" }
-        require(contributionId.isNotBlank()) { "Contribution ID is required" }
-
-        database.withTransaction {
-          val existing =
-            savingsGoalDao.getContributionById(userId, contributionId)
-              ?: throw SecurityException("Contribution does not belong to authenticated user")
-          require(existing.userId == userId) { "Contribution ownership verification failed" }
-          val rows = savingsGoalDao.deleteContribution(userId, contributionId)
-          check(rows == 1) { "Contribution deletion rejected for authenticated user" }
-        }
-      }
-    }
+  ): Result<Unit> = Result.failure(
+    IllegalStateException("Savings contribution history is permanent and cannot be deleted.")
+  )
 }
