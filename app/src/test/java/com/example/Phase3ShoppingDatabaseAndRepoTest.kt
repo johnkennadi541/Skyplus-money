@@ -128,9 +128,38 @@ class Phase3ShoppingDatabaseAndRepoTest {
     assertNull(unpurchased.actualTotalMinor)
     assertEquals(300_00L, unpurchased.estimatedTotalMinor)
 
-    // Delete kitchen list leaves grocery list untouched
+    // Legacy delete action archives instead of deleting the list or its history.
     repo.deleteList("user_1", kitchenList.id).getOrThrow()
     assertEquals(1, repo.getLists("user_1").first().size)
+    assertEquals(kitchenList.id, repo.observeArchivedLists("user_1").first().single().id)
+    repo.restoreList("user_1", kitchenList.id).getOrThrow()
+    assertEquals(2, repo.getLists("user_1").first().size)
+  }
+
+  @Test
+  fun `archiving shopping items and lists preserves purchase and store price history`() = runTest {
+    val list = repo.createList("user_1", "History", "INR", 500_00L, 80).getOrThrow()
+    val item = repo.addItem("user_1", list.id, "Rice", "Groceries", "2", "kg", "80.00", "Market", null).getOrThrow()
+    repo.markItemPurchased("user_1", item.id, "75.00", purchasedAt = 1234L, storeNameOverride = "Market").getOrThrow()
+    repo.recordStorePrice("user_1", item.id, "Other Market", "70.00", recordedAt = 2345L).getOrThrow()
+    val priceCountBefore = repo.getStorePricesForList("user_1", list.id).first().size
+
+    repo.deleteItem("user_1", item.id).getOrThrow()
+    assertTrue(repo.getItemsForList("user_1", list.id).first().isEmpty())
+    val archivedItem = repo.observeArchivedItems("user_1").first().single()
+    assertEquals(item.id, archivedItem.id)
+    assertTrue(archivedItem.isPurchased)
+    assertEquals(1234L, archivedItem.purchasedAt)
+    assertEquals(priceCountBefore, repo.getStorePricesForList("user_1", list.id).first().size)
+
+    repo.restoreItem("user_1", item.id).getOrThrow()
+    assertEquals(1, repo.getItemsForList("user_1", list.id).first().size)
+
+    repo.deleteList("user_1", list.id).getOrThrow()
+    assertTrue(repo.getLists("user_1").first().none { it.id == list.id })
+    assertEquals(priceCountBefore, repo.getStorePricesForList("user_1", list.id).first().size)
+    repo.restoreList("user_1", list.id).getOrThrow()
+    assertEquals(1, repo.getLists("user_1").first().count { it.id == list.id })
   }
 
   @Test
