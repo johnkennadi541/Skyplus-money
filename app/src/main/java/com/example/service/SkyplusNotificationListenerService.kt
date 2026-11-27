@@ -89,7 +89,7 @@ class SkyplusNotificationListenerService : NotificationListenerService() {
       } catch (_: Exception) {
         return null
       }
-    if (!consent.isUpToDate) return null
+    if (consent?.isUpToDate != true) return null
 
     val settings = detectionRepository.getDetectionSettings(userId).first()
     if (!settings.isNotificationDetectionEnabled) return null
