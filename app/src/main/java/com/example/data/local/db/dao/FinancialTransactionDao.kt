@@ -132,7 +132,7 @@ interface FinancialTransactionDao {
     SELECT COUNT(*) FROM financial_transactions
     WHERE userId = :userId
       AND accountId = :accountId
-      AND (type = 'TRANSFER' OR linkedTransferId IS NOT NULL)
+      AND (type = 'TRANSFER' OR linkedTransferId IS NOT NULL OR transferDestinationAccountId IS NOT NULL)
     """
   )
   suspend fun countTransferEntriesForAccount(userId: String, accountId: String): Int
