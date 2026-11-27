@@ -1,5 +1,6 @@
 package com.example.data.local.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -37,7 +38,7 @@ data class InvestmentHoldingEntity(
   val lastPriceProviderLabel: String? = null,
   val autoPriceUpdateEnabled: Boolean,
   val notes: String? = null,
-  val isArchived: Boolean = false,
+  @ColumnInfo(defaultValue = "0") val isArchived: Boolean = false,
   val createdAt: Long,
   val updatedAt: Long,
 ) {
