@@ -354,8 +354,11 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
               "Transfer incoming entry deletion failed."
             }
           } else {
-            require(txn.linkedTransferId.isNullOrBlank()) {
-              "Non-transfer transaction contains a transfer link; refusing to delete it."
+            require(
+              txn.linkedTransferId.isNullOrBlank() &&
+                txn.transferDestinationAccountId.isNullOrBlank()
+            ) {
+              "Non-transfer transaction contains transfer metadata; refusing to delete it."
             }
             val delta = balanceDeltaFor(type, status, txn.amountMinor)
             if (delta != 0L) {
