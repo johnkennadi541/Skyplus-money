@@ -8,6 +8,7 @@ import com.example.domain.model.AuthSessionState
 import com.example.domain.model.SavingsGoal
 import com.example.domain.model.SavingsGoalSummary
 import com.example.domain.repository.AuthRepository
+import com.example.domain.repository.SavingsGoalRepository
 import com.example.domain.usecase.AddSavingsContributionUseCase
 import com.example.domain.usecase.CreateSavingsGoalUseCase
 import com.example.domain.usecase.DeleteSavingsContributionUseCase
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
@@ -41,6 +43,7 @@ constructor(
   private val deleteSavingsGoalUseCase: DeleteSavingsGoalUseCase,
   private val addSavingsContributionUseCase: AddSavingsContributionUseCase,
   private val deleteSavingsContributionUseCase: DeleteSavingsContributionUseCase,
+  private val savingsGoalRepository: SavingsGoalRepository,
 ) : ViewModel() {
 
   private val _userMessage = MutableStateFlow<String?>(null)
@@ -91,6 +94,24 @@ constructor(
           }
       }
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  val archivedGoals: StateFlow<List<SavingsGoal>> =
+    sessionFlow
+      .map { (it as? AuthSessionState.Authenticated)?.user?.uid }
+      .flatMapLatest { uid ->
+        if (uid != null) savingsGoalRepository.observeArchivedGoals(uid) else flowOf(emptyList())
+      }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+  fun restoreGoal(goalId: String) {
+    val uid = activeUid ?: return
+    viewModelScope.launch {
+      savingsGoalRepository.restoreGoal(uid, goalId)
+        .onSuccess { succeed("Goal restored. All contribution history is preserved.") }
+        .onFailure { fail(it.message ?: "Could not restore the goal") }
+    }
+  }
 
   /** Retry the current user's goals query after a recoverable database observation failure. */
   fun retryGoalsLoad() {
