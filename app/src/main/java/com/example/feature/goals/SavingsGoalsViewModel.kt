@@ -95,6 +95,7 @@ constructor(
       }
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+  // Observe only the signed-in user's archived goals; the repository also enforces this UID.
   @OptIn(ExperimentalCoroutinesApi::class)
   val archivedGoals: StateFlow<List<SavingsGoal>> =
     sessionFlow
