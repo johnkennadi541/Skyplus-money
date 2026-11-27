@@ -152,6 +152,26 @@ class Phase3BudgetDatabaseAndRepoTest {
   }
 
   @Test
+  fun `delete archives budget and restore returns it without losing period history`() = runTest {
+    val budget = buildBudget(userA, name = "Retained Food Budget")
+    budgetRepo.createBudget(userA, budget).getOrThrow()
+
+    budgetRepo.deleteBudget(userA, budget.id).getOrThrow()
+
+    assertTrue(budgetRepo.getBudgets(userA).first().isEmpty())
+    val archived = budgetRepo.observeArchivedBudgets(userA).first()
+    assertEquals(1, archived.size)
+    assertEquals(budget.id, archived.single().id)
+    assertTrue(archived.single().isArchived)
+    assertTrue(budgetRepo.updateBudget(userA, archived.single().copy(name = "Should not edit")).isFailure)
+
+    budgetRepo.restoreBudget(userA, budget.id).getOrThrow()
+    val restored = budgetRepo.getBudgets(userA).first().single()
+    assertEquals(budget.id, restored.id)
+    assertFalse(restored.isArchived)
+  }
+
+  @Test
   fun `conflicting budget creation for same category and currency in overlapping range is rejected`() = runTest {
     val budget1 = buildBudget(userA, name = "January Dining", startDate = 1000L, endDate = 2000L)
     val r1 = budgetRepo.createBudget(userA, budget1)
