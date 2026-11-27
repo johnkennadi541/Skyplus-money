@@ -123,6 +123,7 @@ class LoansViewModel @Inject constructor(
       }
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+  /** Restores only the authenticated user's archived loan; the repository retains all payment rows. */
   fun restoreLoan(loanId: String) {
     viewModelScope.launch(dispatchers.io) {
       val uid = (authRepository.observeAuthSession().first() as? AuthSessionState.Authenticated)?.user?.uid
