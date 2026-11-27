@@ -37,6 +37,7 @@ data class InvestmentHoldingEntity(
   val lastPriceProviderLabel: String? = null,
   val autoPriceUpdateEnabled: Boolean,
   val notes: String? = null,
+  val isArchived: Boolean = false,
   val createdAt: Long,
   val updatedAt: Long,
 ) {
@@ -66,6 +67,7 @@ data class InvestmentHoldingEntity(
       lastPriceProviderLabel = lastPriceProviderLabel,
       autoPriceUpdateEnabled = autoPriceUpdateEnabled,
       notes = notes,
+      isArchived = isArchived,
       createdAt = createdAt,
       updatedAt = updatedAt,
     )
@@ -94,6 +96,7 @@ data class InvestmentHoldingEntity(
         lastPriceProviderLabel = holding.lastPriceProviderLabel,
         autoPriceUpdateEnabled = holding.autoPriceUpdateEnabled,
         notes = holding.notes,
+        isArchived = holding.isArchived,
         createdAt = holding.createdAt,
         updatedAt = holding.updatedAt,
       )
