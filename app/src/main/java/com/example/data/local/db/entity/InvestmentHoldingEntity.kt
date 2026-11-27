@@ -38,9 +38,9 @@ data class InvestmentHoldingEntity(
   val lastPriceProviderLabel: String? = null,
   val autoPriceUpdateEnabled: Boolean,
   val notes: String? = null,
-  @ColumnInfo(defaultValue = "0") val isArchived: Boolean = false,
   val createdAt: Long,
   val updatedAt: Long,
+  @ColumnInfo(defaultValue = "0") val isArchived: Boolean = false,
 ) {
   fun toDomain(): InvestmentHolding =
     InvestmentHolding(
