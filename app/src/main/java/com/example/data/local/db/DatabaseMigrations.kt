@@ -501,4 +501,13 @@ object DatabaseMigrations {
         )
       }
     }
+  /** Stage 5 — archive loan and savings-goal records without touching their history. */
+  val MIGRATION_10_11: Migration =
+    object : Migration(10, 11) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE loans ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE savings_goals ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+      }
+    }
+
 }
