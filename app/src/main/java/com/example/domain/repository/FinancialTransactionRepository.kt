@@ -32,6 +32,7 @@ interface FinancialTransactionRepository {
     oldTransaction: FinancialTransaction,
   ): Result<Unit>
   suspend fun deleteTransaction(userId: String, transactionId: String): Result<Unit>
+  suspend fun restoreTransaction(userId: String, transactionId: String): Result<Unit>
   suspend fun findRecentDuplicate(
     userId: String,
     amountMinor: Long,
