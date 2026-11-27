@@ -17,6 +17,10 @@ interface BudgetRepository {
 
   suspend fun deleteBudget(userId: String, budgetId: String): Result<Unit>
 
+  fun observeArchivedBudgets(userId: String): Flow<List<Budget>>
+
+  suspend fun restoreBudget(authenticatedUserId: String, budgetId: String): Result<Unit>
+
   /** Archived, closed periods for this user, newest first. */
   fun observeBudgetPeriods(userId: String): Flow<List<BudgetPeriod>>
 

@@ -39,6 +39,7 @@ data class FinancialTransactionEntity(
   val createdAt: Long,
   val updatedAt: Long,
   val normalizedMerchant: String? = null,
+  val isArchived: Boolean = false,
 ) {
   fun toDomain(): FinancialTransaction =
     FinancialTransaction(
@@ -61,6 +62,7 @@ data class FinancialTransactionEntity(
       confidenceScore = confidenceScore,
       createdAt = createdAt,
       updatedAt = updatedAt,
+      isArchived = isArchived,
     )
 
   companion object {
@@ -86,6 +88,7 @@ data class FinancialTransactionEntity(
         createdAt = transaction.createdAt,
         updatedAt = transaction.updatedAt,
         normalizedMerchant = transaction.merchantOrPayee?.trim()?.lowercase()?.ifBlank { null },
+        isArchived = transaction.isArchived,
       )
   }
 }

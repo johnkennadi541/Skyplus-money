@@ -99,12 +99,14 @@ fun TransactionsScreen(
   modifier: Modifier = Modifier,
 ) {
   val transactions by viewModel.filteredTransactions.collectAsStateWithLifecycle()
+  val archivedTransactions by viewModel.archivedTransactions.collectAsStateWithLifecycle()
   val accounts by viewModel.accounts.collectAsStateWithLifecycle()
   val filterState by viewModel.filterState.collectAsStateWithLifecycle()
   val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
 
   TransactionsContent(
     transactions = transactions,
+    archivedTransactions = archivedTransactions,
     accounts = accounts,
     filterState = filterState,
     userMessage = userMessage,
@@ -133,6 +135,7 @@ fun TransactionsScreen(
       viewModel.updateTransactionFromEdit(orig, accId, type, status, amt, cat, merch, notes, date)
     },
     onDeleteTransaction = viewModel::deleteTransaction,
+    onRestoreTransaction = viewModel::restoreTransaction,
     onOpenIncomeManagement = onOpenIncomeManagement,
     onOpenExpenseManagement = onOpenExpenseManagement,
     onOpenReports = onOpenReports,
@@ -144,6 +147,7 @@ fun TransactionsScreen(
 @Composable
 fun TransactionsContent(
   transactions: List<FinancialTransaction>,
+  archivedTransactions: List<FinancialTransaction> = emptyList(),
   accounts: List<FinancialAccount>,
   filterState: TransactionsFilterState,
   userMessage: String? = null,
@@ -162,6 +166,7 @@ fun TransactionsContent(
   onRecordTransfer: (String, String, String, String?, String?, Long) -> Unit = { _, _, _, _, _, _ -> },
   onUpdateTransaction: (FinancialTransaction, String, TransactionType, TransactionStatus, String, String, String?, String?, Long) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
   onDeleteTransaction: (FinancialTransaction) -> Unit = {},
+  onRestoreTransaction: (FinancialTransaction) -> Unit = {},
   onOpenIncomeManagement: () -> Unit = {},
   onOpenExpenseManagement: () -> Unit = {},
   onOpenReports: () -> Unit = {},
@@ -405,6 +410,32 @@ fun TransactionsContent(
           )
         }
       }
+      if (archivedTransactions.isNotEmpty()) {
+        item {
+          Text(
+            text = "Archived Transactions",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp).padding(top = OceanSpacing.md),
+          )
+        }
+        items(archivedTransactions, key = { "archived-${it.id}" }) { txn ->
+          Row(
+            modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Column(modifier = Modifier.weight(1f)) {
+              Text(txn.merchantOrPayee ?: txn.category, style = MaterialTheme.typography.bodyMedium)
+              Text(
+                FormatMoneyUseCase().format(txn.money),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+            TextButton(onClick = { onRestoreTransaction(txn) }) { Text("Restore") }
+          }
+        }
+      }
     }
 
     FloatingActionButton(
@@ -500,8 +531,8 @@ fun TransactionsContent(
   transactionToDelete?.let { txn ->
     AlertDialog(
       onDismissRequest = { transactionToDelete = null },
-      title = { Text("Delete Transaction") },
-      text = { Text("Are you sure you want to delete this transaction? Affected account balances will be updated atomically.") },
+      title = { Text("Archive Transaction") },
+      text = { Text("Archive this transaction? Its ledger history will be retained and the affected account balance will be adjusted.") },
       confirmButton = {
         Button(
           onClick = {
@@ -511,7 +542,7 @@ fun TransactionsContent(
           colors = ButtonDefaults.buttonColors(containerColor = OceanTheme.colors.negative),
           modifier = Modifier.testTag("confirm_delete_transaction_button"),
         ) {
-          Text("Delete")
+          Text("Archive")
         }
       },
       dismissButton = {
@@ -1025,7 +1056,7 @@ fun TransactionDetailsDialog(
     },
     dismissButton = {
       TextButton(onClick = onDelete, modifier = Modifier.testTag("delete_transaction_dialog_button")) {
-        Text("Delete", color = OceanTheme.colors.negative)
+        Text("Archive", color = OceanTheme.colors.negative)
       }
     },
   )

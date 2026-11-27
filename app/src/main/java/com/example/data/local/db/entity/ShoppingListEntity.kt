@@ -1,5 +1,6 @@
 package com.example.data.local.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -22,6 +23,7 @@ data class ShoppingListEntity(
   val warningThresholdPercent: Int,
   val createdAt: Long,
   val updatedAt: Long,
+  @ColumnInfo(defaultValue = "0") val isArchived: Boolean = false,
 ) {
   fun toDomain(): ShoppingList =
     ShoppingList(
@@ -33,6 +35,7 @@ data class ShoppingListEntity(
       warningThresholdPercent = warningThresholdPercent,
       createdAt = createdAt,
       updatedAt = updatedAt,
+      isArchived = isArchived,
     )
 
   companion object {
@@ -46,6 +49,7 @@ data class ShoppingListEntity(
         warningThresholdPercent = list.warningThresholdPercent,
         createdAt = list.createdAt,
         updatedAt = list.updatedAt,
+        isArchived = list.isArchived,
       )
   }
 }

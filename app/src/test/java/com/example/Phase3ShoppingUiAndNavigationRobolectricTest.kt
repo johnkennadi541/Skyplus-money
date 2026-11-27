@@ -223,4 +223,40 @@ class Phase3ShoppingUiAndNavigationRobolectricTest {
     composeTestRule.onNodeWithTag("shopping_item_a").assertIsDisplayed()
     composeTestRule.onNodeWithTag("shopping_item_b").assertDoesNotExist()
   }
+  @Test
+  fun `archived shopping lists and items expose restore controls`() {
+    val activeList = ShoppingList(id = "active", userId = "u1", name = "Current", currencyCode = "INR")
+    val archivedList = ShoppingList(id = "old_list", userId = "u1", name = "Old Groceries", currencyCode = "INR", isArchived = true)
+    val archivedItem = ShoppingListItem(
+      id = "old_item",
+      listId = "active",
+      userId = "u1",
+      name = "Archived Rice",
+      category = "Groceries",
+      quantityDecimal = "1",
+      unit = "kg",
+      estimatedUnitPriceMinor = 100_00L,
+      estimatedTotalMinor = 100_00L,
+      isArchived = true,
+    )
+    val snapshot = buildSnapshot(listOf(activeList), emptyList(), emptyList())
+    composeTestRule.setContent {
+      SkyplusOceanTheme(themePreference = ThemePreference.LIGHT) {
+        ShoppingListContent(
+          workspace = snapshot,
+          selectedListId = activeList.id,
+          archivedLists = listOf(archivedList),
+          archivedItems = listOf(archivedItem),
+        )
+      }
+    }
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("shopping_lists_lazy_column")
+      .performScrollToNode(hasTestTag("archived_shopping_list_old_list"))
+    composeTestRule.onNodeWithTag("archived_shopping_list_old_list").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("shopping_lists_lazy_column")
+      .performScrollToNode(hasTestTag("archived_shopping_item_old_item"))
+    composeTestRule.onNodeWithTag("archived_shopping_item_old_item").assertIsDisplayed()
+  }
+
 }

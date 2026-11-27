@@ -11,8 +11,11 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface BudgetDao {
 
-  @Query("SELECT * FROM budgets WHERE userId = :userId ORDER BY createdAt DESC")
+  @Query("SELECT * FROM budgets WHERE userId = :userId AND isArchived = 0 ORDER BY createdAt DESC")
   fun getAllBudgets(userId: String): Flow<List<BudgetEntity>>
+
+  @Query("SELECT * FROM budgets WHERE userId = :userId AND isArchived = 1 ORDER BY updatedAt DESC")
+  fun observeArchivedBudgets(userId: String): Flow<List<BudgetEntity>>
 
   @Query("SELECT * FROM budgets WHERE userId = :userId AND id = :id LIMIT 1")
   suspend fun getBudgetById(userId: String, id: String): BudgetEntity?
@@ -24,6 +27,7 @@ interface BudgetDao {
     """
     SELECT * FROM budgets 
     WHERE userId = :userId 
+      AND isArchived = 0
       AND category = :category 
       AND currencyCode = :currencyCode
       AND NOT (:endDate < startDate OR :startDate > endDate)
@@ -56,7 +60,7 @@ interface BudgetDao {
         warningThresholdPercent = :warningThresholdPercent,
         isRecurring = :isRecurring,
         updatedAt = :updatedAt
-    WHERE id = :id AND userId = :userId
+    WHERE id = :id AND userId = :userId AND isArchived = 0
     """
   )
   suspend fun updateBudgetScoped(
@@ -92,8 +96,11 @@ interface BudgetDao {
     )
   }
 
-  @Query("DELETE FROM budgets WHERE userId = :userId AND id = :id")
-  suspend fun deleteBudget(userId: String, id: String): Int
+  @Query("UPDATE budgets SET isArchived = 1, updatedAt = :updatedAt WHERE userId = :userId AND id = :id AND isArchived = 0")
+  suspend fun archiveBudget(userId: String, id: String, updatedAt: Long): Int
+
+  @Query("UPDATE budgets SET isArchived = 0, updatedAt = :updatedAt WHERE userId = :userId AND id = :id AND isArchived = 1")
+  suspend fun restoreBudget(userId: String, id: String, updatedAt: Long): Int
   // ---------------------------------------------------------------------------------------------
   // Stage 3 PR 1 — closed period archive and renewal
   // ---------------------------------------------------------------------------------------------
@@ -130,6 +137,7 @@ interface BudgetDao {
       AND userId = :userId
       AND startDate = :expectedStart
       AND endDate = :expectedEnd
+      AND isArchived = 0
     """
   )
   suspend fun applyRenewalScoped(

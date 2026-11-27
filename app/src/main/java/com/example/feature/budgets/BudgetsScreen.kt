@@ -94,11 +94,14 @@ fun BudgetsScreen(
   val isErrorMessage by viewModel.isErrorMessage.collectAsStateWithLifecycle()
   val selectedCurrency by viewModel.selectedCurrency.collectAsStateWithLifecycle()
   val budgetPeriods by viewModel.budgetPeriods.collectAsStateWithLifecycle()
+  val archivedBudgets by viewModel.archivedBudgets.collectAsStateWithLifecycle()
 
   BudgetsContent(
     budgets = budgets,
     summaries = summaries,
     periods = budgetPeriods,
+    archivedBudgets = archivedBudgets,
+    onRestoreBudget = { id, onSuccess -> viewModel.restoreBudget(id, onSuccess) },
     accounts = accounts,
     userMessage = userMessage,
     isErrorMessage = isErrorMessage,
@@ -133,6 +136,8 @@ fun BudgetsContent(
   onUpdateBudget: (Budget, () -> Unit) -> Unit = { _, _ -> },
   onDeleteBudget: (String, () -> Unit) -> Unit = { _, _ -> },
   modifier: Modifier = Modifier,
+  archivedBudgets: List<Budget> = emptyList(),
+  onRestoreBudget: (String, () -> Unit) -> Unit = { _, _ -> },
 ) {
 
   var showCreateDialog by remember { mutableStateOf(false) }
@@ -381,6 +386,31 @@ fun BudgetsContent(
         }
       }
 
+      if (archivedBudgets.isNotEmpty()) {
+        item {
+          OceanSectionHeader(
+            title = "Archived Budgets",
+            subtitle = "Restore a budget to continue using it",
+            modifier = Modifier.testTag("archived_budgets_section"),
+          )
+        }
+        items(archivedBudgets, key = { "archived_${it.id}" }) { budget ->
+          OceanCard(modifier = Modifier.testTag("archived_budget_${budget.id}")) {
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+              Column(modifier = Modifier.weight(1f)) {
+                Text(budget.name, style = MaterialTheme.typography.titleMedium)
+                Text("${budget.category} • ${budget.currencyCode}", style = MaterialTheme.typography.bodySmall)
+              }
+              TextButton(onClick = { onRestoreBudget(budget.id) {} }) { Text("Restore") }
+            }
+          }
+        }
+      }
+
       val currencyPeriods =
         periods.filter { it.currencyCode.equals(activeCurrency, ignoreCase = true) }
       if (currencyPeriods.isNotEmpty()) {
@@ -467,9 +497,9 @@ fun BudgetsContent(
   budgetToDelete?.let { budget ->
     AlertDialog(
       onDismissRequest = { budgetToDelete = null },
-      title = { Text("Delete Budget") },
+      title = { Text("Archive Budget") },
       text = {
-        Text("Are you sure you want to delete '${budget.name}'? Recorded financial transactions will remain safe in your ledger.")
+        Text("'${budget.name}' will move to Archived Budgets. Its budget periods and linked financial transactions will be preserved.")
       },
       confirmButton = {
         Button(
@@ -481,7 +511,7 @@ fun BudgetsContent(
           colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
           modifier = Modifier.testTag("confirm_delete_budget_button"),
         ) {
-          Text("Delete")
+          Text("Archive")
         }
       },
       dismissButton = {

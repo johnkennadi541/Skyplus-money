@@ -38,6 +38,8 @@ data class Budget(
   val lastRenewedAt: Long = 0L,
   val createdAt: Long = System.currentTimeMillis(),
   val updatedAt: Long = System.currentTimeMillis(),
+  /** Archived budgets remain stored with their period and transaction history. */
+  val isArchived: Boolean = false,
 )
 
 data class BudgetStatus(

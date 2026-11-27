@@ -2,9 +2,11 @@ package com.example.domain.repository
 
 import com.example.domain.model.FinancialTransaction
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
 interface FinancialTransactionRepository {
   fun getTransactions(userId: String): Flow<List<FinancialTransaction>>
+  fun getArchivedTransactions(userId: String): Flow<List<FinancialTransaction>> = flowOf(emptyList())
   fun getTransactionsByAccount(userId: String, accountId: String): Flow<List<FinancialTransaction>>
   suspend fun getTransactionById(userId: String, transactionId: String): FinancialTransaction?
   suspend fun recordIncome(
@@ -31,6 +33,7 @@ interface FinancialTransactionRepository {
     oldTransaction: FinancialTransaction,
   ): Result<Unit>
   suspend fun deleteTransaction(userId: String, transactionId: String): Result<Unit>
+  suspend fun restoreTransaction(userId: String, transactionId: String): Result<Unit> = Result.failure(UnsupportedOperationException("Transaction restore is not implemented"))
   suspend fun findRecentDuplicate(
     userId: String,
     amountMinor: Long,

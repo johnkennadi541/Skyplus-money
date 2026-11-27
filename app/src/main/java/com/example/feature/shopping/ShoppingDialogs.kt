@@ -14,7 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -679,7 +678,6 @@ fun StorePriceComparisonDialog(
   formatMoneyUseCase: FormatMoneyUseCase,
   onDismiss: () -> Unit,
   onRecordPrice: (storeName: String, unitPriceDecimal: String, recordedAt: Long, notes: String?) -> Unit,
-  onDeletePrice: (priceId: String) -> Unit,
 ) {
   val item = comparison.item
   var storeName by remember { mutableStateOf("") }
@@ -843,16 +841,6 @@ fun StorePriceComparisonDialog(
                       color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                   }
-                }
-                IconButton(
-                  onClick = { onDeletePrice(quote.id) },
-                  modifier = Modifier.minimumInteractiveComponentSize().testTag("delete_store_price_${quote.id}"),
-                ) {
-                  Icon(
-                    imageVector = Icons.Rounded.Delete,
-                    contentDescription = "Delete store quote",
-                    tint = MaterialTheme.colorScheme.error,
-                  )
                 }
               }
             }

@@ -94,6 +94,8 @@ fun ShoppingListScreen(
   val selectedFilter by viewModel.selectedFilter.collectAsStateWithLifecycle()
   val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
   val isErrorMessage by viewModel.isErrorMessage.collectAsStateWithLifecycle()
+  val archivedLists by viewModel.archivedLists.collectAsStateWithLifecycle()
+  val archivedItems by viewModel.archivedItems.collectAsStateWithLifecycle()
 
   ShoppingListContent(
     workspace = workspace,
@@ -103,6 +105,10 @@ fun ShoppingListScreen(
     selectedFilter = selectedFilter,
     userMessage = userMessage,
     isErrorMessage = isErrorMessage,
+    archivedLists = archivedLists,
+    archivedItems = archivedItems,
+    onRestoreList = { id, onSuccess -> viewModel.restoreList(id, onSuccess) },
+    onRestoreItem = { id, onSuccess -> viewModel.restoreItem(id, onSuccess) },
     onSelectList = viewModel::selectList,
     onSearchQueryChange = viewModel::updateSearchQuery,
     onSelectFilter = viewModel::selectFilter,
@@ -128,7 +134,6 @@ fun ShoppingListScreen(
     onRecordStorePrice = { itemId, storeName, unitPrice, recordedAt, notes ->
       viewModel.recordStorePrice(itemId, storeName, unitPrice, recordedAt, notes)
     },
-    onDeleteStorePrice = { priceId -> viewModel.deleteStorePrice(priceId) },
     modifier = modifier,
   )
 }
@@ -155,8 +160,11 @@ fun ShoppingListContent(
   onMarkUnpurchased: (String) -> Unit = {},
   onDeleteItem: (String, () -> Unit) -> Unit = { _, _ -> },
   onRecordStorePrice: (String, String, String, Long, String?) -> Unit = { _, _, _, _, _ -> },
-  onDeleteStorePrice: (String) -> Unit = {},
   modifier: Modifier = Modifier,
+  archivedLists: List<ShoppingList> = emptyList(),
+  archivedItems: List<ShoppingListItem> = emptyList(),
+  onRestoreList: (String, () -> Unit) -> Unit = { _, _ -> },
+  onRestoreItem: (String, () -> Unit) -> Unit = { _, _ -> },
 ) {
   val formatMoneyUseCase = remember { FormatMoneyUseCase() }
   val calculationEngine = remember { ShoppingCalculationEngine() }
@@ -314,6 +322,29 @@ fun ShoppingListContent(
               Spacer(modifier = Modifier.width(6.dp))
               Text("Create First Shopping List")
             }
+            archivedLists.forEach { archived ->
+              Row(
+                modifier = Modifier.fillMaxWidth().testTag("archived_shopping_list_${archived.id}"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+              ) {
+                Text(archived.name, modifier = Modifier.weight(1f))
+                TextButton(onClick = { onRestoreList(archived.id) {} }) { Text("Restore") }
+              }
+            }
+            archivedItems.forEach { archived ->
+              val parentIsArchived = archivedLists.any { it.id == archived.listId }
+              Row(
+                modifier = Modifier.fillMaxWidth().testTag("archived_shopping_item_${archived.id}"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+              ) {
+                Text(archived.name, modifier = Modifier.weight(1f))
+                TextButton(enabled = !parentIsArchived, onClick = { onRestoreItem(archived.id) {} }) {
+                  Text(if (parentIsArchived) "Restore list first" else "Restore")
+                }
+              }
+            }
           }
         }
       }
@@ -447,6 +478,39 @@ fun ShoppingListContent(
           }
         }
 
+        if (archivedLists.isNotEmpty()) {
+          item(key = "archived_lists_header") {
+            OceanSectionHeader(title = "Archived Shopping Lists", subtitle = "Purchase and price history is retained")
+          }
+          items(archivedLists, key = { "archived_list_${it.id}" }) { archived ->
+            OceanCard(modifier = Modifier.testTag("archived_shopping_list_${archived.id}")) {
+              Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(modifier = Modifier.weight(1f)) {
+                  Text(archived.name, style = MaterialTheme.typography.titleMedium)
+                  Text("${archived.currencyCode} • Archived", style = MaterialTheme.typography.bodySmall)
+                }
+                TextButton(onClick = { onRestoreList(archived.id) {} }) { Text("Restore") }
+              }
+            }
+          }
+        }
+        if (archivedItems.isNotEmpty()) {
+          item(key = "archived_items_header") {
+            OceanSectionHeader(title = "Archived Shopping Items", subtitle = "Purchase details and store-price history are retained")
+          }
+          items(archivedItems, key = { "archived_item_${it.id}" }) { archived ->
+            val parentIsArchived = archivedLists.any { it.id == archived.listId }
+            OceanCard(modifier = Modifier.testTag("archived_shopping_item_${archived.id}")) {
+              Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(modifier = Modifier.weight(1f)) {
+                  Text(archived.name, style = MaterialTheme.typography.titleMedium)
+                  Text(if (parentIsArchived) "Restore its list first" else "Archived item", style = MaterialTheme.typography.bodySmall)
+                }
+                TextButton(enabled = !parentIsArchived, onClick = { onRestoreItem(archived.id) {} }) { Text("Restore") }
+              }
+            }
+          }
+        }
         item(key = "bottom_spacer") { Spacer(modifier = Modifier.height(OceanSpacing.xl)) }
       }
     }
@@ -483,7 +547,7 @@ fun ShoppingListContent(
   listToDelete?.let { target ->
     ConfirmDeleteShoppingEntityDialog(
       title = "Delete '${target.name}'?",
-      message = "All items and store price records inside '${target.name}' will be permanently removed.",
+      message = "'${target.name}' will be moved to Archived Lists. Its items, purchase details and store-price history will be preserved.",
       confirmTag = "confirm_delete_shopping_list_button",
       onDismiss = { listToDelete = null },
       onConfirm = {
@@ -542,7 +606,7 @@ fun ShoppingListContent(
   itemToDelete?.let { target ->
     ConfirmDeleteShoppingEntityDialog(
       title = "Delete '${target.name}'?",
-      message = "This removes '${target.name}' and its store price quotes from your list.",
+      message = "'${target.name}' will be archived. Purchase details and store-price history will be preserved.",
       confirmTag = "confirm_delete_shopping_item_button",
       onDismiss = { itemToDelete = null },
       onConfirm = {
@@ -564,7 +628,6 @@ fun ShoppingListContent(
         onRecordPrice = { store, unitPrice, recordedAt, notes ->
           onRecordStorePrice(id, store, unitPrice, recordedAt, notes)
         },
-        onDeletePrice = { priceId -> onDeleteStorePrice(priceId) },
       )
     }
   }

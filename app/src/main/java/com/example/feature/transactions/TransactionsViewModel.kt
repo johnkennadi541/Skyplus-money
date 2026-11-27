@@ -110,6 +110,19 @@ class TransactionsViewModel @Inject constructor(
         initialValue = emptyList(),
       )
 
+  @OptIn(ExperimentalCoroutinesApi::class)
+  val archivedTransactions: StateFlow<List<FinancialTransaction>> =
+    authRepository.observeAuthSession()
+      .flatMapLatest { session ->
+        val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+        if (uid != null) getTransactionsUseCase.archived(uid) else flowOf(emptyList())
+      }
+      .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList(),
+      )
+
   val filteredTransactions: StateFlow<List<FinancialTransaction>> =
     combine(allTransactions, filterState) { txns, filters ->
       val now = System.currentTimeMillis()
@@ -410,16 +423,34 @@ class TransactionsViewModel @Inject constructor(
       val session = authRepository.observeAuthSession().first()
       val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
       if (uid.isNullOrBlank()) {
-        _userMessage.value = "Delete failed: Authentication required"
+        _userMessage.value = "Archive failed: Authentication required"
         return@launch
       }
       if (transaction.userId != uid) {
-        _userMessage.value = "Delete failed: Transaction ownership verification failed"
+        _userMessage.value = "Archive failed: Transaction ownership verification failed"
         return@launch
       }
       deleteTransactionUseCase(uid, transaction.id)
-        .onSuccess { _userMessage.value = "Transaction deleted" }
-        .onFailure { error -> _userMessage.value = "Delete failed: ${error.message}" }
+        .onSuccess { _userMessage.value = "Transaction archived" }
+        .onFailure { error -> _userMessage.value = "Archive failed: ${error.message}" }
+    }
+  }
+
+  fun restoreTransaction(transaction: FinancialTransaction) {
+    viewModelScope.launch {
+      val session = authRepository.observeAuthSession().first()
+      val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+      if (uid.isNullOrBlank()) {
+        _userMessage.value = "Restore failed: Authentication required"
+        return@launch
+      }
+      if (transaction.userId != uid) {
+        _userMessage.value = "Restore failed: Transaction ownership verification failed"
+        return@launch
+      }
+      getTransactionsUseCase.restore(uid, transaction.id)
+        .onSuccess { _userMessage.value = "Transaction restored" }
+        .onFailure { error -> _userMessage.value = "Restore failed: ${error.message}" }
     }
   }
 

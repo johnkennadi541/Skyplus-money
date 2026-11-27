@@ -510,4 +510,39 @@ object DatabaseMigrations {
       }
     }
 
+  /** Stage 6 — archive budgets and shopping records without deleting associated history. */
+  val MIGRATION_11_12: Migration =
+    object : Migration(11, 12) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE budgets ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE shopping_lists ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE shopping_items ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE financial_transactions ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+
+        // Immutable purchase-event ledger. Deliberately no cascading foreign keys:
+        // archived/deleted parent records must never erase a completed purchase snapshot.
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS shopping_purchase_history (
+            id TEXT NOT NULL PRIMARY KEY,
+            userId TEXT NOT NULL,
+            listId TEXT NOT NULL,
+            itemId TEXT NOT NULL,
+            itemName TEXT NOT NULL,
+            quantityDecimal TEXT NOT NULL,
+            unit TEXT NOT NULL,
+            actualUnitPriceMinor INTEGER NOT NULL,
+            actualTotalMinor INTEGER NOT NULL,
+            currencyCode TEXT NOT NULL,
+            storeName TEXT,
+            purchasedAt INTEGER NOT NULL,
+            recordedAt INTEGER NOT NULL
+          )
+          """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_shopping_purchase_history_userId_itemId_purchasedAt ON shopping_purchase_history(userId, itemId, purchasedAt)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_shopping_purchase_history_userId_listId_purchasedAt ON shopping_purchase_history(userId, listId, purchasedAt)")
+      }
+    }
+
 }

@@ -7,13 +7,17 @@ import androidx.room.Query
 import com.example.data.local.db.entity.ShoppingItemEntity
 import com.example.data.local.db.entity.ShoppingListEntity
 import com.example.data.local.db.entity.ShoppingStorePriceEntity
+import com.example.data.local.db.entity.ShoppingPurchaseHistoryEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ShoppingDao {
 
-  @Query("SELECT * FROM shopping_lists WHERE userId = :userId ORDER BY updatedAt DESC, createdAt DESC")
+  @Query("SELECT * FROM shopping_lists WHERE userId = :userId AND isArchived = 0 ORDER BY updatedAt DESC, createdAt DESC")
   fun getAllLists(userId: String): Flow<List<ShoppingListEntity>>
+
+  @Query("SELECT * FROM shopping_lists WHERE userId = :userId AND isArchived = 1 ORDER BY updatedAt DESC")
+  fun observeArchivedLists(userId: String): Flow<List<ShoppingListEntity>>
 
   @Query("SELECT * FROM shopping_lists WHERE userId = :userId AND id = :listId LIMIT 1")
   suspend fun getListById(userId: String, listId: String): ShoppingListEntity?
@@ -29,7 +33,7 @@ interface ShoppingDao {
         budgetMinor = :budgetMinor,
         warningThresholdPercent = :warningThresholdPercent,
         updatedAt = :updatedAt
-    WHERE id = :id AND userId = :userId
+    WHERE id = :id AND userId = :userId AND isArchived = 0
     """
   )
   suspend fun updateListScoped(
@@ -55,14 +59,20 @@ interface ShoppingDao {
     )
   }
 
-  @Query("DELETE FROM shopping_lists WHERE userId = :userId AND id = :listId")
-  suspend fun deleteList(userId: String, listId: String): Int
+  @Query("UPDATE shopping_lists SET isArchived = 1, updatedAt = :updatedAt WHERE userId = :userId AND id = :listId AND isArchived = 0")
+  suspend fun archiveList(userId: String, listId: String, updatedAt: Long): Int
 
-  @Query("SELECT * FROM shopping_items WHERE userId = :userId ORDER BY isPurchased ASC, updatedAt DESC, createdAt DESC")
+  @Query("UPDATE shopping_lists SET isArchived = 0, updatedAt = :updatedAt WHERE userId = :userId AND id = :listId AND isArchived = 1")
+  suspend fun restoreList(userId: String, listId: String, updatedAt: Long): Int
+
+  @Query("SELECT * FROM shopping_items WHERE userId = :userId AND isArchived = 0 AND EXISTS (SELECT 1 FROM shopping_lists WHERE shopping_lists.id = shopping_items.listId AND shopping_lists.userId = :userId AND shopping_lists.isArchived = 0) ORDER BY isPurchased ASC, updatedAt DESC, createdAt DESC")
   fun getAllItemsForUser(userId: String): Flow<List<ShoppingItemEntity>>
 
-  @Query("SELECT * FROM shopping_items WHERE userId = :userId AND listId = :listId ORDER BY isPurchased ASC, updatedAt DESC, createdAt DESC")
+  @Query("SELECT * FROM shopping_items WHERE userId = :userId AND listId = :listId AND isArchived = 0 AND EXISTS (SELECT 1 FROM shopping_lists WHERE shopping_lists.id = shopping_items.listId AND shopping_lists.userId = :userId AND shopping_lists.isArchived = 0) ORDER BY isPurchased ASC, updatedAt DESC, createdAt DESC")
   fun getItemsForList(userId: String, listId: String): Flow<List<ShoppingItemEntity>>
+
+  @Query("SELECT * FROM shopping_items WHERE userId = :userId AND isArchived = 1 ORDER BY updatedAt DESC")
+  fun observeArchivedItems(userId: String): Flow<List<ShoppingItemEntity>>
 
   @Query("SELECT COUNT(*) FROM shopping_items WHERE userId = :userId AND listId = :listId")
   suspend fun countItemsForList(userId: String, listId: String): Int
@@ -89,7 +99,7 @@ interface ShoppingDao {
         actualTotalMinor = :actualTotalMinor,
         purchasedAt = :purchasedAt,
         updatedAt = :updatedAt
-    WHERE id = :id AND userId = :userId
+    WHERE id = :id AND userId = :userId AND isArchived = 0
     """
   )
   suspend fun updateItemScoped(
@@ -131,11 +141,20 @@ interface ShoppingDao {
     )
   }
 
-  @Query("DELETE FROM shopping_items WHERE userId = :userId AND id = :itemId")
-  suspend fun deleteItem(userId: String, itemId: String): Int
+  @Query("UPDATE shopping_items SET isArchived = 1, updatedAt = :updatedAt WHERE userId = :userId AND id = :itemId AND isArchived = 0")
+  suspend fun archiveItem(userId: String, itemId: String, updatedAt: Long): Int
 
-  @Query("DELETE FROM shopping_items WHERE userId = :userId AND listId = :listId")
-  suspend fun deleteItemsForList(userId: String, listId: String): Int
+  @Query("UPDATE shopping_items SET isArchived = 0, updatedAt = :updatedAt WHERE userId = :userId AND id = :itemId AND isArchived = 1")
+  suspend fun restoreItem(userId: String, itemId: String, updatedAt: Long): Int
+
+  @Insert(onConflict = OnConflictStrategy.ABORT)
+  suspend fun insertPurchaseHistory(record: ShoppingPurchaseHistoryEntity)
+
+  @Query("SELECT * FROM shopping_purchase_history WHERE userId = :userId AND itemId = :itemId ORDER BY purchasedAt DESC, recordedAt DESC")
+  fun getPurchaseHistoryForItem(userId: String, itemId: String): Flow<List<ShoppingPurchaseHistoryEntity>>
+
+  @Query("SELECT * FROM shopping_purchase_history WHERE userId = :userId AND listId = :listId ORDER BY purchasedAt DESC, recordedAt DESC")
+  fun getPurchaseHistoryForList(userId: String, listId: String): Flow<List<ShoppingPurchaseHistoryEntity>>
 
   @Query("SELECT * FROM shopping_store_prices WHERE userId = :userId ORDER BY recordedAt DESC")
   fun getAllStorePricesForUser(userId: String): Flow<List<ShoppingStorePriceEntity>>
@@ -149,12 +168,4 @@ interface ShoppingDao {
   @Insert(onConflict = OnConflictStrategy.ABORT)
   suspend fun insertStorePrice(record: ShoppingStorePriceEntity)
 
-  @Query("DELETE FROM shopping_store_prices WHERE userId = :userId AND id = :priceId")
-  suspend fun deleteStorePrice(userId: String, priceId: String): Int
-
-  @Query("DELETE FROM shopping_store_prices WHERE userId = :userId AND itemId = :itemId")
-  suspend fun deleteStorePricesForItem(userId: String, itemId: String): Int
-
-  @Query("DELETE FROM shopping_store_prices WHERE userId = :userId AND listId = :listId")
-  suspend fun deleteStorePricesForList(userId: String, listId: String): Int
 }

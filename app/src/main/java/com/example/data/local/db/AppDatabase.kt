@@ -28,6 +28,7 @@ import com.example.data.local.db.entity.SavingsContributionEntity
 import com.example.data.local.db.entity.SavingsGoalEntity
 import com.example.data.local.db.entity.ShoppingListEntity
 import com.example.data.local.db.entity.ShoppingStorePriceEntity
+import com.example.data.local.db.entity.ShoppingPurchaseHistoryEntity
 import com.example.data.local.db.entity.TransactionDetectionEventEntity
 
 @Database(
@@ -49,8 +50,9 @@ import com.example.data.local.db.entity.TransactionDetectionEventEntity
     ShoppingListEntity::class,
     ShoppingItemEntity::class,
     ShoppingStorePriceEntity::class,
+    ShoppingPurchaseHistoryEntity::class,
   ],
-  version = 11,
+  version = 12,
   exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

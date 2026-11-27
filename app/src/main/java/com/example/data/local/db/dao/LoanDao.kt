@@ -160,6 +160,4 @@ interface LoanDao {
   @Insert(onConflict = OnConflictStrategy.ABORT)
   suspend fun insertPayment(payment: LoanPaymentEntity)
 
-  @Query("DELETE FROM loan_payments WHERE userId = :userId AND loanId = :loanId")
-  suspend fun deletePaymentsForLoan(userId: String, loanId: String): Int
 }

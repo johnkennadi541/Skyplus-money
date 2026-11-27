@@ -71,6 +71,7 @@ data class FinancialTransaction(
   val confidenceScore: Float? = null,
   val createdAt: Long = System.currentTimeMillis(),
   val updatedAt: Long = System.currentTimeMillis(),
+  val isArchived: Boolean = false,
 ) {
   val money: Money
     get() = Money.fromMinorUnits(amountMinor, currencyCode)

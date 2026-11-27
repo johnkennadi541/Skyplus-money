@@ -120,6 +120,14 @@ class BudgetsViewModel @Inject constructor(
       )
 
   @OptIn(ExperimentalCoroutinesApi::class)
+  val archivedBudgets: StateFlow<List<Budget>> =
+    authRepository.observeAuthSession()
+      .flatMapLatest { session ->
+        val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+        if (uid != null) budgetRepository.observeArchivedBudgets(uid) else flowOf(emptyList())
+      }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
   val budgetPeriods: StateFlow<List<BudgetPeriod>> =
     authRepository.observeAuthSession()
       .flatMapLatest { session ->
@@ -235,6 +243,29 @@ class BudgetsViewModel @Inject constructor(
         onFailure = { error ->
           _isErrorMessage.value = true
           _userMessage.value = error.message ?: "Failed to update budget"
+        },
+      )
+    }
+  }
+
+  fun restoreBudget(budgetId: String, onSuccess: () -> Unit = {}) {
+    viewModelScope.launch(dispatchers.io) {
+      val session = authRepository.observeAuthSession().first()
+      val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+      if (uid == null) {
+        _isErrorMessage.value = true
+        _userMessage.value = "Authentication session required"
+        return@launch
+      }
+      budgetRepository.restoreBudget(uid, budgetId).fold(
+        onSuccess = {
+          _isErrorMessage.value = false
+          _userMessage.value = "Budget restored successfully"
+          launch(dispatchers.main) { onSuccess() }
+        },
+        onFailure = { error ->
+          _isErrorMessage.value = true
+          _userMessage.value = error.message ?: "Failed to restore budget"
         },
       )
     }

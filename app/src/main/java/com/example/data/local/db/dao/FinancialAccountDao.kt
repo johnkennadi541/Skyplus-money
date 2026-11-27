@@ -73,9 +73,6 @@ interface FinancialAccountDao {
     )
   }
 
-  @Query("DELETE FROM financial_accounts WHERE userId = :userId AND id = :accountId")
-  suspend fun deleteAccount(userId: String, accountId: String): Int
-
   @Query(
     "UPDATE financial_accounts SET currentBalanceMinor = currentBalanceMinor + :deltaMinor, updatedAt = :updatedAt WHERE userId = :userId AND id = :accountId"
   )

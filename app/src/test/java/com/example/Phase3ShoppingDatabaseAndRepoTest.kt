@@ -100,6 +100,8 @@ class Phase3ShoppingDatabaseAndRepoTest {
     assertEquals(2, prices.size)
     assertEquals(q2.id, prices.first().id)
     assertTrue(prices.any { it.id == q1.id })
+    assertTrue(repo.deleteStorePrice("user_1", q1.id).isFailure)
+    assertEquals(2, repo.getStorePricesForList("user_1", groceryList.id).first().size)
 
     // Mark purchased at lower actual price -> preserves estimated and records savings + purchase quote
     val purchased =
@@ -117,6 +119,14 @@ class Phase3ShoppingDatabaseAndRepoTest {
     assertEquals(5_000L, purchased.purchasedAt)
     assertEquals(50_00L, engine.calculateSavingsOrOverspendMinor(purchased))
 
+    val purchaseSnapshot = repo.getPurchaseHistoryForItem("user_1", rice.id).first().single()
+    assertEquals("Basmati Rice", purchaseSnapshot.itemName)
+    assertEquals("2.5", purchaseSnapshot.quantityDecimal)
+    assertEquals(100_00L, purchaseSnapshot.actualUnitPriceMinor)
+    assertEquals(250_00L, purchaseSnapshot.actualTotalMinor)
+    assertEquals("DailyMart", purchaseSnapshot.storeName)
+    assertEquals(5_000L, purchaseSnapshot.purchasedAt)
+
     val pricesAfterPurchase = repo.getStorePricesForList("user_1", groceryList.id).first()
     assertEquals(3, pricesAfterPurchase.size)
     assertEquals("DailyMart", pricesAfterPurchase.first().storeName)
@@ -128,9 +138,89 @@ class Phase3ShoppingDatabaseAndRepoTest {
     assertNull(unpurchased.actualTotalMinor)
     assertEquals(300_00L, unpurchased.estimatedTotalMinor)
 
-    // Delete kitchen list leaves grocery list untouched
+    // Legacy delete action archives instead of deleting the list or its history.
     repo.deleteList("user_1", kitchenList.id).getOrThrow()
     assertEquals(1, repo.getLists("user_1").first().size)
+    assertEquals(kitchenList.id, repo.observeArchivedLists("user_1").first().single().id)
+    repo.restoreList("user_1", kitchenList.id).getOrThrow()
+    assertEquals(2, repo.getLists("user_1").first().size)
+  }
+
+  @Test
+  fun `purchase history survives unpurchase and records repeat purchases without a store`() = runTest {
+    val list = repo.createList("user_1", "Purchase Ledger", "INR", null, 80).getOrThrow()
+    val item = repo.addItem(
+      "user_1", list.id, "Cooking Oil", "Groceries", "2", "litre", "150.00", null, null
+    ).getOrThrow()
+
+    repo.markItemPurchased(
+      authenticatedUserId = "user_1",
+      itemId = item.id,
+      actualUnitPriceDecimal = "140.00",
+      actualTotalOverrideDecimal = "275.00",
+      purchasedAt = 10_000L,
+      storeNameOverride = null,
+    ).getOrThrow()
+
+    val firstPurchase = repo.getPurchaseHistoryForItem("user_1", item.id).first().single()
+    assertEquals("Cooking Oil", firstPurchase.itemName)
+    assertEquals("2", firstPurchase.quantityDecimal)
+    assertEquals(140_00L, firstPurchase.actualUnitPriceMinor)
+    assertEquals(275_00L, firstPurchase.actualTotalMinor)
+    assertNull(firstPurchase.storeName)
+    assertEquals(10_000L, firstPurchase.purchasedAt)
+
+    repo.markItemUnpurchased("user_1", item.id).getOrThrow()
+    val pending = repo.getItemsForList("user_1", list.id).first().single()
+    assertFalse(pending.isPurchased)
+    assertNull(pending.actualTotalMinor)
+
+    // A second purchase is a separate immutable event, not an overwrite of the first.
+    repo.markItemPurchased(
+      authenticatedUserId = "user_1",
+      itemId = item.id,
+      actualUnitPriceDecimal = "135.00",
+      actualTotalOverrideDecimal = "260.00",
+      purchasedAt = 20_000L,
+      storeNameOverride = null,
+    ).getOrThrow()
+
+    val history = repo.getPurchaseHistoryForItem("user_1", item.id).first()
+    assertEquals(2, history.size)
+    assertEquals(20_000L, history[0].purchasedAt)
+    assertEquals(260_00L, history[0].actualTotalMinor)
+    assertEquals(10_000L, history[1].purchasedAt)
+    assertEquals(275_00L, history[1].actualTotalMinor)
+    assertTrue(repo.getPurchaseHistoryForItem("other_user", item.id).first().isEmpty())
+
+    repo.markItemUnpurchased("user_1", item.id).getOrThrow()
+    assertEquals(history, repo.getPurchaseHistoryForItem("user_1", item.id).first())
+  }
+
+  @Test
+  fun `archiving shopping items and lists preserves purchase and store price history`() = runTest {
+    val list = repo.createList("user_1", "History", "INR", 500_00L, 80).getOrThrow()
+    val item = repo.addItem("user_1", list.id, "Rice", "Groceries", "2", "kg", "80.00", "Market", null).getOrThrow()
+    repo.markItemPurchased("user_1", item.id, "75.00", purchasedAt = 1234L, storeNameOverride = "Market").getOrThrow()
+    repo.recordStorePrice("user_1", item.id, "Other Market", "70.00", recordedAt = 2345L).getOrThrow()
+    val priceCountBefore = repo.getStorePricesForList("user_1", list.id).first().size
+
+    repo.deleteItem("user_1", item.id).getOrThrow()
+    assertTrue(repo.getItemsForList("user_1", list.id).first().isEmpty())
+    val archivedItem = repo.observeArchivedItems("user_1").first().single()
+    assertEquals(item.id, archivedItem.id)
+    assertTrue(archivedItem.isPurchased)
+    assertEquals(1234L, archivedItem.purchasedAt)
+    assertEquals(priceCountBefore, repo.getStorePricesForList("user_1", list.id).first().size)
+
+    repo.restoreItem("user_1", item.id).getOrThrow()
+    assertEquals(1, repo.getItemsForList("user_1", list.id).first().size)
+
+    repo.deleteList("user_1", list.id).getOrThrow()
+    assertTrue(repo.getLists("user_1").first().none { it.id == list.id })
+    assertEquals(priceCountBefore, repo.getStorePricesForList("user_1", list.id).first().size)
+    repo.restoreList("user_1", list.id).getOrThrow()
+    assertEquals(1, repo.getLists("user_1").first().count { it.id == list.id })
   }
 
   @Test
@@ -176,6 +266,40 @@ class Phase3ShoppingDatabaseAndRepoTest {
     val stillThere = repo.getItemsForList("owner_uid", ownerList.id).first()
     assertEquals(1, stillThere.size)
     assertEquals("Coffee Beans", stillThere.single().name)
+  }
+
+  @Test
+  fun `archiving a parent list hides its items but retains and restores their history`() = runTest {
+    val list = repo.createList("user_1", "Archived Parent", "INR", 900_00L, 80).getOrThrow()
+    val item = repo.addItem(
+      "user_1", list.id, "Rice", "Groceries", "2", "kg", "80.00", "Market", null
+    ).getOrThrow()
+    repo.markItemPurchased(
+      "user_1", item.id, "75.00", purchasedAt = 1234L, storeNameOverride = "Market"
+    ).getOrThrow()
+    val pricesBefore = repo.getStorePricesForList("user_1", list.id).first()
+    assertEquals(1, pricesBefore.size)
+    val purchaseHistoryBefore = repo.getPurchaseHistoryForList("user_1", list.id).first()
+    assertEquals(1, purchaseHistoryBefore.size)
+
+    repo.deleteList("user_1", list.id).getOrThrow()
+
+    // Parent archive hides child rows from active-list queries without archiving or deleting them.
+    assertTrue(repo.getItemsForList("user_1", list.id).first().isEmpty())
+    assertTrue(repo.getItemsForUser("user_1").first().isEmpty())
+    assertEquals(pricesBefore, repo.getStorePricesForList("user_1", list.id).first())
+    assertEquals(purchaseHistoryBefore, repo.getPurchaseHistoryForList("user_1", list.id).first())
+    assertTrue(repo.restoreItem("user_1", item.id).isFailure)
+
+    // Restoring the parent reveals the unchanged purchase details and associated price history.
+    repo.restoreList("user_1", list.id).getOrThrow()
+    val restored = repo.getItemsForList("user_1", list.id).first().single()
+    assertEquals(item.id, restored.id)
+    assertTrue(restored.isPurchased)
+    assertEquals(1234L, restored.purchasedAt)
+    assertEquals(150_00L, restored.actualTotalMinor)
+    assertEquals(pricesBefore, repo.getStorePricesForList("user_1", list.id).first())
+    assertEquals(purchaseHistoryBefore, repo.getPurchaseHistoryForList("user_1", list.id).first())
   }
 
   @Test
@@ -349,6 +473,7 @@ class Phase3ShoppingDatabaseAndRepoTest {
           DatabaseMigrations.MIGRATION_8_9,
           DatabaseMigrations.MIGRATION_9_10,
           DatabaseMigrations.MIGRATION_10_11,
+          DatabaseMigrations.MIGRATION_11_12,
         )
         .build()
 

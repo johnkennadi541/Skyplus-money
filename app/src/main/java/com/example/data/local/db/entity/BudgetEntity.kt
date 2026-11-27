@@ -34,6 +34,7 @@ data class BudgetEntity(
   @ColumnInfo(defaultValue = "0") val lastRenewedAt: Long = 0L,
   val createdAt: Long,
   val updatedAt: Long,
+  @ColumnInfo(defaultValue = "0") val isArchived: Boolean = false,
 ) {
   fun toDomain(): Budget =
     Budget(
@@ -48,6 +49,7 @@ data class BudgetEntity(
       endDate = endDate,
       warningThresholdPercent = warningThresholdPercent,
       isRecurring = isRecurring,
+      isArchived = isArchived,
       lastRenewedAt = lastRenewedAt,
       createdAt = createdAt,
       updatedAt = updatedAt,
@@ -67,6 +69,7 @@ data class BudgetEntity(
         endDate = domain.endDate,
         warningThresholdPercent = domain.warningThresholdPercent,
         isRecurring = domain.isRecurring,
+        isArchived = domain.isArchived,
         lastRenewedAt = domain.lastRenewedAt,
         createdAt = domain.createdAt,
         updatedAt = domain.updatedAt,

@@ -1,5 +1,6 @@
 package com.example.data.local.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -40,6 +41,7 @@ data class ShoppingItemEntity(
   val purchasedAt: Long? = null,
   val createdAt: Long,
   val updatedAt: Long,
+  @ColumnInfo(defaultValue = "0") val isArchived: Boolean = false,
 ) {
   fun toDomain(): ShoppingListItem =
     ShoppingListItem(
@@ -60,6 +62,7 @@ data class ShoppingItemEntity(
       purchasedAt = purchasedAt,
       createdAt = createdAt,
       updatedAt = updatedAt,
+      isArchived = isArchived,
     )
 
   companion object {
@@ -82,6 +85,7 @@ data class ShoppingItemEntity(
         purchasedAt = item.purchasedAt,
         createdAt = item.createdAt,
         updatedAt = item.updatedAt,
+        isArchived = item.isArchived,
       )
   }
 }
