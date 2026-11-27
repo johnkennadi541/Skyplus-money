@@ -148,10 +148,6 @@ fun ShoppingListContent(
   selectedFilter: ShoppingItemFilter = ShoppingItemFilter.ALL,
   userMessage: String? = null,
   isErrorMessage: Boolean = false,
-  archivedLists: List<ShoppingList> = emptyList(),
-  archivedItems: List<ShoppingListItem> = emptyList(),
-  onRestoreList: (String, () -> Unit) -> Unit = { _, _ -> },
-  onRestoreItem: (String, () -> Unit) -> Unit = { _, _ -> },
   onSelectList: (String?) -> Unit = {},
   onSearchQueryChange: (String) -> Unit = {},
   onSelectFilter: (ShoppingItemFilter) -> Unit = {},
@@ -167,6 +163,10 @@ fun ShoppingListContent(
   onRecordStorePrice: (String, String, String, Long, String?) -> Unit = { _, _, _, _, _ -> },
   onDeleteStorePrice: (String) -> Unit = {},
   modifier: Modifier = Modifier,
+  archivedLists: List<ShoppingList> = emptyList(),
+  archivedItems: List<ShoppingListItem> = emptyList(),
+  onRestoreList: (String, () -> Unit) -> Unit = { _, _ -> },
+  onRestoreItem: (String, () -> Unit) -> Unit = { _, _ -> },
 ) {
   val formatMoneyUseCase = remember { FormatMoneyUseCase() }
   val calculationEngine = remember { ShoppingCalculationEngine() }
