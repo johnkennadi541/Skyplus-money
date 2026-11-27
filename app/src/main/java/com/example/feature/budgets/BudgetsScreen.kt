@@ -126,8 +126,6 @@ fun BudgetsContent(
   budgets: List<BudgetStatus>,
   summaries: Map<String, BudgetSummary>,
   periods: List<com.example.domain.model.BudgetPeriod> = emptyList(),
-  archivedBudgets: List<Budget> = emptyList(),
-  onRestoreBudget: (String, () -> Unit) -> Unit = { _, _ -> },
   accounts: List<FinancialAccount>,
   userMessage: String? = null,
   isErrorMessage: Boolean = false,
@@ -138,6 +136,8 @@ fun BudgetsContent(
   onUpdateBudget: (Budget, () -> Unit) -> Unit = { _, _ -> },
   onDeleteBudget: (String, () -> Unit) -> Unit = { _, _ -> },
   modifier: Modifier = Modifier,
+  archivedBudgets: List<Budget> = emptyList(),
+  onRestoreBudget: (String, () -> Unit) -> Unit = { _, _ -> },
 ) {
 
   var showCreateDialog by remember { mutableStateOf(false) }
