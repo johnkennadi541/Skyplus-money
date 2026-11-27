@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.Flow
 
 interface FinancialTransactionRepository {
   fun getTransactions(userId: String): Flow<List<FinancialTransaction>>
+  fun getArchivedTransactions(userId: String): Flow<List<FinancialTransaction>>
   fun getTransactionsByAccount(userId: String, accountId: String): Flow<List<FinancialTransaction>>
   suspend fun getTransactionById(userId: String, transactionId: String): FinancialTransaction?
   suspend fun recordIncome(
