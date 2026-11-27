@@ -139,9 +139,6 @@ interface InvestmentDao {
   @Insert(onConflict = OnConflictStrategy.ABORT)
   suspend fun insertTransaction(transaction: InvestmentTransactionEntity)
 
-  @Query("DELETE FROM investment_transactions WHERE userId = :userId AND holdingId = :holdingId")
-  suspend fun deleteTransactionsForHolding(userId: String, holdingId: String): Int
-
   @Query(
     """
     SELECT * FROM investment_price_history
@@ -166,6 +163,4 @@ interface InvestmentDao {
   @Insert(onConflict = OnConflictStrategy.ABORT)
   suspend fun insertPriceHistory(history: InvestmentPriceHistoryEntity)
 
-  @Query("DELETE FROM investment_price_history WHERE userId = :userId AND holdingId = :holdingId")
-  suspend fun deletePriceHistoryForHolding(userId: String, holdingId: String): Int
 }
