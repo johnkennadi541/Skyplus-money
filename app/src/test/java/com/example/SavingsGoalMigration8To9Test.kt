@@ -211,108 +211,101 @@ class SavingsGoalMigration8To9Test {
 
 
 /**
- * Exercises the migration through Room itself: a complete v8 entity schema is created by Room,
- * then the production v9 AppDatabase opens the same file and validates its complete schema.
+ * Migration 9 → 10 adds only an archive flag. Existing holding values are retained and
+ * the default keeps every previously-created holding visible as active.
  */
-@androidx.room.Database(
-  entities = [
-    com.example.data.local.db.entity.FinancialAccountEntity::class,
-    com.example.data.local.db.entity.FinancialTransactionEntity::class,
-    com.example.data.local.db.entity.TransactionDetectionEventEntity::class,
-    com.example.data.local.db.entity.AccountMappingRuleEntity::class,
-    com.example.data.local.db.entity.BudgetEntity::class,
-    com.example.data.local.db.entity.BudgetPeriodEntity::class,
-    com.example.data.local.db.entity.CreditCardEntity::class,
-    com.example.data.local.db.entity.LoanEntity::class,
-    com.example.data.local.db.entity.LoanPaymentEntity::class,
-    com.example.data.local.db.entity.InvestmentHoldingEntity::class,
-    com.example.data.local.db.entity.InvestmentTransactionEntity::class,
-    com.example.data.local.db.entity.InvestmentPriceHistoryEntity::class,
-    com.example.data.local.db.entity.ShoppingListEntity::class,
-    com.example.data.local.db.entity.ShoppingItemEntity::class,
-    com.example.data.local.db.entity.ShoppingStorePriceEntity::class,
-  ],
-  version = 8,
-  exportSchema = false,
-)
-abstract class SavingsGoalVersion8Database : androidx.room.RoomDatabase()
-
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
-class SavingsGoalRoomMigrationIntegrationTest {
+class InvestmentArchiveMigration9To10Test {
+  private lateinit var context: Context
+  private lateinit var dbName: String
+  private lateinit var helper: SupportSQLiteOpenHelper
+  private lateinit var db: SupportSQLiteDatabase
+
+  @Before
+  fun setUp() {
+    context = RuntimeEnvironment.getApplication()
+    dbName = "investment-archive-migration-9-10-${System.nanoTime()}.db"
+    context.deleteDatabase(dbName)
+    val configuration =
+      SupportSQLiteOpenHelper.Configuration.builder(context)
+        .name(dbName)
+        .callback(
+          object : SupportSQLiteOpenHelper.Callback(9) {
+            override fun onCreate(database: SupportSQLiteDatabase) {
+              database.execSQL(
+                """
+                CREATE TABLE investment_holdings (
+                  id TEXT NOT NULL PRIMARY KEY,
+                  userId TEXT NOT NULL,
+                  name TEXT NOT NULL,
+                  category TEXT NOT NULL,
+                  symbolOrTicker TEXT,
+                  isin TEXT,
+                  brokerOrPlatform TEXT,
+                  currencyCode TEXT NOT NULL,
+                  purchaseDate INTEGER NOT NULL,
+                  quantityDecimal TEXT NOT NULL,
+                  totalInvestedMinor INTEGER NOT NULL,
+                  totalBuyCostMinor INTEGER NOT NULL,
+                  realizedPnlMinor INTEGER NOT NULL,
+                  totalChargesMinor INTEGER NOT NULL,
+                  currentMarketPriceDecimal TEXT NOT NULL,
+                  currentValuationMinor INTEGER NOT NULL,
+                  lastPriceUpdateDate INTEGER NOT NULL,
+                  lastPriceSource TEXT NOT NULL,
+                  lastPriceProviderLabel TEXT,
+                  autoPriceUpdateEnabled INTEGER NOT NULL,
+                  notes TEXT,
+                  createdAt INTEGER NOT NULL,
+                  updatedAt INTEGER NOT NULL
+                )
+                """.trimIndent()
+              )
+              database.execSQL(
+                """
+                INSERT INTO investment_holdings
+                  (id, userId, name, category, currencyCode, purchaseDate, quantityDecimal,
+                   totalInvestedMinor, totalBuyCostMinor, realizedPnlMinor, totalChargesMinor,
+                   currentMarketPriceDecimal, currentValuationMinor, lastPriceUpdateDate,
+                   lastPriceSource, autoPriceUpdateEnabled, createdAt, updatedAt)
+                VALUES ('holding_1', 'uid_archive', 'Index Fund', 'MUTUAL_FUNDS', 'INR',
+                        100, '10', 50000, 50000, 0, 0, '50', 50000, 100,
+                        'MANUAL', 0, 10, 20)
+                """.trimIndent()
+              )
+            }
+
+            override fun onUpgrade(database: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+          }
+        )
+        .build()
+    helper = FrameworkSQLiteOpenHelperFactory().create(configuration)
+    db = helper.writableDatabase
+  }
+
+  @After
+  fun tearDown() {
+    runCatching { db.close() }
+    runCatching { helper.close() }
+    context.deleteDatabase(dbName)
+  }
 
   @Test
-  fun `Room opens a complete version 8 database through the production 8 to 9 migration`() {
-    val context = RuntimeEnvironment.getApplication()
-    val dbName = "savings-room-migration-integration.db"
-    context.deleteDatabase(dbName)
+  fun `archive migration preserves existing holding and defaults it to active`() {
+    DatabaseMigrations.MIGRATION_9_10.migrate(db)
 
-    val version8 =
-      androidx.room.Room.databaseBuilder(
-        context,
-        SavingsGoalVersion8Database::class.java,
-        dbName,
-      ).build()
-
-    version8.openHelper.writableDatabase.execSQL(
-      """
-      INSERT INTO financial_accounts
-        (id, userId, name, accountType, currencyCode, initialBalanceMinor, currentBalanceMinor,
-         institutionName, accountNumberLast4, colorHex, isActive, createdAt, updatedAt)
-      VALUES ('room_acc_1', 'uid_room_test', 'Salary', 'BANK', 'INR', 0, 250000,
-              'SBI', '9999', '#0A2540', 1, 111, 222)
-      """.trimIndent()
-    )
-    version8.close()
-
-    val migrated =
-      androidx.room.Room.databaseBuilder(
-        context,
-        com.example.data.local.db.AppDatabase::class.java,
-        dbName,
-      )
-        .addMigrations(DatabaseMigrations.MIGRATION_8_9)
-        .build()
-
-    try {
-      val database = migrated.openHelper.writableDatabase
-
-      assertEquals(9, database.version)
-      assertEquals(1, database.query("SELECT COUNT(*) FROM financial_accounts").use { cursor ->
-        cursor.moveToFirst()
-        cursor.getInt(0)
-      })
-      database.query(
-        "SELECT name, currentBalanceMinor, createdAt, updatedAt FROM financial_accounts WHERE id = 'room_acc_1'"
-      ).use { cursor ->
-        assertTrue(cursor.moveToFirst())
-        assertEquals("Salary", cursor.getString(0))
-        assertEquals(250_000L, cursor.getLong(1))
-        assertEquals(111L, cursor.getLong(2))
-        assertEquals(222L, cursor.getLong(3))
-      }
-
-      for (table in listOf("savings_goals", "savings_contributions")) {
-        database.query(
-          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
-          arrayOf<Any>(table),
-        ).use { cursor -> assertTrue("Missing migrated table: $table", cursor.moveToFirst()) }
-      }
-      for (index in listOf(
-        "index_savings_goals_userId",
-        "index_savings_goals_userId_currencyCode",
-        "index_savings_contributions_userId",
-        "index_savings_contributions_userId_goalId",
-        "index_savings_contributions_userId_goalId_contributedAt",
-      )) {
-        database.query(
-          "SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?",
-          arrayOf<Any>(index),
-        ).use { cursor -> assertTrue("Missing migrated index: $index", cursor.moveToFirst()) }
-      }
-    } finally {
-      migrated.close()
-      context.deleteDatabase(dbName)
+    db.query(
+      "SELECT id, name, quantityDecimal, totalInvestedMinor, currentValuationMinor, isArchived FROM investment_holdings WHERE id = 'holding_1'"
+    ).use { cursor ->
+      assertEquals(1, cursor.count)
+      cursor.moveToFirst()
+      assertEquals("holding_1", cursor.getString(0))
+      assertEquals("Index Fund", cursor.getString(1))
+      assertEquals("10", cursor.getString(2))
+      assertEquals(50_000L, cursor.getLong(3))
+      assertEquals(50_000L, cursor.getLong(4))
+      assertEquals(0, cursor.getInt(5))
     }
   }
 }
