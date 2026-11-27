@@ -100,6 +100,8 @@ class Phase3ShoppingDatabaseAndRepoTest {
     assertEquals(2, prices.size)
     assertEquals(q2.id, prices.first().id)
     assertTrue(prices.any { it.id == q1.id })
+    assertTrue(repo.deleteStorePrice("user_1", q1.id).isFailure)
+    assertEquals(2, repo.getStorePricesForList("user_1", groceryList.id).first().size)
 
     // Mark purchased at lower actual price -> preserves estimated and records savings + purchase quote
     val purchased =
