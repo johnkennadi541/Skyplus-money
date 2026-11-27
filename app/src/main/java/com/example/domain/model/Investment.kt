@@ -57,6 +57,7 @@ data class InvestmentHolding(
   val lastPriceProviderLabel: String? = "Manual",
   val autoPriceUpdateEnabled: Boolean = false,
   val notes: String? = null,
+  val isArchived: Boolean = false,
   val createdAt: Long = System.currentTimeMillis(),
   val updatedAt: Long = System.currentTimeMillis(),
 )
