@@ -288,27 +288,82 @@ class FinancialTransactionRepositoryImpl @Inject constructor(
               ?: throw SecurityException("Transaction does not belong to authenticated user")
           require(txn.userId == userId) { "Transaction ownership verification failed" }
           val now = System.currentTimeMillis()
-          val type = runCatching { TransactionType.valueOf(txn.type) }.getOrDefault(TransactionType.EXPENSE)
-          val status = runCatching { TransactionStatus.valueOf(txn.status) }.getOrDefault(TransactionStatus.COMPLETED)
+          // Persisted enum values and amounts are untrusted database state. Never guess a
+          // fallback type/status: an unknown value must abort the transaction without writes.
+          val type = TransactionType.valueOf(txn.type)
+          val status = TransactionStatus.valueOf(txn.status)
+          require(txn.amountMinor > 0L) {
+            "Persisted transaction amount is invalid; refusing to alter account balances."
+          }
 
-          if (status == TransactionStatus.COMPLETED && type == TransactionType.TRANSFER && !txn.linkedTransferId.isNullOrBlank()) {
-            val linkedEntries = transactionDao.findByLinkedTransferId(userId, txn.linkedTransferId)
-            for (entry in linkedEntries) {
-              val reverseDelta =
-                if (entry.category == TransactionCategories.TRANSFER_IN_CATEGORY) {
-                  -entry.amountMinor
-                } else {
-                  entry.amountMinor
-                }
-              accountDao.adjustBalance(userId, entry.accountId, reverseDelta, now)
-              transactionDao.deleteTransaction(userId, entry.id)
+          if (type == TransactionType.TRANSFER) {
+            require(status == TransactionStatus.COMPLETED) {
+              "Only completed paired transfers can be deleted."
+            }
+            val transferId = txn.linkedTransferId?.takeIf { it.isNotBlank() }
+              ?: throw IllegalStateException("Transfer is missing its linked transfer ID.")
+            val linkedEntries = transactionDao.findByLinkedTransferId(userId, transferId)
+            require(linkedEntries.size == 2) {
+              "Transfer ledger is incomplete or duplicated; refusing to delete either entry."
+            }
+            val outgoing = linkedEntries.singleOrNull {
+              it.category == TransactionCategories.TRANSFER_OUT_CATEGORY
+            } ?: throw IllegalStateException("Transfer is missing its unique outgoing entry.")
+            val incoming = linkedEntries.singleOrNull {
+              it.category == TransactionCategories.TRANSFER_IN_CATEGORY
+            } ?: throw IllegalStateException("Transfer is missing its unique incoming entry.")
+
+            require(
+              outgoing.id != incoming.id &&
+                outgoing.id == txn.id || incoming.id == txn.id
+            ) { "Selected transaction is not part of a valid paired transfer." }
+            require(
+              outgoing.type == TransactionType.TRANSFER.name &&
+                incoming.type == TransactionType.TRANSFER.name &&
+                outgoing.status == TransactionStatus.COMPLETED.name &&
+                incoming.status == TransactionStatus.COMPLETED.name &&
+                outgoing.amountMinor > 0L &&
+                incoming.amountMinor > 0L &&
+                outgoing.accountId.isNotBlank() &&
+                incoming.accountId.isNotBlank() &&
+                outgoing.accountId != incoming.accountId &&
+                outgoing.transferDestinationAccountId == incoming.accountId &&
+                incoming.transferDestinationAccountId == outgoing.accountId &&
+                outgoing.linkedTransferId == transferId &&
+                incoming.linkedTransferId == transferId
+            ) { "Transfer pair failed integrity checks; refusing to change balances." }
+
+            val sourceAccount = accountDao.getAccountById(userId, outgoing.accountId)
+              ?: throw IllegalStateException("Transfer source account is missing.")
+            val destinationAccount = accountDao.getAccountById(userId, incoming.accountId)
+              ?: throw IllegalStateException("Transfer destination account is missing.")
+            require(
+              sourceAccount.userId == userId &&
+                destinationAccount.userId == userId &&
+                sourceAccount.currencyCode.equals(outgoing.currencyCode, ignoreCase = true) &&
+                destinationAccount.currencyCode.equals(incoming.currencyCode, ignoreCase = true)
+            ) { "Transfer account ownership or currency validation failed." }
+
+            // Reverse both legs atomically, then verify that both rows were deleted.
+            accountDao.adjustBalance(userId, outgoing.accountId, outgoing.amountMinor, now)
+            accountDao.adjustBalance(userId, incoming.accountId, -incoming.amountMinor, now)
+            check(transactionDao.deleteTransaction(userId, outgoing.id) == 1) {
+              "Transfer outgoing entry deletion failed."
+            }
+            check(transactionDao.deleteTransaction(userId, incoming.id) == 1) {
+              "Transfer incoming entry deletion failed."
             }
           } else {
+            require(txn.linkedTransferId.isNullOrBlank()) {
+              "Non-transfer transaction contains a transfer link; refusing to delete it."
+            }
             val delta = balanceDeltaFor(type, status, txn.amountMinor)
             if (delta != 0L) {
-              accountDao.adjustBalance(userId, txn.accountId, -delta, now)
+              accountDao.adjustBalance(userId, txn.accountId, Math.negateExact(delta), now)
             }
-            transactionDao.deleteTransaction(userId, transactionId)
+            check(transactionDao.deleteTransaction(userId, transactionId) == 1) {
+              "Transaction deletion rejected for authenticated user."
+            }
           }
         }
       }
