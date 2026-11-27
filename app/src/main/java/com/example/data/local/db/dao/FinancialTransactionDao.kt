@@ -9,13 +9,16 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FinancialTransactionDao {
-  @Query("SELECT * FROM financial_transactions WHERE userId = :userId ORDER BY transactionDate DESC, createdAt DESC")
+  @Query("SELECT * FROM financial_transactions WHERE userId = :userId AND isArchived = 0 ORDER BY transactionDate DESC, createdAt DESC")
   fun getAllTransactions(userId: String): Flow<List<FinancialTransactionEntity>>
 
   @Query(
-    "SELECT * FROM financial_transactions WHERE userId = :userId AND accountId = :accountId ORDER BY transactionDate DESC, createdAt DESC"
+    "SELECT * FROM financial_transactions WHERE userId = :userId AND accountId = :accountId AND isArchived = 0 ORDER BY transactionDate DESC, createdAt DESC"
   )
   fun getTransactionsByAccount(userId: String, accountId: String): Flow<List<FinancialTransactionEntity>>
+
+  @Query("SELECT * FROM financial_transactions WHERE userId = :userId AND isArchived = 1 ORDER BY transactionDate DESC, createdAt DESC")
+  fun getArchivedTransactions(userId: String): Flow<List<FinancialTransactionEntity>>
 
   @Query("SELECT * FROM financial_transactions WHERE userId = :userId AND id = :transactionId LIMIT 1")
   suspend fun getTransactionById(userId: String, transactionId: String): FinancialTransactionEntity?
@@ -43,7 +46,7 @@ interface FinancialTransactionDao {
         confidenceScore = :confidenceScore,
         updatedAt = :updatedAt,
         normalizedMerchant = :normalizedMerchant
-    WHERE id = :id AND userId = :userId
+    WHERE id = :id AND userId = :userId AND isArchived = 0
     """
   )
   suspend fun updateTransactionScoped(
@@ -96,8 +99,8 @@ interface FinancialTransactionDao {
     )
   }
 
-  @Query("DELETE FROM financial_transactions WHERE userId = :userId AND id = :transactionId")
-  suspend fun deleteTransaction(userId: String, transactionId: String)
+  @Query("UPDATE financial_transactions SET isArchived = 1, updatedAt = :updatedAt WHERE userId = :userId AND id = :transactionId AND isArchived = 0")
+  suspend fun archiveTransaction(userId: String, transactionId: String, updatedAt: Long): Int
 
   @Query(
     """
@@ -130,6 +133,6 @@ interface FinancialTransactionDao {
   @Query("SELECT COUNT(*) FROM financial_transactions WHERE userId = :userId AND accountId = :accountId")
   suspend fun countForAccount(userId: String, accountId: String): Int
 
-  @Query("DELETE FROM financial_transactions WHERE userId = :userId AND accountId = :accountId")
-  suspend fun deleteByAccount(userId: String, accountId: String)
+  @Query("SELECT COUNT(*) FROM financial_transactions WHERE userId = :userId AND accountId = :accountId AND isArchived = 0")
+  suspend fun countActiveForAccount(userId: String, accountId: String): Int
 }
