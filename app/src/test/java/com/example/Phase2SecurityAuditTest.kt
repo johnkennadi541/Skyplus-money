@@ -20,6 +20,7 @@ import com.example.domain.model.TransactionType
 import com.example.service.SkyplusNotificationListenerService
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -108,6 +109,22 @@ class Phase2SecurityAuditTest {
     assertEquals(
       Manifest.permission.BIND_NOTIFICATION_LISTENER_SERVICE,
       listenerService?.permission,
+    )
+  }
+
+  @Test
+  fun `auto-save defaults off until user explicitly opts in`() = runTest {
+    val uid = "uid_auto_save_default_off"
+    val defaults = detectionRepo.getDetectionSettings(uid).first()
+
+    assertFalse("New users must not auto-save detected transactions by default", defaults.isAutoSaveHighConfidenceEnabled)
+    assertFalse("Domain defaults must keep auto-save disabled", DetectionSettings(userId = uid).isAutoSaveHighConfidenceEnabled)
+
+    val optedIn = defaults.copy(isAutoSaveHighConfidenceEnabled = true)
+    detectionRepo.updateDetectionSettings(uid, optedIn).getOrThrow()
+    assertTrue(
+      "An explicit user opt-in must be preserved",
+      detectionRepo.getDetectionSettings(uid).first().isAutoSaveHighConfidenceEnabled,
     )
   }
 
