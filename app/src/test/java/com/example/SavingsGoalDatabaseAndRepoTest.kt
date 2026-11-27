@@ -233,7 +233,7 @@ class SavingsGoalDatabaseAndRepoTest {
     repository.deleteGoal(userA, "goal_1").getOrThrow()
 
     assertTrue(repository.getGoal(userA, "goal_1")!!.isArchived)
-    assertTrue(repository.observeGoals(userA).none { it.id == "goal_1" })
+    assertTrue(repository.observeGoals(userA).first().none { it.id == "goal_1" })
     assertTrue(repository.observeArchivedGoals(userA).first().any { it.id == "goal_1" })
     assertEquals(2, repository.observeContributions(userA).first().size)
     repository.restoreGoal(userA, "goal_1").getOrThrow()
