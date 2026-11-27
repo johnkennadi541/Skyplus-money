@@ -8,6 +8,12 @@ interface SavingsGoalRepository {
 
   fun observeGoals(userId: String): Flow<List<SavingsGoal>>
 
+  fun observeArchivedGoals(userId: String): Flow<List<SavingsGoal>>
+
+  suspend fun archiveGoal(authenticatedUserId: String, goalId: String): Result<Unit>
+
+  suspend fun restoreGoal(authenticatedUserId: String, goalId: String): Result<Unit>
+
   fun observeContributions(userId: String): Flow<List<SavingsContribution>>
 
   fun observeContributionsForGoal(
@@ -28,7 +34,7 @@ interface SavingsGoalRepository {
     goal: SavingsGoal,
   ): Result<Unit>
 
-  /** Removes the goal and its contributions in one transaction. */
+  /** Legacy compatibility: archives the goal and retains all contribution history. */
   suspend fun deleteGoal(userId: String, goalId: String): Result<Unit>
 
   /** Rejects a contribution whose currency differs from the goal's, and any non-positive amount. */
@@ -37,5 +43,6 @@ interface SavingsGoalRepository {
     contribution: SavingsContribution,
   ): Result<SavingsContribution>
 
-  suspend fun deleteContribution(userId: String, contributionId: String): Result<Unit>
+  /** Financial contribution history is immutable; this legacy removal action is refused. */
+  suspend fun deleteContribution(userId: String, contributionId: String)
 }
