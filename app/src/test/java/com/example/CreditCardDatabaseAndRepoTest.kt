@@ -521,7 +521,10 @@ class CreditCardDatabaseAndRepoTest {
 
     cardRepository.deleteCard(userA, created.id).getOrThrow()
 
-    assertTrue(cardRepository.observeCards(userA).first().isEmpty())
+    val retainedCard = cardRepository.getCard(userA, created.id)
+    assertNotNull(retainedCard)
+    assertFalse(retainedCard!!.isActive)
+    assertEquals(1, cardRepository.observeCards(userA).first().size)
     val stillThere = accountRepository.getAccountById(userA, account.id)
     assertNotNull(stillThere)
     assertEquals(-25_000L, stillThere?.currentBalanceMinor)
