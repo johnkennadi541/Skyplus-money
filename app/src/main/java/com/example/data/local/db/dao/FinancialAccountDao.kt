@@ -107,16 +107,6 @@ interface FinancialAccountDao {
   }
 
   @Query(
-    "UPDATE financial_accounts SET currentBalanceMinor = :newBalanceMinor, updatedAt = :updatedAt WHERE userId = :userId AND id = :accountId"
-  )
-  suspend fun setBalance(
-    userId: String,
-    accountId: String,
-    newBalanceMinor: Long,
-    updatedAt: Long = System.currentTimeMillis(),
-  )
-
-  @Query(
     "UPDATE financial_accounts SET isActive = :isActive, updatedAt = :updatedAt WHERE userId = :userId AND id = :accountId"
   )
   suspend fun setActive(
