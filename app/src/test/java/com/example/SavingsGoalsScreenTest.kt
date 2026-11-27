@@ -87,11 +87,15 @@ class SavingsGoalsScreenTest {
     isLoading: Boolean = false,
     hasLoadError: Boolean = false,
     onRetryLoadGoals: () -> Unit = {},
+    archivedGoals: List<SavingsGoal> = emptyList(),
+    onRestoreGoal: (String) -> Unit = {},
   ) {
     composeTestRule.setContent {
       SkyplusOceanTheme(themePreference = ThemePreference.DARK) {
         SavingsGoalsContent(
           goals = summaries,
+          archivedGoals = archivedGoals,
+          onRestoreGoal = onRestoreGoal,
           isLoading = isLoading,
           hasLoadError = hasLoadError,
           onRetryLoadGoals = onRetryLoadGoals,
@@ -113,6 +117,23 @@ class SavingsGoalsScreenTest {
       }
     }
     composeTestRule.waitForIdle()
+  }
+
+  @Test
+  fun `archived goals can be restored from the archived list`() {
+    var restoredId: String? = null
+    val archived = goal(name = "Rainy day")
+    render(
+      summaries = emptyList(),
+      archivedGoals = listOf(archived),
+      onRestoreGoal = { restoredId = it },
+    )
+
+    composeTestRule.onNodeWithTag("toggle_archived_goals").performClick()
+    composeTestRule.onNodeWithTag("archived_goal_goal_1").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("restore_goal_goal_1").performClick()
+
+    assertEquals("goal_1", restoredId)
   }
 
   @Test

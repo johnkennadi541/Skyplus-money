@@ -93,6 +93,7 @@ class SavingsGoalsViewModelTest {
       deleteSavingsGoalUseCase = DeleteSavingsGoalUseCase(repository),
       addSavingsContributionUseCase = AddSavingsContributionUseCase(repository),
       deleteSavingsContributionUseCase = DeleteSavingsContributionUseCase(repository),
+      savingsGoalRepository = repository,
     )
   }
 
