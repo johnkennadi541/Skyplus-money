@@ -510,4 +510,14 @@ object DatabaseMigrations {
       }
     }
 
+  /** Stage 6 — archive budgets and shopping records without deleting associated history. */
+  val MIGRATION_11_12: Migration =
+    object : Migration(11, 12) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE budgets ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE shopping_lists ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE shopping_items ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+      }
+    }
+
 }
