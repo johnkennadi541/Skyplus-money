@@ -13,6 +13,8 @@ import com.example.domain.repository.AuthRepository
 import com.example.domain.usecase.DeleteTransactionUseCase
 import com.example.domain.usecase.GetAccountsUseCase
 import com.example.domain.usecase.GetTransactionsUseCase
+import com.example.domain.usecase.GetArchivedTransactionsUseCase
+import com.example.domain.usecase.RestoreTransactionUseCase
 import com.example.domain.usecase.RecordExpenseUseCase
 import com.example.domain.usecase.RecordGeneralTransactionUseCase
 import com.example.domain.usecase.RecordIncomeUseCase
@@ -58,6 +60,8 @@ data class TransactionsFilterState(
 class TransactionsViewModel @Inject constructor(
   private val authRepository: AuthRepository,
   private val getTransactionsUseCase: GetTransactionsUseCase,
+  private val getArchivedTransactionsUseCase: GetArchivedTransactionsUseCase,
+  private val restoreTransactionUseCase: RestoreTransactionUseCase,
   private val getAccountsUseCase: GetAccountsUseCase,
   private val recordExpenseUseCase: RecordExpenseUseCase,
   private val recordIncomeUseCase: RecordIncomeUseCase,
@@ -103,6 +107,19 @@ class TransactionsViewModel @Inject constructor(
       .flatMapLatest { session ->
         val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
         if (uid != null) getTransactionsUseCase(uid) else flowOf(emptyList())
+      }
+      .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList(),
+      )
+
+  @OptIn(ExperimentalCoroutinesApi::class)
+  val archivedTransactions: StateFlow<List<FinancialTransaction>> =
+    authRepository.observeAuthSession()
+      .flatMapLatest { session ->
+        val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+        if (uid != null) getArchivedTransactionsUseCase(uid) else flowOf(emptyList())
       }
       .stateIn(
         scope = viewModelScope,
@@ -410,16 +427,34 @@ class TransactionsViewModel @Inject constructor(
       val session = authRepository.observeAuthSession().first()
       val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
       if (uid.isNullOrBlank()) {
-        _userMessage.value = "Delete failed: Authentication required"
+        _userMessage.value = "Archive failed: Authentication required"
         return@launch
       }
       if (transaction.userId != uid) {
-        _userMessage.value = "Delete failed: Transaction ownership verification failed"
+        _userMessage.value = "Archive failed: Transaction ownership verification failed"
         return@launch
       }
       deleteTransactionUseCase(uid, transaction.id)
-        .onSuccess { _userMessage.value = "Transaction deleted" }
-        .onFailure { error -> _userMessage.value = "Delete failed: ${error.message}" }
+        .onSuccess { _userMessage.value = "Transaction archived" }
+        .onFailure { error -> _userMessage.value = "Archive failed: ${error.message}" }
+    }
+  }
+
+  fun restoreTransaction(transaction: FinancialTransaction) {
+    viewModelScope.launch {
+      val session = authRepository.observeAuthSession().first()
+      val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+      if (uid.isNullOrBlank()) {
+        _userMessage.value = "Restore failed: Authentication required"
+        return@launch
+      }
+      if (transaction.userId != uid) {
+        _userMessage.value = "Restore failed: Transaction ownership verification failed"
+        return@launch
+      }
+      restoreTransactionUseCase(uid, transaction.id)
+        .onSuccess { _userMessage.value = "Transaction restored" }
+        .onFailure { error -> _userMessage.value = "Restore failed: ${error.message}" }
     }
   }
 
