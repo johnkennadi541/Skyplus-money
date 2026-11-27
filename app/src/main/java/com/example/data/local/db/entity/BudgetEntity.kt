@@ -32,9 +32,9 @@ data class BudgetEntity(
    */
   @ColumnInfo(defaultValue = "0") val isRecurring: Boolean = true,
   @ColumnInfo(defaultValue = "0") val lastRenewedAt: Long = 0L,
-  @ColumnInfo(defaultValue = "0") val isArchived: Boolean = false,
   val createdAt: Long,
   val updatedAt: Long,
+  @ColumnInfo(defaultValue = "0") val isArchived: Boolean = false,
 ) {
   fun toDomain(): Budget =
     Budget(
