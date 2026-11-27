@@ -304,24 +304,20 @@ fun SafeDeleteAccountDialog(
 ) {
   AlertDialog(
     onDismissRequest = onDismiss,
-    title = { Text("Delete Account") },
+    title = { Text("Deactivate Account") },
     text = {
       Text(
-        "Remove '${account.name}'? If this account has recorded transactions, we recommend deactivating it instead to preserve ledger history, or you can permanently remove the account and its transactions."
+        "Deactivate '${account.name}'? The account will be excluded from active workflows. All balances and transaction history will be preserved, and you can reactivate it later."
       )
     },
     confirmButton = {
       Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Button(
-          onClick = { onSafeDelete(false) },
-          colors = ButtonDefaults.buttonColors(containerColor = OceanTheme.colors.negative),
-          modifier = Modifier.testTag("confirm_delete_account_button"),
-        ) {
-          Text("Delete Safely")
-        }
         if (account.isActive) {
-          OutlinedButton(onClick = onDeactivate) {
-            Text("Deactivate Instead")
+          Button(
+            onClick = onDeactivate,
+            modifier = Modifier.testTag("confirm_deactivate_account_button"),
+          ) {
+            Text("Deactivate Account")
           }
         }
       }
