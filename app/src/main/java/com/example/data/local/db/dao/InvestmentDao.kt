@@ -53,7 +53,7 @@ interface InvestmentDao {
         autoPriceUpdateEnabled = :autoPriceUpdateEnabled,
         notes = :notes,
         updatedAt = :updatedAt
-    WHERE id = :id AND userId = :userId
+    WHERE id = :id AND userId = :userId AND isArchived = 0
     """
   )
   suspend fun updateHoldingScoped(
