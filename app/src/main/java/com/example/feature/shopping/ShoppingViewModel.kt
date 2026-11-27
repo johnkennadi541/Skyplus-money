@@ -8,6 +8,7 @@ import com.example.domain.model.FinancialAccount
 import com.example.domain.model.ShoppingList
 import com.example.domain.repository.AuthRepository
 import com.example.domain.repository.FinancialAccountRepository
+import com.example.domain.repository.ShoppingRepository
 import com.example.domain.usecase.AddShoppingItemUseCase
 import com.example.domain.usecase.CreateShoppingListUseCase
 import com.example.domain.usecase.DeleteShoppingItemUseCase
@@ -45,6 +46,7 @@ class ShoppingViewModel @Inject constructor(
   private val purchaseShoppingItemUseCase: PurchaseShoppingItemUseCase,
   private val deleteShoppingItemUseCase: DeleteShoppingItemUseCase,
   private val manageStorePriceUseCase: ManageStorePriceUseCase,
+  private val shoppingRepository: ShoppingRepository,
   private val dispatchers: DispatcherProvider,
 ) : ViewModel() {
 
@@ -102,6 +104,57 @@ class ShoppingViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = ShoppingWorkspaceSnapshot(),
       )
+
+  val archivedLists: StateFlow<List<ShoppingList>> =
+    authRepository.observeAuthSession()
+      .flatMapLatest { session ->
+        val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+        if (uid != null) shoppingRepository.observeArchivedLists(uid) else flowOf(emptyList())
+      }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+  val archivedItems: StateFlow<List<com.example.domain.model.ShoppingListItem>> =
+    authRepository.observeAuthSession()
+      .flatMapLatest { session ->
+        val uid = (session as? AuthSessionState.Authenticated)?.user?.uid
+        if (uid != null) shoppingRepository.observeArchivedItems(uid) else flowOf(emptyList())
+      }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+  fun restoreList(listId: String, onSuccess: () -> Unit = {}) {
+    viewModelScope.launch(dispatchers.io) {
+      val uid = requireAuthenticatedUid() ?: return@launch
+      shoppingRepository.restoreList(uid, listId).fold(
+        onSuccess = {
+          _selectedListId.value = listId
+          _isErrorMessage.value = false
+          _userMessage.value = "Shopping list restored"
+          launch(dispatchers.main) { onSuccess() }
+        },
+        onFailure = { error ->
+          _isErrorMessage.value = true
+          _userMessage.value = error.message ?: "Failed to restore shopping list"
+        },
+      )
+    }
+  }
+
+  fun restoreItem(itemId: String, onSuccess: () -> Unit = {}) {
+    viewModelScope.launch(dispatchers.io) {
+      val uid = requireAuthenticatedUid() ?: return@launch
+      shoppingRepository.restoreItem(uid, itemId).fold(
+        onSuccess = {
+          _isErrorMessage.value = false
+          _userMessage.value = "Shopping item restored"
+          launch(dispatchers.main) { onSuccess() }
+        },
+        onFailure = { error ->
+          _isErrorMessage.value = true
+          _userMessage.value = error.message ?: "Failed to restore shopping item"
+        },
+      )
+    }
+  }
 
   fun selectList(listId: String?) {
     _selectedListId.value = listId
