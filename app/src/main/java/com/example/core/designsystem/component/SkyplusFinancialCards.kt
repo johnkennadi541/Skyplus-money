@@ -30,6 +30,7 @@ import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
 import com.example.core.designsystem.theme.SkyplusElevation
 import com.example.core.designsystem.theme.SkyplusIconSize
+import com.example.core.designsystem.theme.SkyplusYellowBright
 
 /** Tone of a delta or trend line: colour only, the wording stays neutral and factual. */
 enum class SkyplusDeltaTone {
