@@ -1,7 +1,6 @@
 package com.example.core.designsystem.component
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,7 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.core.designsystem.theme.OceanSpacing
-import com.example.core.designsystem.theme.OceanTheme
 import com.example.core.designsystem.theme.SkyplusIconSize
 
 /**
@@ -36,8 +34,7 @@ data class SkyplusNavItem(
  *
  * The bar itself is generic: it renders whatever items it is given, so the six planned sections
  * (Home, Transactions, Portfolio, Tools, Reports, Settings) can be adopted one at a time without
- * touching this component again. The active item is tinted with the yellow accent container so the
- * selected state is visible without relying on colour alone (the filled icon differs too).
+ * changing this component. The selected item uses the primary brand colour and a soft container.
  */
 @Composable
 fun SkyplusNavigationBar(
@@ -47,7 +44,6 @@ fun SkyplusNavigationBar(
   modifier: Modifier = Modifier,
 ) {
   val colors = MaterialTheme.colorScheme
-  val extended = OceanTheme.colors
   NavigationBar(
     modifier = modifier,
     containerColor = colors.surface,
@@ -77,9 +73,9 @@ fun SkyplusNavigationBar(
         },
         colors =
           NavigationBarItemDefaults.colors(
-            selectedIconColor = colors.onTertiaryContainer,
+            selectedIconColor = colors.primary,
             selectedTextColor = colors.onSurface,
-            indicatorColor = extended.accentContainer,
+            indicatorColor = colors.primaryContainer,
             unselectedIconColor = colors.onSurfaceVariant,
             unselectedTextColor = colors.onSurfaceVariant,
           ),
