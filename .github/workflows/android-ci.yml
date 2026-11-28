@@ -55,6 +55,17 @@ jobs:
           echo "Test classes executed: $(find "$DIR" -name 'TEST-*.xml' | wc -l)"
           awk -F'"' '/<testsuite /{for(i=1;i<=NF;i++){if($i ~ /tests=$/){t+=$(i+1)} if($i ~ /failures=$/){f+=$(i+1)} if($i ~ /errors=$/){e+=$(i+1)} if($i ~ /skipped=$/){s+=$(i+1)}}} END{printf "tests=%d failures=%d errors=%d skipped=%d\n", t, f, e, s}' "$DIR"/TEST-*.xml
 
+      # Preserve JUnit XML reports on failures so the exact assertion and stack trace
+      # can be inspected before changing UI or test behavior.
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: skyplus-money-junit-reports
+          path: app/build/test-results/testDebugUnitTest/*.xml
+          if-no-files-found: warn
+          retention-days: 7
+
       # Report the Room migration integration test independently of the aggregate suite total.
       - name: Verify Room 8-to-9 migration integration test
         if: always()
