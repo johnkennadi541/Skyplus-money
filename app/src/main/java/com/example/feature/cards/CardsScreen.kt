@@ -120,21 +120,25 @@ fun CardsContent(
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
       item {
-        Row(
+        Column(
           modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically,
+          verticalArrangement = Arrangement.spacedBy(OceanSpacing.sm),
         ) {
           OceanSectionHeader(
             title = "Credit cards",
             subtitle = "Balances are liabilities and are never counted as assets",
           )
-          SkyplusPrimaryButton(
-            text = "Add card",
-            onClick = { showCreateDialog = true },
-            icon = Icons.Rounded.Add,
-            modifier = Modifier.testTag("add_card_button"),
-          )
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+          ) {
+            SkyplusPrimaryButton(
+              text = "Add card",
+              onClick = { showCreateDialog = true },
+              icon = Icons.Rounded.Add,
+              modifier = Modifier.testTag("add_card_button"),
+            )
+          }
         }
       }
 
