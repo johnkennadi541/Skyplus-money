@@ -70,7 +70,7 @@ public final class MainActivity extends Activity {
         final char[] secret = password.getText().toString().toCharArray();
         if (secret.length < 16) {
             status.setText("Use at least 16 characters.");
-            java.util.Arrays.fill(secret, '\\0');
+            java.util.Arrays.fill(secret, '\0');
             return;
         }
         generate.setEnabled(false);
@@ -120,7 +120,7 @@ public final class MainActivity extends Activity {
                 if (temp != null) temp.delete();
                 runOnUiThread(() -> status.setText("Generation failed safely: " + e.getClass().getSimpleName()));
             } finally {
-                java.util.Arrays.fill(secret, '\\0');
+                java.util.Arrays.fill(secret, '\0');
                 runOnUiThread(() -> generate.setEnabled(true));
             }
         }).start();
