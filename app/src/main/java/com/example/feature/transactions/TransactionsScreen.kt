@@ -228,7 +228,7 @@ fun TransactionsContent(
             Icon(
               imageVector = Icons.Rounded.Assessment,
               contentDescription = null,
-              tint = OceanTheme.colors.gold,
+              tint = MaterialTheme.colorScheme.primary,
               modifier = Modifier.size(16.dp),
             )
             Spacer(modifier = Modifier.width(4.dp))
@@ -372,7 +372,7 @@ fun TransactionsContent(
               Icon(
                 imageVector = Icons.AutoMirrored.Rounded.ReceiptLong,
                 contentDescription = null,
-                tint = OceanTheme.colors.gold,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(48.dp),
               )
               Spacer(modifier = Modifier.height(OceanSpacing.sm))
@@ -414,8 +414,8 @@ fun TransactionsContent(
           .align(Alignment.BottomEnd)
           .padding(OceanSpacing.lg)
           .testTag("add_transaction_fab"),
-      containerColor = OceanTheme.colors.gold,
-      contentColor = Color.Black,
+      containerColor = MaterialTheme.colorScheme.primary,
+      contentColor = MaterialTheme.colorScheme.onPrimary,
     ) {
       Icon(imageVector = Icons.Rounded.Add, contentDescription = "Add Transaction")
     }
@@ -710,7 +710,7 @@ fun AddEditTransactionBottomSheet(
         TabRow(
           selectedTabIndex = selectedTab,
           containerColor = Color.Transparent,
-          contentColor = OceanTheme.colors.gold,
+          contentColor = MaterialTheme.colorScheme.primary,
         ) {
           Tab(
             selected = selectedTab == 0,
@@ -864,14 +864,14 @@ fun AddEditTransactionBottomSheet(
             val isSelected = selectedCategory == cat
             Surface(
               shape = RoundedCornerShape(8.dp),
-              color = if (isSelected) OceanTheme.colors.gold.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
-              border = BorderStroke(1.dp, if (isSelected) OceanTheme.colors.gold else Color.Gray.copy(alpha = 0.4f)),
+              color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
+              border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.4f)),
               modifier = Modifier.clickable { selectedCategory = cat },
             ) {
               Text(
                 text = cat,
                 style = MaterialTheme.typography.labelSmall,
-                color = if (isSelected) OceanTheme.colors.gold else MaterialTheme.colorScheme.onSurface,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
               )
             }
@@ -961,7 +961,7 @@ fun AddEditTransactionBottomSheet(
             selectedAccountId.isNotBlank() &&
             (!isCrossCurrencyTransfer || destAmountText.isNotBlank()),
         modifier = Modifier.fillMaxWidth().testTag("save_transaction_button"),
-        colors = ButtonDefaults.buttonColors(containerColor = OceanTheme.colors.gold, contentColor = Color.Black),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
       ) {
         Text(if (isEditing) "Update Transaction" else "Save Transaction", fontWeight = FontWeight.Bold)
       }
@@ -1045,7 +1045,7 @@ private fun DetailRow(label: String, value: String, isHighlighted: Boolean = fal
     Text(
       text = value,
       style = if (isHighlighted) OceanNumericStyle else MaterialTheme.typography.bodyMedium,
-      color = if (isHighlighted) OceanTheme.colors.gold else MaterialTheme.colorScheme.onSurface,
+      color = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
       fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Normal,
     )
   }
