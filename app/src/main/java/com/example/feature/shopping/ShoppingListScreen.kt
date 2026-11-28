@@ -63,6 +63,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.designsystem.component.BadgeTone
 import com.example.core.designsystem.component.OceanCard
+import com.example.core.designsystem.component.SkyplusSectionCard
 import com.example.core.designsystem.component.OceanSectionHeader
 import com.example.core.designsystem.component.OceanStatusBadge
 import com.example.core.designsystem.theme.OceanSpacing
@@ -284,7 +285,7 @@ fun ShoppingListContent(
         modifier = Modifier.fillMaxSize().padding(vertical = OceanSpacing.lg),
         contentAlignment = Alignment.TopCenter,
       ) {
-        OceanCard(modifier = Modifier.testTag("shopping_empty_state")) {
+        SkyplusSectionCard(modifier = Modifier.testTag("shopping_empty_state")) {
           Column(
             modifier = Modifier.fillMaxWidth().padding(OceanSpacing.md),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -405,7 +406,7 @@ fun ShoppingListContent(
 
         if (filteredItems.isEmpty()) {
           item(key = "items_empty") {
-            OceanCard(modifier = Modifier.testTag("shopping_items_empty_state")) {
+            SkyplusSectionCard(modifier = Modifier.testTag("shopping_items_empty_state")) {
               Column(
                 modifier = Modifier.fillMaxWidth().padding(OceanSpacing.sm),
                 verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
@@ -586,7 +587,7 @@ private fun ActiveShoppingListBudgetCard(
   val actualSpentStr = formatMoneyUseCase.format(Money.fromMinorUnits(summary.actualSpentMinor, currency))
   val projectedStr = formatMoneyUseCase.format(Money.fromMinorUnits(summary.projectedSpendMinor, currency))
 
-  OceanCard(modifier = Modifier.testTag("shopping_budget_card")) {
+  SkyplusSectionCard(modifier = Modifier.testTag("shopping_budget_card")) {
     Row(
       modifier = Modifier.fillMaxWidth(),
       horizontalArrangement = Arrangement.SpaceBetween,
