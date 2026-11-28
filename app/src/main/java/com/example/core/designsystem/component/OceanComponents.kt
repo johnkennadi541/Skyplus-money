@@ -121,10 +121,11 @@ fun OceanSectionHeader(
     Text(
       text = title,
       style = MaterialTheme.typography.titleLarge,
-      color = MaterialTheme.colorScheme.onBackground,
+      color = MaterialTheme.colorScheme.onSurface,
+      fontWeight = FontWeight.SemiBold,
     )
     if (subtitle != null) {
-      Spacer(modifier = Modifier.height(2.dp))
+      Spacer(modifier = Modifier.height(4.dp))
       Text(
         text = subtitle,
         style = MaterialTheme.typography.bodySmall,
