@@ -321,9 +321,9 @@ fun BudgetsContent(
         item {
           Surface(
             modifier = Modifier.fillMaxWidth().testTag("budget_no_active_summary"),
-            shape = MaterialTheme.shapes.small,
-            color = OceanTheme.colors.cardSubtle,
-            border = BorderStroke(1.dp, OceanTheme.colors.cardBorder.copy(alpha = 0.7f)),
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
           ) {
             Text(
               text = stringResource(R.string.budgets_no_active_summary),
@@ -836,9 +836,9 @@ private fun BudgetPeriodRow(period: com.example.domain.model.BudgetPeriod) {
 
   Surface(
     modifier = Modifier.fillMaxWidth().testTag("budget_period_${period.id}"),
-    shape = MaterialTheme.shapes.small,
-    color = OceanTheme.colors.cardSubtle,
-    border = BorderStroke(1.dp, OceanTheme.colors.cardBorder.copy(alpha = 0.6f)),
+    shape = MaterialTheme.shapes.medium,
+    color = MaterialTheme.colorScheme.surface,
+    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
   ) {
     Row(
       modifier = Modifier.fillMaxWidth().padding(OceanSpacing.sm),
