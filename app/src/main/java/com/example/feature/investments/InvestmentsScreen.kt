@@ -242,7 +242,7 @@ fun InvestmentsContent(
           Icon(
             imageVector = Icons.Rounded.CloudSync,
             contentDescription = "Optional market price sync settings",
-            tint = if (syncSettings.autoUpdateConsentEnabled) extended.positive else extended.gold,
+            tint = if (syncSettings.autoUpdateConsentEnabled) extended.positive else MaterialTheme.colorScheme.primary,
           )
         }
         Button(
@@ -337,7 +337,7 @@ fun InvestmentsContent(
             )
             OceanStatusBadge(
               text = if (syncSettings.autoUpdateConsentEnabled) "EOD Sync Opt-In" else "Manual Pricing",
-              tone = if (syncSettings.autoUpdateConsentEnabled) BadgeTone.POSITIVE else BadgeTone.GOLD,
+              tone = if (syncSettings.autoUpdateConsentEnabled) BadgeTone.POSITIVE else BadgeTone.INFO,
             )
           }
           Spacer(modifier = Modifier.height(OceanSpacing.xs))
@@ -449,7 +449,7 @@ fun InvestmentsContent(
               Icon(
                 imageVector = Icons.AutoMirrored.Rounded.TrendingUp,
                 contentDescription = null,
-                tint = extended.gold,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(36.dp),
               )
               Text(
