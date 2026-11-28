@@ -628,7 +628,7 @@ private fun InvestmentHoldingCard(
         OceanStatusBadge(text = "Stale >7d", tone = BadgeTone.WARNING)
       }
       if (performance.isFullyExited) {
-        OceanStatusBadge(text = "Exited", tone = BadgeTone.GOLD)
+        OceanStatusBadge(text = "Exited", tone = BadgeTone.INFO)
       }
     }
   }
