@@ -1,7 +1,6 @@
 package com.example.navigation
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -352,7 +352,7 @@ fun SkyplusAppShell(
                     if (OceanTheme.colors.isDark) Icons.Rounded.LightMode
                     else Icons.Rounded.DarkMode,
                   contentDescription = stringResource(R.string.cd_toggle_theme),
-                  tint = OceanTheme.colors.gold,
+                  tint = MaterialTheme.colorScheme.primary,
                 )
               }
             },
@@ -413,6 +413,14 @@ fun SkyplusAppShell(
                     overflow = TextOverflow.Ellipsis,
                   )
                 },
+                colors =
+                  NavigationRailItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                  ),
               )
             }
           }
@@ -422,8 +430,8 @@ fun SkyplusAppShell(
           NavHost(
             navController = navController,
             startDestination = SkyplusRoute.Home,
-            enterTransition = { fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMedium)) },
-            exitTransition = { fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMedium)) },
+            enterTransition = { fadeIn(animationSpec = tween(durationMillis = 160)) },
+            exitTransition = { fadeOut(animationSpec = tween(durationMillis = 120)) },
           ) {
             composable<SkyplusRoute.Home> {
               val dashboardState =

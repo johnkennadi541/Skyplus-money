@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.core.designsystem.component.BadgeTone
 import com.example.core.designsystem.component.OceanCard
+import com.example.core.designsystem.component.SkyplusSectionCard
 import com.example.core.designsystem.component.OceanSectionHeader
 import com.example.core.designsystem.component.OceanStatusBadge
 import com.example.core.designsystem.theme.OceanNumericStyle
@@ -156,7 +157,7 @@ fun AccountsContent(
             groupedByCurrency.forEach { (curr, accList) ->
               val totalMinor = accList.sumOf { it.currentBalanceMinor }
               val formattedTotal = FormatMoneyUseCase().format(Money.fromMinorUnits(totalMinor, curr))
-              OceanCard {
+              SkyplusSectionCard {
                 Row(
                   modifier = Modifier.fillMaxWidth(),
                   horizontalArrangement = Arrangement.SpaceBetween,
@@ -177,7 +178,7 @@ fun AccountsContent(
                   Text(
                     text = formattedTotal,
                     style = OceanNumericStyle,
-                    color = OceanTheme.colors.gold,
+                    color = MaterialTheme.colorScheme.primary,
                   )
                 }
               }
@@ -188,7 +189,7 @@ fun AccountsContent(
 
       if (accounts.isEmpty()) {
         item {
-          OceanCard(modifier = Modifier.widthIn(max = 760.dp).testTag("accounts_empty_card")) {
+          SkyplusSectionCard(modifier = Modifier.widthIn(max = 760.dp).testTag("accounts_empty_card")) {
             Column(
               modifier = Modifier.fillMaxWidth().padding(OceanSpacing.lg),
               horizontalAlignment = Alignment.CenterHorizontally,

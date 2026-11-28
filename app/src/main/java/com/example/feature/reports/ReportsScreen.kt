@@ -26,7 +26,6 @@ import androidx.compose.material.icons.rounded.Assessment
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,7 +47,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -56,10 +54,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
-import com.example.core.designsystem.component.OceanCard
+import com.example.core.designsystem.component.SkyplusSectionCard
 import com.example.core.designsystem.component.OceanSectionHeader
 import com.example.core.designsystem.theme.OceanSpacing
-import com.example.core.designsystem.theme.OceanTheme
 import com.example.domain.model.EmailReportSettings
 import com.example.domain.model.FinancialReportSnapshot
 import com.example.domain.model.ReportCategoryTab
@@ -300,7 +297,7 @@ fun ReportsContent(
               onOpenEmailPreview = onOpenEmailPreview,
             )
           } else if (activeReport == null) {
-            OceanCard(modifier = Modifier.testTag("reports_no_data_card")) {
+            SkyplusSectionCard(modifier = Modifier.testTag("reports_no_data_card")) {
               Column(
                 modifier = Modifier.fillMaxWidth().padding(OceanSpacing.lg),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -308,7 +305,7 @@ fun ReportsContent(
                 Icon(
                   imageVector = Icons.Rounded.Assessment,
                   contentDescription = null,
-                  tint = OceanTheme.colors.gold,
+                  tint = MaterialTheme.colorScheme.primary,
                   modifier = Modifier.size(44.dp),
                 )
                 Spacer(modifier = Modifier.height(OceanSpacing.sm))
@@ -412,7 +409,6 @@ fun ReportsContent(
       confirmButton = {
         Button(
           onClick = onConfirmSendEmail,
-          colors = ButtonDefaults.buttonColors(containerColor = OceanTheme.colors.gold, contentColor = Color.Black),
           modifier = Modifier.testTag("confirm_launch_email_button"),
         ) {
           Text("Open Email App", fontWeight = FontWeight.Bold)

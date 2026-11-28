@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.core.designsystem.component.BadgeTone
 import com.example.core.designsystem.component.OceanCard
+import com.example.core.designsystem.component.SkyplusSectionCard
 import com.example.core.designsystem.component.OceanSectionHeader
 import com.example.core.designsystem.component.OceanStatusBadge
 import com.example.core.designsystem.component.SkyplusConfirmDialog
@@ -258,7 +259,7 @@ private fun GoalCard(
     else "$currency ${summary.remainingMinor}"
   val progress = (summary.progressPercent.toFloat() / 100f).coerceIn(0f, 1f)
 
-  OceanCard(modifier = Modifier.fillMaxWidth().testTag("goal_card_${summary.goal.id}")) {
+  SkyplusSectionCard(modifier = Modifier.fillMaxWidth().testTag("goal_card_${summary.goal.id}")) {
     Row(
       modifier = Modifier.fillMaxWidth(),
       horizontalArrangement = Arrangement.SpaceBetween,

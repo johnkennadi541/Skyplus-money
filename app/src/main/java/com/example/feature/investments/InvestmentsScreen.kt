@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.designsystem.component.BadgeTone
 import com.example.core.designsystem.component.OceanCard
+import com.example.core.designsystem.component.SkyplusSectionCard
 import com.example.core.designsystem.component.OceanStatusBadge
 import com.example.core.designsystem.theme.OceanNumericStyle
 import com.example.core.designsystem.theme.OceanSpacing
@@ -324,7 +325,7 @@ fun InvestmentsContent(
         val returnPct = activeSummary?.returnPercent?.toPlainString() ?: "0.00"
         val staleCount = activeSummary?.staleHoldingCount ?: 0
 
-        OceanCard(modifier = Modifier.fillMaxWidth().testTag("portfolio_summary_card")) {
+        SkyplusSectionCard(modifier = Modifier.fillMaxWidth().testTag("portfolio_summary_card")) {
           Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -440,7 +441,7 @@ fun InvestmentsContent(
       // Holdings List or Empty State
       if (filteredPerformances.isEmpty()) {
         item {
-          OceanCard(modifier = Modifier.fillMaxWidth().testTag("investments_empty_card")) {
+          SkyplusSectionCard(modifier = Modifier.fillMaxWidth().testTag("investments_empty_card")) {
             Column(
               modifier = Modifier.fillMaxWidth().padding(OceanSpacing.sm),
               horizontalAlignment = Alignment.CenterHorizontally,
