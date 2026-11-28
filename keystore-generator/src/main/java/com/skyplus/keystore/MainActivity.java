@@ -96,6 +96,7 @@ public final class MainActivity extends Activity {
         status.setText("No production key is stored yet.");
         root.addView(status);
         setContentView(scroll);
+        recoverPreviousKeystore();
     }
 
     private void addHeading(LinearLayout root, String value) {
@@ -123,6 +124,18 @@ public final class MainActivity extends Activity {
 
     private File keystoreFile() {
         return new File(getNoBackupFilesDir(), "release-upload.jks");
+    }
+
+    private void recoverPreviousKeystore() {
+        File destination = keystoreFile();
+        File previous = new File(getNoBackupFilesDir(), "release-upload.previous");
+        if (!destination.exists() && previous.isFile()) {
+            if (previous.renameTo(destination)) {
+                status.setText("Recovered the previously saved keystore after an interrupted file replacement.");
+            } else {
+                status.setText("Recovery file exists. Do not uninstall the app; contact support before continuing.");
+            }
+        }
     }
 
     private char[] takePassword(EditText field) {
@@ -407,15 +420,18 @@ public final class MainActivity extends Activity {
     private static byte[] readBounded(InputStream in, int maxBytes) throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         byte[] buffer = new byte[8192];
-        int total = 0;
-        int count;
-        while ((count = in.read(buffer)) != -1) {
-            total += count;
-            if (total > maxBytes) throw new SecurityException("Selected file exceeds the allowed size");
-            out.write(buffer, 0, count);
+        try {
+            int total = 0;
+            int count;
+            while ((count = in.read(buffer)) != -1) {
+                total += count;
+                if (total > maxBytes) throw new SecurityException("Selected file exceeds the allowed size");
+                out.write(buffer, 0, count);
+            }
+            return out.toByteArray();
+        } finally {
+            Arrays.fill(buffer, (byte) 0);
         }
-        Arrays.fill(buffer, (byte) 0);
-        return out.toByteArray();
     }
 
     private static String safeError(Exception e) {
