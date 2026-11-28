@@ -35,11 +35,11 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Compile Debug Kotlin
-        run: ./gradlew :app:compileDebugKotlin
+        run: ./gradlew :app:compileDebugKotlin :keystore-generator:assembleDebug
 
       # Blocking gate: every unit and Robolectric test must pass.
       - name: Run Unit & Robolectric Tests
-        run: ./gradlew :app:testDebugUnitTest
+        run: ./gradlew :app:testDebugUnitTest :keystore-generator:testDebugUnitTest
 
       # Always print an exact count of what the suite actually executed, so the
       # result can be quoted without guessing.
