@@ -177,7 +177,7 @@ fun AccountsContent(
                   Text(
                     text = formattedTotal,
                     style = OceanNumericStyle,
-                    color = OceanTheme.colors.gold,
+                    color = MaterialTheme.colorScheme.primary,
                   )
                 }
               }
@@ -196,7 +196,7 @@ fun AccountsContent(
               Icon(
                 imageVector = Icons.Rounded.AccountBalance,
                 contentDescription = null,
-                tint = OceanTheme.colors.gold,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(48.dp),
               )
               Spacer(modifier = Modifier.height(OceanSpacing.sm))
@@ -235,8 +235,8 @@ fun AccountsContent(
           .align(Alignment.BottomEnd)
           .padding(OceanSpacing.lg)
           .testTag("add_account_fab"),
-      containerColor = OceanTheme.colors.gold,
-      contentColor = Color.Black,
+      containerColor = MaterialTheme.colorScheme.primary,
+      contentColor = MaterialTheme.colorScheme.onPrimary,
     ) {
       Icon(imageVector = Icons.Rounded.Add, contentDescription = "Add Account")
     }
@@ -540,14 +540,14 @@ fun AddEditAccountDialog(
             val isSelected = currencyCode.equals(curr, ignoreCase = true)
             Surface(
               shape = RoundedCornerShape(8.dp),
-              color = if (isSelected) OceanTheme.colors.gold.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
-              border = BorderStroke(1.dp, if (isSelected) OceanTheme.colors.gold else Color.Gray.copy(alpha = 0.4f)),
+              color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
+              border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.4f)),
               modifier = Modifier.clickable { currencyCode = curr }.testTag("currency_chip_$curr"),
             ) {
               Text(
                 text = curr,
                 style = MaterialTheme.typography.labelSmall,
-                color = if (isSelected) OceanTheme.colors.gold else MaterialTheme.colorScheme.onSurface,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(vertical = 8.dp, horizontal = 10.dp),
               )
             }
