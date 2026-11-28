@@ -1,16 +1,21 @@
 name: SKYPLUS MONEY - Release APK
 
 # Manual only. Nothing here runs on push, so a source upload never builds an APK.
-# Run it from the Actions tab once the keystore secrets and the
-# RELEASE_CERT_SHA256 repository variable are in place.
+# Run it from the Actions tab on main after the release-signing Environment
+# contains the required signing secrets and RELEASE_CERT_SHA256 variable.
 #
-# Secrets required: KEYSTORE_BASE64, STORE_PASSWORD, KEY_PASSWORD
-# Variable required: RELEASE_CERT_SHA256  (public certificate fingerprint)
+# Environment secrets required: KEYSTORE_BASE64, STORE_PASSWORD, KEY_PASSWORD
+# Environment variable required: RELEASE_CERT_SHA256 (public certificate fingerprint)
 # Every secret is passed through the step's env: block and referenced as "$NAME".
 # No secret is ever written into the shell text with ${{ }} interpolation.
 
 on:
   workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type BUILD-RELEASE-APK to confirm a signed release build'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -29,6 +34,17 @@ jobs:
     timeout-minutes: 45
 
     steps:
+      - name: Require explicit manual confirmation
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          if [ "${CONFIRMATION:-}" != "BUILD-RELEASE-APK" ]; then
+            echo "::error::Confirmation did not exactly match BUILD-RELEASE-APK. No release APK will be built."
+            exit 1
+          fi
+          echo "Explicit release build confirmation received."
+
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -55,11 +71,11 @@ jobs:
           [ -n "${STORE_PASSWORD:-}" ] || missing="$missing STORE_PASSWORD"
           [ -n "${KEY_PASSWORD:-}" ] || missing="$missing KEY_PASSWORD"
           if [ -n "$missing" ]; then
-            echo "::error::Missing repository secret(s):$missing"
+            echo "::error::Missing release-signing Environment secret(s):$missing"
             exit 1
           fi
           if [ -z "${EXPECTED_FINGERPRINT:-}" ]; then
-            echo "::error::Repository variable RELEASE_CERT_SHA256 is not set. Take the value from the one-time keystore run summary."
+            echo "::error::Environment variable release-signing/RELEASE_CERT_SHA256 is not set. Take the value from the one-time keystore run summary."
             exit 1
           fi
           NORMALISED=$(printf '%s' "$EXPECTED_FINGERPRINT" | tr -d ':[:space:]' | tr 'A-F' 'a-f')
