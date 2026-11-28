@@ -31,8 +31,8 @@ import com.example.core.designsystem.theme.SkyplusSizes
  * Stage 1 button set. One place decides height, radius, padding and colours so screens never
  * hand-roll a button again.
  *
- * The accent (yellow) is the primary action colour; navy text on yellow keeps contrast above the
- * accessibility threshold in both themes.
+ * The primary brand colour is used for the main action; semantic warning yellow is reserved
+ * for warning states rather than being used as a general action colour.
  */
 @Composable
 fun SkyplusPrimaryButton(
@@ -51,13 +51,13 @@ fun SkyplusPrimaryButton(
     shape = MaterialTheme.shapes.small,
     colors =
       ButtonDefaults.buttonColors(
-        containerColor = colors.tertiary,
-        contentColor = colors.onTertiary,
-        disabledContainerColor = colors.tertiary.copy(alpha = 0.38f),
-        disabledContentColor = colors.onTertiary.copy(alpha = 0.6f),
+        containerColor = colors.primary,
+        contentColor = colors.onPrimary,
+        disabledContainerColor = colors.primary.copy(alpha = 0.38f),
+        disabledContentColor = colors.onPrimary.copy(alpha = 0.6f),
       ),
   ) {
-    ButtonContent(text = text, loading = loading, icon = icon, tint = colors.onTertiary)
+    ButtonContent(text = text, loading = loading, icon = icon, tint = colors.onPrimary)
   }
 }
 
