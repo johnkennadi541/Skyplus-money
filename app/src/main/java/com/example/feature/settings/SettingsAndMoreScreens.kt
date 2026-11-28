@@ -317,11 +317,18 @@ fun SettingsScreen(
           contentDescription = stringResource(R.string.cd_navigate_back),
         )
       }
-      Text(
-        text = stringResource(R.string.settings_title),
-        style = MaterialTheme.typography.headlineSmall,
-        color = MaterialTheme.colorScheme.onBackground,
-      )
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = stringResource(R.string.settings_title),
+          style = MaterialTheme.typography.headlineSmall,
+          color = MaterialTheme.colorScheme.onBackground,
+        )
+        Text(
+          text = "Personalise your SKYPLUS MONEY experience",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
     }
 
     OceanCard {
@@ -400,19 +407,33 @@ fun ProfileScreen(
           contentDescription = stringResource(R.string.cd_navigate_back),
         )
       }
-      Text(
-        text = stringResource(R.string.profile_title),
-        style = MaterialTheme.typography.headlineSmall,
-        color = MaterialTheme.colorScheme.onBackground,
-      )
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = stringResource(R.string.profile_title),
+          style = MaterialTheme.typography.headlineSmall,
+          color = MaterialTheme.colorScheme.onBackground,
+        )
+        Text(
+          text = "Your account, security and preferences",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
     }
 
     OceanCard(modifier = Modifier.testTag("profile_account_details_card")) {
-      Text(
-        text = stringResource(R.string.profile_account_details),
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurface,
-      )
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+      ) {
+        Text(
+          text = stringResource(R.string.profile_account_details),
+          style = MaterialTheme.typography.titleMedium,
+          color = MaterialTheme.colorScheme.onSurface,
+        )
+        OceanStatusBadge(text = "Signed in", tone = BadgeTone.SUCCESS)
+      }
       Spacer(modifier = Modifier.height(OceanSpacing.xs))
       Text(
         text = authenticatedUser?.email?.ifBlank { "Authenticated User" } ?: "Authenticated User",
