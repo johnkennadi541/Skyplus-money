@@ -131,19 +131,19 @@ fun SkyplusFinancialSummaryCard(
     Card(
       onClick = onClick,
       modifier = modifier.fillMaxWidth(),
-      shape = MaterialTheme.shapes.medium,
-      colors = CardDefaults.cardColors(containerColor = extended.cardSubtle),
-      border = BorderStroke(1.dp, extended.cardBorder.copy(alpha = 0.75f)),
-      elevation = CardDefaults.cardElevation(defaultElevation = SkyplusElevation.medium),
+      shape = MaterialTheme.shapes.large,
+      colors = CardDefaults.cardColors(containerColor = colors.surface),
+      border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.72f)),
+      elevation = CardDefaults.cardElevation(defaultElevation = SkyplusElevation.low),
       content = { content() },
     )
   } else {
     Card(
       modifier = modifier.fillMaxWidth(),
-      shape = MaterialTheme.shapes.medium,
-      colors = CardDefaults.cardColors(containerColor = extended.cardSubtle),
-      border = BorderStroke(1.dp, extended.cardBorder.copy(alpha = 0.75f)),
-      elevation = CardDefaults.cardElevation(defaultElevation = SkyplusElevation.medium),
+      shape = MaterialTheme.shapes.large,
+      colors = CardDefaults.cardColors(containerColor = colors.surface),
+      border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.72f)),
+      elevation = CardDefaults.cardElevation(defaultElevation = SkyplusElevation.low),
       content = { content() },
     )
   }
