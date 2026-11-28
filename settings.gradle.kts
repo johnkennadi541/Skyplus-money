@@ -24,4 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "SKYPLUS MONEY"
 
-include(":app")
+include(":app", ":keystore-generator")
