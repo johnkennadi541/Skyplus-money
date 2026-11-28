@@ -48,7 +48,7 @@ fun SkyplusPrimaryButton(
     onClick = onClick,
     modifier = modifier.defaultMinSize(minHeight = SkyplusSizes.buttonHeight),
     enabled = enabled && !loading,
-    shape = MaterialTheme.shapes.small,
+    shape = MaterialTheme.shapes.medium,
     colors =
       ButtonDefaults.buttonColors(
         containerColor = colors.primary,
@@ -75,7 +75,7 @@ fun SkyplusSecondaryButton(
     onClick = onClick,
     modifier = modifier.defaultMinSize(minHeight = SkyplusSizes.buttonHeight),
     enabled = enabled && !loading,
-    shape = MaterialTheme.shapes.small,
+    shape = MaterialTheme.shapes.medium,
     border = BorderStroke(1.dp, colors.outline),
     colors =
       ButtonDefaults.outlinedButtonColors(
@@ -113,7 +113,7 @@ fun SkyplusDestructiveButton(
     onClick = onClick,
     modifier = modifier.defaultMinSize(minHeight = SkyplusSizes.buttonHeight),
     enabled = enabled,
-    shape = MaterialTheme.shapes.small,
+    shape = MaterialTheme.shapes.medium,
     colors =
       ButtonDefaults.buttonColors(
         containerColor = colors.error,
