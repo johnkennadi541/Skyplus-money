@@ -67,7 +67,10 @@ public final class MainActivity extends Activity {
     }
 
     private void generateKey() {
-        final char[] secret = password.getText().toString().toCharArray();
+        android.text.Editable entered = password.getText();
+        final char[] secret = new char[entered.length()];
+        entered.getChars(0, entered.length(), secret, 0);
+        entered.clear();
         if (secret.length < 16) {
             status.setText("Use at least 16 characters.");
             java.util.Arrays.fill(secret, '\0');
