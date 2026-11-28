@@ -48,7 +48,7 @@ fun SkyplusTextField(
     singleLine = singleLine,
     minLines = minLines,
     isError = isError,
-    shape = MaterialTheme.shapes.small,
+    shape = MaterialTheme.shapes.medium,
     label = label?.let { { Text(text = it, style = MaterialTheme.typography.bodySmall) } },
     placeholder =
       placeholder?.let {
@@ -74,12 +74,12 @@ fun SkyplusTextField(
     keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
     colors =
       OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = colors.tertiary,
+        focusedBorderColor = colors.primary,
         unfocusedBorderColor = colors.outline,
         disabledBorderColor = colors.outline.copy(alpha = 0.38f),
         errorBorderColor = colors.error,
-        focusedLabelColor = colors.tertiary,
-        cursorColor = colors.tertiary,
+        focusedLabelColor = colors.primary,
+        cursorColor = colors.primary,
       ),
   )
 }
