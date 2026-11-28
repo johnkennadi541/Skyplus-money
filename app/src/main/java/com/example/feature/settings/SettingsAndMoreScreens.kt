@@ -37,13 +37,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.R
-import com.example.core.designsystem.component.BadgeTone
 import com.example.core.designsystem.component.OceanCard
 import com.example.core.designsystem.component.OceanSectionHeader
-import com.example.core.designsystem.component.OceanStatusBadge
+import com.example.core.designsystem.component.SkyplusSectionCard
 import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
-import com.example.domain.model.DomainModuleDescriptor
 import com.example.domain.model.ThemePreference
 
 @Composable
@@ -56,28 +54,6 @@ fun MoreScreen(
   modifier: Modifier = Modifier,
   onSignOut: (() -> Unit)? = null,
 ) {
-  val plannedModules =
-    listOf(
-      DomainModuleDescriptor(
-        "Accounts & Wallets",
-        "feature/accounts",
-        2,
-        "Multi-currency accounts, transfers, balances",
-      ),
-      DomainModuleDescriptor(
-        "Debts & EMIs",
-        "feature/debts",
-        3,
-        "Loans, EMI schedules, credit card cycles",
-      ),
-      DomainModuleDescriptor(
-        "Shopping Lists",
-        "feature/shopping",
-        4,
-        "Planned purchase budgets and item lists",
-      ),
-    )
-
   Column(
     modifier =
       modifier
@@ -107,7 +83,7 @@ fun MoreScreen(
             style = MaterialTheme.typography.titleMedium,
           )
           Text(
-            text = "Dark/Light Ocean theme & Phase 5 backup policy",
+            text = "Appearance and app preferences",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
@@ -136,7 +112,7 @@ fun MoreScreen(
             style = MaterialTheme.typography.titleMedium,
           )
           Text(
-            text = "Phase 1 Google Sign-In, Facebook Login & configuration status",
+            text = "Google sign-in and session readiness",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
@@ -179,7 +155,7 @@ fun MoreScreen(
         Icon(
           imageVector = androidx.compose.material.icons.Icons.Rounded.NotificationsActive,
           contentDescription = "Smart Detection",
-          tint = OceanTheme.colors.gold,
+          tint = MaterialTheme.colorScheme.primary,
         )
         Spacer(modifier = Modifier.width(OceanSpacing.sm))
         Column(modifier = Modifier.weight(1f)) {
@@ -188,7 +164,7 @@ fun MoreScreen(
             style = MaterialTheme.typography.titleMedium,
           )
           Text(
-            text = "On-device bank/UPI notification detection, auto-save & review queue",
+            text = "Review supported bank notifications before recording entries",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
@@ -214,7 +190,7 @@ fun MoreScreen(
             style = MaterialTheme.typography.titleMedium,
           )
           Text(
-            text = "Terms & Conditions and Privacy Policy placeholders",
+            text = "Terms, privacy information, and consent details",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
@@ -251,33 +227,7 @@ fun MoreScreen(
       }
     }
 
-    OceanSectionHeader(
-      title = stringResource(R.string.more_module_directory_title),
-      subtitle = "Clean Architecture feature modules scaffolded in Phase 0",
-    )
 
-    plannedModules.forEach { module ->
-      OceanCard {
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Text(
-            text = module.name,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-          )
-          OceanStatusBadge(text = "Phase ${module.targetPhase}", tone = BadgeTone.INFO)
-        }
-        Spacer(modifier = Modifier.height(OceanSpacing.xxs))
-        Text(
-          text = "${module.packagePath} — ${module.responsibility}",
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-      }
-    }
   }
 }
 
@@ -324,7 +274,7 @@ fun SettingsScreen(
       )
     }
 
-    OceanCard {
+    SkyplusSectionCard {
       Text(
         text = stringResource(R.string.settings_theme_section),
         style = MaterialTheme.typography.titleMedium,
@@ -350,9 +300,7 @@ fun SettingsScreen(
       }
     }
 
-    OceanCard {
-      OceanStatusBadge(text = "Phase 5 Specification", tone = BadgeTone.INFO)
-      Spacer(modifier = Modifier.height(OceanSpacing.xs))
+    SkyplusSectionCard {
       Text(
         text = stringResource(R.string.settings_sync_section),
         style = MaterialTheme.typography.titleMedium,
@@ -407,7 +355,7 @@ fun ProfileScreen(
       )
     }
 
-    OceanCard(modifier = Modifier.testTag("profile_account_details_card")) {
+    SkyplusSectionCard(modifier = Modifier.testTag("profile_account_details_card")) {
       Text(
         text = stringResource(R.string.profile_account_details),
         style = MaterialTheme.typography.titleMedium,
@@ -415,7 +363,12 @@ fun ProfileScreen(
       )
       Spacer(modifier = Modifier.height(OceanSpacing.xs))
       Text(
-        text = authenticatedUser?.email?.ifBlank { "Authenticated User" } ?: "Authenticated User",
+        text = authenticatedUser?.displayName?.takeIf { it.isNotBlank() } ?: "Authenticated User",
+        style = MaterialTheme.typography.titleLarge,
+        color = MaterialTheme.colorScheme.onSurface,
+      )
+      Text(
+        text = authenticatedUser?.email?.ifBlank { "Email unavailable" } ?: "Email unavailable",
         style = MaterialTheme.typography.bodyLarge,
         color = MaterialTheme.colorScheme.primary,
       )
@@ -432,7 +385,7 @@ fun ProfileScreen(
         Spacer(modifier = Modifier.width(OceanSpacing.sm))
         Column(modifier = Modifier.weight(1f)) {
           Text(text = stringResource(R.string.profile_settings), style = MaterialTheme.typography.titleMedium)
-          Text(text = "Theme selection, preferences", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          Text(text = "Appearance and app preferences", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Icon(imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null)
       }
@@ -444,7 +397,7 @@ fun ProfileScreen(
         Spacer(modifier = Modifier.width(OceanSpacing.sm))
         Column(modifier = Modifier.weight(1f)) {
           Text(text = stringResource(R.string.profile_security_settings), style = MaterialTheme.typography.titleMedium)
-          Text(text = "Google Sign-In & Firebase Auth security", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          Text(text = "Google sign-in and session status", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Icon(imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null)
       }
@@ -456,7 +409,7 @@ fun ProfileScreen(
         Spacer(modifier = Modifier.width(OceanSpacing.sm))
         Column(modifier = Modifier.weight(1f)) {
           Text(text = stringResource(R.string.profile_notification_settings), style = MaterialTheme.typography.titleMedium)
-          Text(text = "On-device bank notification transaction detection", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          Text(text = "Review supported bank notifications before recording entries", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Icon(imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null)
       }
@@ -474,28 +427,16 @@ fun ProfileScreen(
       }
     }
 
-    OceanCard(onClick = onOpenSettings, modifier = Modifier.testTag("profile_sync_item")) {
-      Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Icon(imageVector = Icons.Rounded.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.width(OceanSpacing.sm))
-        Column(modifier = Modifier.weight(1f)) {
-          Text(text = stringResource(R.string.profile_cloud_sync), style = MaterialTheme.typography.titleMedium)
-          Text(text = "Optional Firestore cloud synchronization", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Icon(imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null)
-      }
+    SkyplusSectionCard(modifier = Modifier.testTag("profile_sync_item")) {
+      Text(text = stringResource(R.string.profile_cloud_sync), style = MaterialTheme.typography.titleMedium)
+      Spacer(modifier = Modifier.height(OceanSpacing.xxs))
+      Text(text = "Cloud sync is not enabled. No financial records are uploaded from this screen.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 
-    OceanCard(onClick = onOpenSettings, modifier = Modifier.testTag("profile_backup_item")) {
-      Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Icon(imageVector = Icons.Rounded.Security, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-        Spacer(modifier = Modifier.width(OceanSpacing.sm))
-        Column(modifier = Modifier.weight(1f)) {
-          Text(text = stringResource(R.string.profile_backup), style = MaterialTheme.typography.titleMedium)
-          Text(text = "Optional Google Drive encrypted backup", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Icon(imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null)
-      }
+    SkyplusSectionCard(modifier = Modifier.testTag("profile_backup_item")) {
+      Text(text = stringResource(R.string.profile_backup), style = MaterialTheme.typography.titleMedium)
+      Spacer(modifier = Modifier.height(OceanSpacing.xxs))
+      Text(text = "Encrypted backup is not available yet. Backup support requires a separate security design and explicit approval.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 
     if (onSignOut != null) {

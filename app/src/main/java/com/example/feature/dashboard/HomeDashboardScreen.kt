@@ -51,7 +51,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.core.designsystem.component.OceanCard
+import com.example.core.designsystem.component.SkyplusSectionCard
 import com.example.core.designsystem.component.OceanSectionHeader
 import com.example.core.designsystem.component.SkyplusBottomSheet
 import com.example.core.designsystem.component.SkyplusChartContainer
@@ -108,7 +108,7 @@ fun HomeDashboardScreen(
     verticalArrangement = Arrangement.spacedBy(OceanSpacing.md),
   ) {
     if (autoSavedNotice != null) {
-      OceanCard(
+      SkyplusSectionCard(
         modifier = Modifier.fillMaxWidth().testTag("auto_saved_notice_banner")
       ) {
         Row(
@@ -322,7 +322,7 @@ private fun CashFlowCard(uiState: HomeDashboardUiState) {
           ) {
             ChartBar(
               fraction = fractionOf(bar.incomeMinor, maxValue),
-              color = extended.accent,
+              color = MaterialTheme.colorScheme.primary,
               modifier = Modifier.weight(1f),
             )
             ChartBar(
@@ -406,7 +406,7 @@ private fun CategoryCard(uiState: HomeDashboardUiState) {
                 Modifier.fillMaxWidth(slice.percentage / 100f)
                   .fillMaxHeight()
                   .clip(RoundedCornerShape(3.dp))
-                  .background(extended.accent)
+                  .background(MaterialTheme.colorScheme.primary)
             )
           }
         }
@@ -596,7 +596,7 @@ private fun QuickAction(
       modifier =
         Modifier.size(SkyplusIconSize.minTouchTarget)
           .clip(CircleShape)
-          .background(extended.accentContainer),
+          .background(MaterialTheme.colorScheme.primaryContainer),
       contentAlignment = Alignment.Center,
     ) {
       SkyplusIconButton(

@@ -26,7 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.core.designsystem.component.BadgeTone
-import com.example.core.designsystem.component.OceanCard
+import com.example.core.designsystem.component.SkyplusSectionCard
 import com.example.core.designsystem.component.OceanStatusBadge
 import com.example.core.designsystem.theme.OceanSpacing
 
@@ -64,7 +64,7 @@ fun LegalConsentPreviewScreen(
       )
     }
 
-    OceanCard {
+    SkyplusSectionCard {
       OceanStatusBadge(text = "Draft Placeholder — Legal Review Required", tone = BadgeTone.WARNING)
       Spacer(modifier = Modifier.height(OceanSpacing.sm))
       Text(
@@ -74,7 +74,7 @@ fun LegalConsentPreviewScreen(
       )
     }
 
-    OceanCard {
+    SkyplusSectionCard {
       Text(
         text = "Consent Audit Model (Scheduled in Phase 1)",
         style = MaterialTheme.typography.titleMedium,
