@@ -35,7 +35,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Compile Debug Kotlin
-        run: ./gradlew :app:compileDebugKotlin
+        run: ./gradlew :app:compileDebugKotlin :keystore-generator:assembleDebug
 
       # Blocking gate: every unit and Robolectric test must pass.
       - name: Run Unit & Robolectric Tests
