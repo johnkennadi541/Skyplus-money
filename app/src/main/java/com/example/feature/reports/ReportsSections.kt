@@ -101,7 +101,7 @@ fun OverviewReportSection(
         text = fmtMoney(nw.netWorthMinor, currency),
         style = MaterialTheme.typography.headlineMedium,
         fontWeight = FontWeight.Bold,
-        color = if (nw.netWorthMinor >= 0L) extended.gold else extended.negative,
+        color = if (nw.netWorthMinor >= 0L) MaterialTheme.colorScheme.primary else extended.negative,
       )
       Spacer(modifier = Modifier.height(OceanSpacing.sm))
       ReportMetricRow(
@@ -178,7 +178,7 @@ fun OverviewReportSection(
         KpiBox(
           title = "Net Savings",
           value = fmtMoney(ie.netSavingsMinor, currency),
-          valueColor = if (ie.netSavingsMinor >= 0L) extended.gold else extended.negative,
+          valueColor = if (ie.netSavingsMinor >= 0L) MaterialTheme.colorScheme.primary else extended.negative,
           modifier = Modifier.weight(1f),
         )
         KpiBox(
@@ -216,7 +216,7 @@ fun IncomeExpenseReportSection(
       ReportMetricRow("Gross Expenses (${report.completedExpenseCount})", fmtMoney(report.grossExpensesMinor, currency))
       ReportMetricRow("Refunds & Reversals (${report.completedRefundCount})", fmtMoney(report.totalRefundsAndReversalsMinor, currency), extended.positive)
       ReportMetricRow("Net Expenses", fmtMoney(report.netExpensesMinor, currency), extended.negative, isBold = true)
-      ReportMetricRow("Net Savings (${report.savingsPercentage.toPlainString()}%)", fmtMoney(report.netSavingsMinor, currency), extended.gold, isBold = true)
+      ReportMetricRow("Net Savings (${report.savingsPercentage.toPlainString()}%)", fmtMoney(report.netSavingsMinor, currency), MaterialTheme.colorScheme.primary, isBold = true)
       Spacer(modifier = Modifier.height(OceanSpacing.xs))
       Row(horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs)) {
         OceanStatusBadge(text = "${report.excludedTransferCount} Transfers Excluded", tone = BadgeTone.INFO)
@@ -291,7 +291,7 @@ fun BudgetReportSection(
       val fraction = (report.utilizationPercent.toFloat() / 100f).coerceIn(0f, 1f)
       LinearProgressIndicator(
         progress = { fraction },
-        color = if (report.overspentBudgetCount > 0) extended.negative else extended.gold,
+        color = if (report.overspentBudgetCount > 0) extended.negative else MaterialTheme.colorScheme.primary,
         trackColor = extended.cardBorder,
         modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
       )
@@ -381,7 +381,7 @@ fun LoansEmiReportSection(
       Spacer(modifier = Modifier.height(OceanSpacing.xs))
       ReportMetricRow("Original Principal", fmtMoney(report.totalPrincipalMinor, currencyCode))
       ReportMetricRow("Outstanding Principal", fmtMoney(report.totalOutstandingMinor, currencyCode), extended.negative, isBold = true)
-      ReportMetricRow("Scheduled Monthly EMI", fmtMoney(report.totalMonthlyEmiMinor, currencyCode), extended.gold)
+      ReportMetricRow("Scheduled Monthly EMI", fmtMoney(report.totalMonthlyEmiMinor, currencyCode), MaterialTheme.colorScheme.primary)
       ReportMetricRow("Period EMI Paid (${report.periodPaymentsCount} payments)", fmtMoney(report.periodTotalEmiPaidMinor, currencyCode), extended.positive)
       ReportMetricRow("Period Interest Paid", fmtMoney(report.periodInterestPaidMinor, currencyCode), extended.warning)
       ReportMetricRow("All-Time Interest Paid", fmtMoney(report.allTimeInterestPaidMinor, currencyCode))
@@ -640,7 +640,7 @@ fun ExportsAndEmailSection(
           horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
           verticalAlignment = Alignment.CenterVertically,
         ) {
-          Icon(icon, contentDescription = null, tint = extended.gold, modifier = Modifier.size(20.dp))
+          Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
           Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
@@ -731,7 +731,7 @@ fun ExportsAndEmailSection(
         }
         Button(
           onClick = { onOpenEmailPreview(recipientDraft) },
-          colors = ButtonDefaults.buttonColors(containerColor = extended.gold, contentColor = Color.Black),
+          colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
           modifier = Modifier.weight(1f).minimumInteractiveComponentSize().testTag("email_preview_send_button"),
         ) {
           Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -751,7 +751,7 @@ private fun EmptyReportCategoryCard(
 ) {
   OceanCard(modifier = modifier.fillMaxWidth()) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Icon(Icons.Rounded.AccountBalance, contentDescription = null, tint = OceanTheme.colors.gold)
+      Icon(Icons.Rounded.AccountBalance, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
       Spacer(modifier = Modifier.width(OceanSpacing.xs))
       Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
     }
