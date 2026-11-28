@@ -432,7 +432,7 @@ fun ProfileScreen(
           style = MaterialTheme.typography.titleMedium,
           color = MaterialTheme.colorScheme.onSurface,
         )
-        OceanStatusBadge(text = "Signed in", tone = BadgeTone.SUCCESS)
+        OceanStatusBadge(text = "Signed in", tone = BadgeTone.POSITIVE)
       }
       Spacer(modifier = Modifier.height(OceanSpacing.xs))
       Text(
