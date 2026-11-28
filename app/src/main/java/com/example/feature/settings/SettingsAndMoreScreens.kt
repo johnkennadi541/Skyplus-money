@@ -179,7 +179,7 @@ fun MoreScreen(
         Icon(
           imageVector = androidx.compose.material.icons.Icons.Rounded.NotificationsActive,
           contentDescription = "Smart Detection",
-          tint = OceanTheme.colors.gold,
+          tint = MaterialTheme.colorScheme.primary,
         )
         Spacer(modifier = Modifier.width(OceanSpacing.sm))
         Column(modifier = Modifier.weight(1f)) {
@@ -452,7 +452,7 @@ fun ProfileScreen(
 
     OceanCard(onClick = onOpenSmartDetection, modifier = Modifier.testTag("profile_notification_item")) {
       Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Icon(imageVector = Icons.Rounded.NotificationsActive, contentDescription = null, tint = OceanTheme.colors.gold)
+        Icon(imageVector = Icons.Rounded.NotificationsActive, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.width(OceanSpacing.sm))
         Column(modifier = Modifier.weight(1f)) {
           Text(text = stringResource(R.string.profile_notification_settings), style = MaterialTheme.typography.titleMedium)
