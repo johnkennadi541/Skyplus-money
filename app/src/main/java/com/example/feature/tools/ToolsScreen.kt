@@ -37,7 +37,6 @@ import androidx.compose.ui.unit.dp
 import com.example.core.designsystem.component.OceanCard
 import com.example.core.designsystem.component.OceanSectionHeader
 import com.example.core.designsystem.theme.OceanSpacing
-import com.example.core.designsystem.theme.OceanTheme
 import com.example.core.designsystem.theme.SkyplusIconSize
 
 /**
@@ -191,7 +190,6 @@ private fun ToolRow(
   testTag: String,
   onClick: () -> Unit,
 ) {
-  val extended = OceanTheme.colors
   Row(
     modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).testTag(testTag),
     verticalAlignment = Alignment.CenterVertically,
@@ -200,7 +198,7 @@ private fun ToolRow(
     Icon(
       imageVector = icon,
       contentDescription = null,
-      tint = extended.accent,
+      tint = MaterialTheme.colorScheme.primary,
       modifier = Modifier.size(SkyplusIconSize.md),
     )
     Column(modifier = Modifier.weight(1f)) {
