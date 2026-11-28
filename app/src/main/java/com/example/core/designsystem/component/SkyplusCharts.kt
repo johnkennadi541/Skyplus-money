@@ -37,12 +37,12 @@ fun SkyplusChartContainer(
   emptyMessage: String = "No data for this period yet.",
   content: @Composable () -> Unit,
 ) {
-  val extended = OceanTheme.colors
+  val colors = MaterialTheme.colorScheme
   Surface(
     modifier = modifier.fillMaxWidth(),
-    shape = MaterialTheme.shapes.medium,
-    color = extended.cardSubtle,
-    border = BorderStroke(1.dp, extended.cardBorder.copy(alpha = 0.75f)),
+    shape = MaterialTheme.shapes.large,
+    color = colors.surface,
+    border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.72f)),
     shadowElevation = SkyplusElevation.low,
   ) {
     Column(modifier = Modifier.padding(OceanSpacing.md)) {

@@ -246,6 +246,7 @@ private fun SummaryCard(uiState: HomeDashboardUiState, onOpenAccounts: () -> Uni
     amount = uiState.totalBalanceText,
     caption = "Across your active accounts",
     icon = Icons.Rounded.AccountBalanceWallet,
+    isHero = true,
     onClick = onOpenAccounts,
     modifier = Modifier.testTag("home_total_balance_card"),
   )

@@ -433,7 +433,7 @@ fun LoanDetailContent(
                   text =
                     "Interest: ${FormatMoneyUseCase().format(Money.fromMinorUnits(payment.interestComponentMinor, payment.currencyCode))}",
                   style = MaterialTheme.typography.bodySmall,
-                  color = OceanTheme.colors.gold,
+                  color = MaterialTheme.colorScheme.primary,
                 )
               }
               Text(
@@ -511,7 +511,7 @@ fun LoanDetailContent(
                 Text(
                   text = "Interest Component: ${FormatMoneyUseCase().format(bd.interestComponentMoney)}",
                   style = MaterialTheme.typography.bodySmall,
-                  color = OceanTheme.colors.gold,
+                  color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
                   text = "New Remaining Balance: ${FormatMoneyUseCase().format(bd.remainingBalanceMoney)}",

@@ -48,12 +48,12 @@ val OceanGoldBright = SkyplusYellowBright
 val OceanGoldDeep = SkyplusYellowDeep
 
 // Light theme surfaces
-val OceanMistBackground = Color(0xFFF3F8FC)
+val OceanMistBackground = Color(0xFFF8FAFC)
 val OceanMistSurface = Color(0xFFFFFFFF)
-val OceanMistCardSubtle = Color(0xFFE9F2F9)
-val OceanMistBorder = Color(0xFFCBDCEB)
+val OceanMistCardSubtle = Color(0xFFFFFFFF)
+val OceanMistBorder = Color(0xFFE2E8F0)
 val OceanTextDark = Color(0xFF091E32)
-val OceanTextMutedLight = Color(0xFF47637E)
+val OceanTextMutedLight = Color(0xFF64748B)
 
 // Dark theme text
 val OceanTextLight = Color(0xFFF1F6FB)

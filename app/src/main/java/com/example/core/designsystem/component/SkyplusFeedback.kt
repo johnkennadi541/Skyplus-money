@@ -159,9 +159,9 @@ fun SkyplusSkeletonBlock(
 fun SkyplusSkeletonCard(modifier: Modifier = Modifier) {
   Surface(
     modifier = modifier.fillMaxWidth(),
-    shape = MaterialTheme.shapes.medium,
-    color = OceanTheme.colors.cardSubtle,
-    border = BorderStroke(1.dp, OceanTheme.colors.cardBorder.copy(alpha = 0.6f)),
+    shape = MaterialTheme.shapes.large,
+    color = MaterialTheme.colorScheme.surface,
+    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
     shadowElevation = SkyplusElevation.low,
   ) {
     Column(modifier = Modifier.padding(OceanSpacing.md)) {

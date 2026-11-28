@@ -31,8 +31,8 @@ import com.example.core.designsystem.theme.SkyplusSizes
  * Stage 1 button set. One place decides height, radius, padding and colours so screens never
  * hand-roll a button again.
  *
- * The accent (yellow) is the primary action colour; navy text on yellow keeps contrast above the
- * accessibility threshold in both themes.
+ * Primary actions use the brand primary for predictable hierarchy. Yellow is reserved for
+ * restrained highlights and warning semantics, never used as a blanket action colour.
  */
 @Composable
 fun SkyplusPrimaryButton(
@@ -48,16 +48,16 @@ fun SkyplusPrimaryButton(
     onClick = onClick,
     modifier = modifier.defaultMinSize(minHeight = SkyplusSizes.buttonHeight),
     enabled = enabled && !loading,
-    shape = MaterialTheme.shapes.small,
+    shape = MaterialTheme.shapes.medium,
     colors =
       ButtonDefaults.buttonColors(
-        containerColor = colors.tertiary,
-        contentColor = colors.onTertiary,
-        disabledContainerColor = colors.tertiary.copy(alpha = 0.38f),
-        disabledContentColor = colors.onTertiary.copy(alpha = 0.6f),
+        containerColor = colors.primary,
+        contentColor = colors.onPrimary,
+        disabledContainerColor = colors.primary.copy(alpha = 0.38f),
+        disabledContentColor = colors.onPrimary.copy(alpha = 0.6f),
       ),
   ) {
-    ButtonContent(text = text, loading = loading, icon = icon, tint = colors.onTertiary)
+    ButtonContent(text = text, loading = loading, icon = icon, tint = colors.onPrimary)
   }
 }
 
@@ -75,7 +75,7 @@ fun SkyplusSecondaryButton(
     onClick = onClick,
     modifier = modifier.defaultMinSize(minHeight = SkyplusSizes.buttonHeight),
     enabled = enabled && !loading,
-    shape = MaterialTheme.shapes.small,
+    shape = MaterialTheme.shapes.medium,
     border = BorderStroke(1.dp, colors.outline),
     colors =
       ButtonDefaults.outlinedButtonColors(
@@ -113,7 +113,7 @@ fun SkyplusDestructiveButton(
     onClick = onClick,
     modifier = modifier.defaultMinSize(minHeight = SkyplusSizes.buttonHeight),
     enabled = enabled,
-    shape = MaterialTheme.shapes.small,
+    shape = MaterialTheme.shapes.medium,
     colors =
       ButtonDefaults.buttonColors(
         containerColor = colors.error,

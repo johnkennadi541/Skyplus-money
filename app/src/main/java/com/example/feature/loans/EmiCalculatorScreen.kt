@@ -156,7 +156,7 @@ fun EmiCalculatorContent(
       Icon(
         imageVector = Icons.Rounded.Calculate,
         contentDescription = null,
-        tint = OceanTheme.colors.gold,
+        tint = MaterialTheme.colorScheme.primary,
         modifier = Modifier.size(28.dp),
       )
     }
@@ -341,7 +341,7 @@ fun EmiCalculatorContent(
                   text = FormatMoneyUseCase().format(result.totalInterestMoney),
                   style = MaterialTheme.typography.titleSmall,
                   fontWeight = FontWeight.SemiBold,
-                  color = OceanTheme.colors.gold,
+                  color = MaterialTheme.colorScheme.primary,
                   modifier = Modifier.testTag("emi_total_interest_result"),
                 )
               }
@@ -382,7 +382,7 @@ fun EmiCalculatorContent(
                 Text(
                   text = "Interest: ${result.interestSharePercent}%",
                   style = MaterialTheme.typography.labelSmall,
-                  color = OceanTheme.colors.gold,
+                  color = MaterialTheme.colorScheme.primary,
                 )
               }
               Row(
@@ -403,7 +403,7 @@ fun EmiCalculatorContent(
                     modifier =
                       Modifier.fillMaxHeight()
                         .weight(interestWeight)
-                        .background(OceanTheme.colors.gold)
+                        .background(MaterialTheme.colorScheme.primary)
                   )
                 }
               }

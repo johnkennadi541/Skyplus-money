@@ -179,7 +179,7 @@ fun MoreScreen(
         Icon(
           imageVector = androidx.compose.material.icons.Icons.Rounded.NotificationsActive,
           contentDescription = "Smart Detection",
-          tint = OceanTheme.colors.gold,
+          tint = MaterialTheme.colorScheme.primary,
         )
         Spacer(modifier = Modifier.width(OceanSpacing.sm))
         Column(modifier = Modifier.weight(1f)) {
@@ -317,11 +317,18 @@ fun SettingsScreen(
           contentDescription = stringResource(R.string.cd_navigate_back),
         )
       }
-      Text(
-        text = stringResource(R.string.settings_title),
-        style = MaterialTheme.typography.headlineSmall,
-        color = MaterialTheme.colorScheme.onBackground,
-      )
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = stringResource(R.string.settings_title),
+          style = MaterialTheme.typography.headlineSmall,
+          color = MaterialTheme.colorScheme.onBackground,
+        )
+        Text(
+          text = "Personalise your SKYPLUS MONEY experience",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
     }
 
     OceanCard {
@@ -400,19 +407,33 @@ fun ProfileScreen(
           contentDescription = stringResource(R.string.cd_navigate_back),
         )
       }
-      Text(
-        text = stringResource(R.string.profile_title),
-        style = MaterialTheme.typography.headlineSmall,
-        color = MaterialTheme.colorScheme.onBackground,
-      )
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = stringResource(R.string.profile_title),
+          style = MaterialTheme.typography.headlineSmall,
+          color = MaterialTheme.colorScheme.onBackground,
+        )
+        Text(
+          text = "Your account, security and preferences",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
     }
 
     OceanCard(modifier = Modifier.testTag("profile_account_details_card")) {
-      Text(
-        text = stringResource(R.string.profile_account_details),
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurface,
-      )
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+      ) {
+        Text(
+          text = stringResource(R.string.profile_account_details),
+          style = MaterialTheme.typography.titleMedium,
+          color = MaterialTheme.colorScheme.onSurface,
+        )
+        OceanStatusBadge(text = "Signed in", tone = BadgeTone.POSITIVE)
+      }
       Spacer(modifier = Modifier.height(OceanSpacing.xs))
       Text(
         text = authenticatedUser?.email?.ifBlank { "Authenticated User" } ?: "Authenticated User",
@@ -452,7 +473,7 @@ fun ProfileScreen(
 
     OceanCard(onClick = onOpenSmartDetection, modifier = Modifier.testTag("profile_notification_item")) {
       Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Icon(imageVector = Icons.Rounded.NotificationsActive, contentDescription = null, tint = OceanTheme.colors.gold)
+        Icon(imageVector = Icons.Rounded.NotificationsActive, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.width(OceanSpacing.sm))
         Column(modifier = Modifier.weight(1f)) {
           Text(text = stringResource(R.string.profile_notification_settings), style = MaterialTheme.typography.titleMedium)

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -271,7 +272,7 @@ private fun GoalCard(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
           )
-          Spacer(modifier = Modifier.height(OceanSpacing.xxs))
+          Spacer(modifier = Modifier.width(OceanSpacing.xxs))
           if (summary.isComplete) {
             OceanStatusBadge(
               text = if (summary.isOverTarget) "Over target" else "Complete",
@@ -358,7 +359,7 @@ private fun GoalCard(
     LinearProgressIndicator(
       progress = { progress },
       modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-      color = if (summary.isComplete) extended.positive else MaterialTheme.colorScheme.tertiary,
+      color = if (summary.isComplete) extended.positive else MaterialTheme.colorScheme.primary,
       trackColor = MaterialTheme.colorScheme.surfaceVariant,
     )
     Spacer(modifier = Modifier.height(OceanSpacing.xxs))

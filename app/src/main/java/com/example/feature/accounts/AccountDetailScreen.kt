@@ -122,7 +122,7 @@ fun AccountDetailScreen(
                 Text(
                   text = formattedCurrent,
                   style = OceanNumericStyle,
-                  color = if (account.currentBalanceMinor >= 0) OceanTheme.colors.gold else OceanTheme.colors.negative,
+                  color = if (account.currentBalanceMinor >= 0) MaterialTheme.colorScheme.primary else OceanTheme.colors.negative,
                 )
               }
               OceanStatusBadge(

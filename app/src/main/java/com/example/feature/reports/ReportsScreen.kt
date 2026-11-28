@@ -308,7 +308,7 @@ fun ReportsContent(
                 Icon(
                   imageVector = Icons.Rounded.Assessment,
                   contentDescription = null,
-                  tint = OceanTheme.colors.gold,
+                  tint = MaterialTheme.colorScheme.primary,
                   modifier = Modifier.size(44.dp),
                 )
                 Spacer(modifier = Modifier.height(OceanSpacing.sm))
@@ -412,7 +412,7 @@ fun ReportsContent(
       confirmButton = {
         Button(
           onClick = onConfirmSendEmail,
-          colors = ButtonDefaults.buttonColors(containerColor = OceanTheme.colors.gold, contentColor = Color.Black),
+          colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
           modifier = Modifier.testTag("confirm_launch_email_button"),
         ) {
           Text("Open Email App", fontWeight = FontWeight.Bold)

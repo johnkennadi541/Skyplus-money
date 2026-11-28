@@ -172,7 +172,7 @@ private fun DedicatedLedgerTypeScreen(
     floatingActionButton = {
       FloatingActionButton(
         onClick = { isAddOpen = true },
-        containerColor = OceanTheme.colors.gold,
+        containerColor = MaterialTheme.colorScheme.primary,
         contentColor = Color.Black,
         modifier = Modifier.testTag("${testTag}_add_fab"),
       ) {
@@ -235,7 +235,7 @@ private fun DedicatedLedgerTypeScreen(
                     Text(
                       text = FormatMoneyUseCase().format(totalMoney),
                       style = OceanNumericStyle,
-                      color = if (targetType == TransactionType.INCOME) OceanTheme.colors.positive else OceanTheme.colors.gold,
+                      color = if (targetType == TransactionType.INCOME) OceanTheme.colors.positive else MaterialTheme.colorScheme.primary,
                     )
                   }
                 }

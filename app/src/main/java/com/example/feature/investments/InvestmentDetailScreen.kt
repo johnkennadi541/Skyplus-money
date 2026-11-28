@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
@@ -223,7 +224,7 @@ fun InvestmentDetailContent(
             if (performance.isPriceStale) {
               OceanStatusBadge(text = "Stale Price >7d", tone = BadgeTone.WARNING)
             } else if (performance.isFullyExited) {
-              OceanStatusBadge(text = "Fully Exited", tone = BadgeTone.GOLD)
+              OceanStatusBadge(text = "Fully Exited", tone = BadgeTone.INFO)
             } else {
               OceanStatusBadge(text = holding.lastPriceSource.displayName, tone = BadgeTone.POSITIVE)
             }
@@ -345,7 +346,7 @@ fun InvestmentDetailContent(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
               OceanStatusBadge(
                 text = tx.type.displayName.uppercase(),
-                tone = if (tx.type == InvestmentTransactionType.BUY) BadgeTone.INFO else BadgeTone.GOLD,
+                tone = BadgeTone.INFO,
               )
               Text(
                 text = dateFormatter.format(Date(tx.transactionDate)),
@@ -518,6 +519,8 @@ private fun DetailMetricRow(
       text = value,
       style = MaterialTheme.typography.bodySmall,
       fontWeight = FontWeight.SemiBold,
+      textAlign = TextAlign.End,
+      modifier = Modifier.weight(1.4f),
       color = highlightColor ?: MaterialTheme.colorScheme.onSurface,
     )
   }

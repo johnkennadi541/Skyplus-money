@@ -49,15 +49,16 @@ fun OceanCard(
   onClick: (() -> Unit)? = null,
   content: @Composable ColumnScope.() -> Unit,
 ) {
-  val extended = OceanTheme.colors
-  val containerColor = extended.cardSubtle
-  val border = BorderStroke(1.dp, extended.cardBorder.copy(alpha = 0.75f))
+  // Neutral, elevated surface: financial figures stay readable without heavy tinted cards.
+  // Material theme tokens keep this consistent in both light and dark modes.
+  val containerColor = MaterialTheme.colorScheme.surface
+  val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
 
   if (onClick != null) {
     Card(
       onClick = onClick,
       modifier = modifier.fillMaxWidth(),
-      shape = MaterialTheme.shapes.medium,
+      shape = MaterialTheme.shapes.large,
       colors = CardDefaults.cardColors(containerColor = containerColor),
       border = border,
       elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -120,10 +121,11 @@ fun OceanSectionHeader(
     Text(
       text = title,
       style = MaterialTheme.typography.titleLarge,
-      color = MaterialTheme.colorScheme.onBackground,
+      color = MaterialTheme.colorScheme.onSurface,
+      fontWeight = FontWeight.SemiBold,
     )
     if (subtitle != null) {
-      Spacer(modifier = Modifier.height(2.dp))
+      Spacer(modifier = Modifier.height(4.dp))
       Text(
         text = subtitle,
         style = MaterialTheme.typography.bodySmall,

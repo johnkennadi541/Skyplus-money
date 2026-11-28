@@ -216,19 +216,21 @@ fun ShoppingListContent(
         .testTag("shopping_screen"),
     verticalArrangement = Arrangement.spacedBy(OceanSpacing.sm),
   ) {
-    // Header
-    Row(
+    // Header and actions are stacked to keep the title readable on narrow screens.
+    Column(
       modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.SpaceBetween,
-      verticalAlignment = Alignment.CenterVertically,
+      verticalArrangement = Arrangement.spacedBy(OceanSpacing.xs),
     ) {
       OceanSectionHeader(
         title = stringResource(R.string.shopping_title),
         subtitle = stringResource(R.string.shopping_subtitle),
-        modifier = Modifier.weight(1f),
+        modifier = Modifier.fillMaxWidth(),
       )
-      Spacer(modifier = Modifier.width(OceanSpacing.xs))
-      Row(horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs)) {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
         OutlinedButton(
           onClick = { showCreateListDialog = true },
           modifier = Modifier.minimumInteractiveComponentSize().testTag("create_shopping_list_button"),
@@ -238,6 +240,7 @@ fun ShoppingListContent(
           Text("New List")
         }
         if (activeList != null) {
+          Spacer(modifier = Modifier.width(OceanSpacing.xs))
           Button(
             onClick = { showAddItemDialog = true },
             modifier = Modifier.minimumInteractiveComponentSize().testTag("add_shopping_item_button"),
@@ -833,7 +836,7 @@ private fun ShoppingListItemCard(
         ) {
           OceanStatusBadge(text = item.category, tone = BadgeTone.INFO)
           item.storeName?.let { store ->
-            OceanStatusBadge(text = store, tone = BadgeTone.GOLD)
+            OceanStatusBadge(text = store, tone = BadgeTone.INFO)
           }
           if (item.isPurchased && comparison?.savingsOrOverspendMinor != null) {
             val diff = comparison.savingsOrOverspendMinor

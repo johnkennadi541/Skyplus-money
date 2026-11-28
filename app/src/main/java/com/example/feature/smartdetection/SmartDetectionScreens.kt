@@ -198,7 +198,7 @@ fun SmartDetectionSettingsScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs)) {
               Button(
                 onClick = { viewModel.openNotificationSettings() },
-                colors = ButtonDefaults.buttonColors(containerColor = OceanTheme.colors.gold, contentColor = Color.Black),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                 modifier = Modifier.weight(1f).testTag("enable_notification_access_button"),
               ) {
                 Text("Grant Access")
@@ -284,7 +284,7 @@ fun SmartDetectionSettingsScreen(
             verticalAlignment = Alignment.CenterVertically,
           ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-              Icon(Icons.Rounded.RateReview, contentDescription = null, tint = OceanTheme.colors.gold)
+              Icon(Icons.Rounded.RateReview, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
               Spacer(modifier = Modifier.width(OceanSpacing.sm))
               Column {
                 Text("Review Queue", style = MaterialTheme.typography.titleMedium)
@@ -317,7 +317,7 @@ fun SmartDetectionSettingsScreen(
                 Text("Map account hints (last 4 digits) to SKYPLUS accounts", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
               }
             }
-            Text("Manage →", style = MaterialTheme.typography.labelMedium, color = OceanTheme.colors.gold)
+            Text("Manage →", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
           }
         }
       }
@@ -340,7 +340,7 @@ fun SmartDetectionSettingsScreen(
                 Text("Audit log of auto-saved, reviewed, and duplicate events", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
               }
             }
-            Text("View →", style = MaterialTheme.typography.labelMedium, color = OceanTheme.colors.gold)
+            Text("View →", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
           }
         }
       }
@@ -442,7 +442,7 @@ fun NotificationAccessSetupScreen(
     ) {
       OceanCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
-          Icon(Icons.Rounded.NotificationsActive, contentDescription = null, tint = OceanTheme.colors.gold, modifier = Modifier.size(32.dp))
+          Icon(Icons.Rounded.NotificationsActive, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
           Spacer(modifier = Modifier.width(OceanSpacing.sm))
           Column {
             Text(
@@ -484,7 +484,7 @@ fun NotificationAccessSetupScreen(
 
       Button(
         onClick = { viewModel.openNotificationSettings() },
-        colors = ButtonDefaults.buttonColors(containerColor = OceanTheme.colors.gold, contentColor = Color.Black),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
         modifier = Modifier.fillMaxWidth().testTag("open_system_notification_settings_btn"),
       ) {
         Text(if (isPermGranted) "Manage Android Notification Settings" else "Enable Notification Access in Settings")
@@ -557,7 +557,7 @@ fun SmsPolicyStatusScreen(
 
       Button(
         onClick = onOpenNotificationSetup,
-        colors = ButtonDefaults.buttonColors(containerColor = OceanTheme.colors.gold, contentColor = Color.Black),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
         modifier = Modifier.fillMaxWidth(),
       ) {
         Text("Use Notification Detection Instead")
@@ -675,7 +675,7 @@ fun ReviewQueueItemCard(
       Text(
         text = formattedAmount,
         style = OceanNumericStyle,
-        color = OceanTheme.colors.gold,
+        color = MaterialTheme.colorScheme.primary,
       )
     }
 
@@ -721,7 +721,7 @@ fun ReviewQueueItemCard(
       Spacer(modifier = Modifier.width(OceanSpacing.xs))
       Button(
         onClick = onApprove,
-        colors = ButtonDefaults.buttonColors(containerColor = OceanTheme.colors.gold, contentColor = Color.Black),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
         modifier = Modifier.testTag("approve_review_${item.id}"),
       ) {
         Text("Review & Correct")
@@ -903,7 +903,7 @@ fun AccountMappingScreen(
     floatingActionButton = {
       Button(
         onClick = { isAddDialogOpen = true },
-        colors = ButtonDefaults.buttonColors(containerColor = OceanTheme.colors.gold, contentColor = Color.Black),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
         modifier = Modifier.testTag("add_mapping_rule_button"),
       ) {
         Text("+ Add Mapping Rule")
@@ -1080,7 +1080,7 @@ fun DetectionHistoryScreen(
                 Text(event.detectedMerchant ?: event.senderOrTitle, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Text("From: ${event.rawPackageName} • $dateStr", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
               }
-              Text(formattedAmount, style = OceanNumericStyle, color = OceanTheme.colors.gold)
+              Text(formattedAmount, style = OceanNumericStyle, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(OceanSpacing.xs))
             Row(horizontalArrangement = Arrangement.spacedBy(OceanSpacing.xs)) {

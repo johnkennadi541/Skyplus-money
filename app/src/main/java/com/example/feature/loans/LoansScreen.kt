@@ -233,7 +233,7 @@ fun LoansContent(
               Icon(
                 imageVector = Icons.Rounded.Calculate,
                 contentDescription = stringResource(R.string.cd_emi_calculator),
-                tint = OceanTheme.colors.gold,
+                tint = MaterialTheme.colorScheme.primary,
               )
             }
             Button(
@@ -414,7 +414,7 @@ fun LoansContent(
               Icon(
                 imageVector = Icons.Rounded.AccountBalance,
                 contentDescription = null,
-                tint = OceanTheme.colors.gold,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(48.dp),
               )
               Spacer(modifier = Modifier.height(OceanSpacing.sm))

@@ -21,6 +21,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -28,6 +30,7 @@ import com.example.core.designsystem.theme.OceanSpacing
 import com.example.core.designsystem.theme.OceanTheme
 import com.example.core.designsystem.theme.SkyplusElevation
 import com.example.core.designsystem.theme.SkyplusIconSize
+import com.example.core.designsystem.theme.SkyplusYellowBright
 
 /** Tone of a delta or trend line: colour only, the wording stays neutral and factual. */
 enum class SkyplusDeltaTone {
@@ -49,6 +52,7 @@ fun SkyplusFinancialSummaryCard(
   delta: String? = null,
   deltaTone: SkyplusDeltaTone = SkyplusDeltaTone.NEUTRAL,
   icon: ImageVector? = null,
+  isHero: Boolean = false,
   onClick: (() -> Unit)? = null,
 ) {
   val colors = MaterialTheme.colorScheme
@@ -61,7 +65,19 @@ fun SkyplusFinancialSummaryCard(
     }
 
   val content: @Composable () -> Unit = {
-    Column(modifier = Modifier.padding(OceanSpacing.md)) {
+    Column(
+      modifier =
+        Modifier.fillMaxWidth()
+          .background(
+            Brush.horizontalGradient(
+              listOf(
+                if (isHero) extended.heroGradientStart else colors.surface,
+                if (isHero) extended.heroGradientEnd else colors.surface,
+              )
+            )
+          )
+          .padding(OceanSpacing.md)
+    ) {
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -70,7 +86,7 @@ fun SkyplusFinancialSummaryCard(
         Text(
           text = label,
           style = MaterialTheme.typography.labelMedium,
-          color = colors.onSurfaceVariant,
+          color = if (isHero) Color.White.copy(alpha = 0.78f) else colors.onSurfaceVariant,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
           modifier = Modifier.weight(1f),
@@ -80,13 +96,15 @@ fun SkyplusFinancialSummaryCard(
             modifier =
               Modifier.size(SkyplusIconSize.lg)
                 .clip(CircleShape)
-                .background(extended.accent.copy(alpha = 0.14f)),
+                .background(
+                  (if (isHero) SkyplusYellowBright else extended.accent).copy(alpha = 0.16f)
+                ),
             contentAlignment = Alignment.Center,
           ) {
             Icon(
               imageVector = icon,
               contentDescription = null,
-              tint = extended.accent,
+              tint = if (isHero) SkyplusYellowBright else extended.accent,
               modifier = Modifier.size(SkyplusIconSize.sm),
             )
           }
@@ -96,7 +114,7 @@ fun SkyplusFinancialSummaryCard(
       Text(
         text = amount,
         style = MaterialTheme.typography.headlineMedium,
-        color = colors.onSurface,
+        color = if (isHero) Color.White else colors.onSurface,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
@@ -117,7 +135,7 @@ fun SkyplusFinancialSummaryCard(
             Text(
               text = caption,
               style = MaterialTheme.typography.labelSmall,
-              color = colors.onSurfaceVariant,
+              color = if (isHero) Color.White.copy(alpha = 0.76f) else colors.onSurfaceVariant,
               maxLines = 1,
               overflow = TextOverflow.Ellipsis,
             )
@@ -131,19 +149,19 @@ fun SkyplusFinancialSummaryCard(
     Card(
       onClick = onClick,
       modifier = modifier.fillMaxWidth(),
-      shape = MaterialTheme.shapes.medium,
-      colors = CardDefaults.cardColors(containerColor = extended.cardSubtle),
-      border = BorderStroke(1.dp, extended.cardBorder.copy(alpha = 0.75f)),
-      elevation = CardDefaults.cardElevation(defaultElevation = SkyplusElevation.medium),
+      shape = MaterialTheme.shapes.large,
+      colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+      border = if (isHero) null else BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.72f)),
+      elevation = CardDefaults.cardElevation(defaultElevation = if (isHero) SkyplusElevation.medium else SkyplusElevation.low),
       content = { content() },
     )
   } else {
     Card(
       modifier = modifier.fillMaxWidth(),
-      shape = MaterialTheme.shapes.medium,
-      colors = CardDefaults.cardColors(containerColor = extended.cardSubtle),
-      border = BorderStroke(1.dp, extended.cardBorder.copy(alpha = 0.75f)),
-      elevation = CardDefaults.cardElevation(defaultElevation = SkyplusElevation.medium),
+      shape = MaterialTheme.shapes.large,
+      colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+      border = if (isHero) null else BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.72f)),
+      elevation = CardDefaults.cardElevation(defaultElevation = if (isHero) SkyplusElevation.medium else SkyplusElevation.low),
       content = { content() },
     )
   }
